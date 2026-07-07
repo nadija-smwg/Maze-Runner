@@ -382,7 +382,7 @@ void loop() {
   // --- Test Sequence: Reverse ---
   Serial.println("Moving: REVERSE");
   robotReverse(2500); // 50% Speed
-  delay(1500);
+  // delay(1500);
   printStats();
 
   // --- Test Sequence: Stop ---

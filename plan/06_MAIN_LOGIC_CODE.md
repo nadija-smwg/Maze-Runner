@@ -222,54 +222,55 @@ void updateWallMap(SensorData& s) {
 
 ```cpp
 // ---- PIN DEFINITIONS ----
+// Updated to match actual tested hardware wiring
 
-#define PWMA PA6
-#define AIN1 PB0
-#define AIN2 PB1
-#define PWMB PA7
-#define BIN1 PB4
-#define BIN2 PB5
-#define STBY PB6
+#define PWMA PA8      // TIM1 CH1 — 20kHz PWM (register-level)
+#define AIN1 PB12
+#define AIN2 PB13
+#define PWMB PA9      // TIM1 CH2 — 20kHz PWM (register-level)
+#define BIN1 PB15
+#define BIN2 PA10
+#define STBY PB14
 
-#define ENC_LA PA0
-#define ENC_LB PA1
-#define ENC_RA PA2
-#define ENC_RB PA3
+// Encoders use hardware encoder mode (TIM2/TIM3), NOT software ISR
+// Left:  PA0/PA1 → TIM2 CH1/CH2 (32-bit counter)
+// Right: PA6/PA7 → TIM3 CH1/CH2 (16-bit counter)
 
 // ---- ROBOT PARAMETERS (TUNE THESE!) ----
 
 #define WHEEL_DIAMETER_MM  34.0
 #define WHEELBASE_MM       70.0    // Center-to-center wheel distance
-#define ENCODER_CPR        210.0   // Counts per revolution
+#define ENCODER_CPR        600.0   // Counts per revolution (hardware encoder mode)
 
-#define MM_PER_COUNT  (PI * WHEEL_DIAMETER_MM / ENCODER_CPR)
-#define CELL_SIZE_MM  180.0        // IEEE maze cell size
+#define MM_PER_COUNT  0.178f        // Calibrated: mm per encoder count
+#define CELL_SIZE_MM  180.0         // IEEE maze cell size
 
 // ---- PID GAINS ----
 
-float Kp_speed = 2.5, Ki_speed = 0.8, Kd_speed = 0.1;  // Motor speed PID
+float Kp_speed = 1.8, Ki_speed = 0.8, Kd_speed = 0.02;  // Motor speed PID
 float Kp_straight = 3.0;   // Straight-line correction gain
 float Kp_turn = 2.0;        // Turn PID gain
 
-volatile long encoderL = 0;
-volatile long encoderR = 0;
-
-void encoderL_ISR() { encoderL += (digitalRead(ENC_LB) == HIGH) ? 1 : -1; }
-void encoderR_ISR() { encoderR += (digitalRead(ENC_RB) == HIGH) ? -1 : 1; }
+// Encoder state (hardware encoder mode — reads TIM registers directly)
+int32_t lastLeftCount = 0;
+int16_t lastRightCount = 0;
+int32_t totalLeftCount = 0;
+int32_t totalRightCount = 0;
 
 void setMotors(int speedL, int speedR) {
-  speedL = constrain(speedL, -255, 255);
-  speedR = constrain(speedR, -255, 255);
+  // PWM range 0-4999 for register-level TIM1
+  speedL = constrain(speedL, -4999, 4999);
+  speedR = constrain(speedR, -4999, 4999);
   
   // Left motor (Motor A)
   digitalWrite(AIN1, speedL >= 0 ? HIGH : LOW);
   digitalWrite(AIN2, speedL >= 0 ? LOW : HIGH);
-  analogWrite(PWMA, abs(speedL));
+  TIM1->CCR1 = abs(speedL);
   
   // Right motor (Motor B)  
   digitalWrite(BIN1, speedR >= 0 ? HIGH : LOW);
   digitalWrite(BIN2, speedR >= 0 ? LOW : HIGH);
-  analogWrite(PWMB, abs(speedR));
+  TIM1->CCR2 = abs(speedR);
 }
 
 float readGyroYaw() {
@@ -293,26 +294,26 @@ float corridorCenterCorrection(SensorData& s) {
 
 // Move forward exactly one cell (180mm)
 void moveForward() {
-  long startL = encoderL;
-  long startR = encoderR;
+  // Read encoder starting positions from hardware timer registers
+  int32_t startL = (int32_t)TIM2->CNT;
+  int16_t startR = (int16_t)TIM3->CNT;
   long targetCounts = (long)(CELL_SIZE_MM / MM_PER_COUNT);
   
   float yawRef = 0;  // Gyro reference (reset to 0 for each move)
-  mpu.resetFIFO();
   
-  int baseSpeed = 150;  // PWM speed during straight move
+  int baseSpeed = 2500;  // PWM speed during straight move (0-4999 range)
   unsigned long lastTime = millis();
   
   while (true) {
-    long dL = encoderL - startL;
-    long dR = encoderR - startR;
-    long avgCount = (dL + dR) / 2;
+    int32_t dL = (int32_t)TIM2->CNT - startL;
+    int32_t dR = (int32_t)(int16_t)TIM3->CNT - (int32_t)startR;
+    long avgCount = (abs(dL) + abs(dR)) / 2;
     
     if (avgCount >= targetCounts) break;
     
     // Decelerate when approaching end
     float progress = (float)avgCount / targetCounts;
-    int speed = (progress > 0.8) ? 80 : baseSpeed;
+    int speed = (progress > 0.8) ? 1200 : baseSpeed;
     
     // Gyro-based straight correction
     unsigned long now = millis();
@@ -463,10 +464,10 @@ using namespace std;
 
 // ... (all definitions and functions from above) ...
 
-#define XSHUT_1 PC13
-#define XSHUT_2 PC14
-#define XSHUT_3 PC15
-#define BTN_START PA8
+#define XSHUT_1 PA4
+#define XSHUT_2 PA5
+#define XSHUT_3 PB3
+#define BTN_START PB5
 
 enum RobotState { IDLE, EXPLORING, RETURNING, SPEED_RUN, DONE };
 RobotState state = IDLE;
@@ -504,15 +505,18 @@ void initSensors() {
 }
 
 void initMotors() {
+  // Motor direction pins
   pinMode(AIN1, OUTPUT); pinMode(AIN2, OUTPUT);
   pinMode(BIN1, OUTPUT); pinMode(BIN2, OUTPUT);
-  pinMode(STBY, OUTPUT); pinMode(PWMA, OUTPUT); pinMode(PWMB, OUTPUT);
+  pinMode(STBY, OUTPUT);
   digitalWrite(STBY, HIGH);
   
-  pinMode(ENC_LA, INPUT_PULLUP); pinMode(ENC_LB, INPUT_PULLUP);
-  pinMode(ENC_RA, INPUT_PULLUP); pinMode(ENC_RB, INPUT_PULLUP);
-  attachInterrupt(digitalPinToInterrupt(ENC_LA), encoderL_ISR, RISING);
-  attachInterrupt(digitalPinToInterrupt(ENC_RA), encoderR_ISR, RISING);
+  // Setup TIM1 for 20kHz PWM (register-level) — see Testing Codes/2.Motors_Advanced
+  setupPWM();  // Register-level TIM1 CH1/CH2 on PA8/PA9
+  
+  // Setup hardware encoder mode — see Testing Codes/3.Motors_With_Encoders
+  setupLeftEncoder();   // TIM2 on PA0/PA1 (32-bit)
+  setupRightEncoder();  // TIM3 on PA6/PA7 (16-bit)
 }
 
 void setup() {

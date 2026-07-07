@@ -5,32 +5,34 @@
 
 ## Pin Assignment Table (STM32F411CEU6)
 
+> [!NOTE]
+> **Updated to match actual tested hardware wiring** (confirmed by working Testing Codes).
+> Motor PWM uses TIM1 (PA8/PA9) at 20kHz register-level PWM.
+> Encoders use TIM2/TIM3 hardware encoder mode (not software EXTI interrupts).
+
 | STM32 Pin | Function | Connected To | Notes |
 |-----------|----------|--------------|-------|
-| **PA0** | ENC_LA | Left Motor Encoder A | EXTI0 — hardware interrupt |
-| **PA1** | ENC_LB | Left Motor Encoder B | EXTI1 — hardware interrupt |
-| **PA2** | ENC_RA | Right Motor Encoder A | EXTI2 — hardware interrupt |
-| **PA3** | ENC_RB | Right Motor Encoder B | EXTI3 — hardware interrupt |
-| **PA6** | PWM_A | TB6612FNG PWMA | Timer3 CH1 — PWM output |
-| **PA7** | PWM_B | TB6612FNG PWMB | Timer3 CH2 — PWM output |
-| **PB0** | AIN1 | TB6612FNG AIN1 | Digital output |
-| **PB1** | AIN2 | TB6612FNG AIN2 | Digital output |
-| **PB4** | BIN1 | TB6612FNG BIN1 | Digital output |
-| **PB5** | BIN2 | TB6612FNG BIN2 | Digital output |
-| **PB6** | STBY | TB6612FNG STBY | HIGH = enabled |
-| **PB8** | SCL | I2C1 Clock | MPU6050 + All VL53L0X |
-| **PB9** | SDA | I2C1 Data | MPU6050 + All VL53L0X |
-| **PC13** | XSHUT_1 | VL53L0X #1 XSHUT | Active LOW shutdown |
-| **PC14** | XSHUT_2 | VL53L0X #2 XSHUT | Active LOW shutdown |
-| **PC15** | XSHUT_3 | VL53L0X #3 XSHUT | Active LOW shutdown |
-| **PB12** | XSHUT_4 | VL53L0X #4 XSHUT | Only for 5-sensor config |
-| **PB13** | XSHUT_5 | VL53L0X #5 XSHUT | Only for 5-sensor config |
-| **PA8** | BTN_START | Push Button 1 | INPUT_PULLUP |
-| **PA9** | BTN_RESET | Push Button 2 | INPUT_PULLUP |
-| **PA10** | BUZZER | Passive Buzzer | Optional |
+| **PA0** | ENC_LA | Left Motor Encoder A | TIM2 CH1 — Hardware Encoder Mode 3 |
+| **PA1** | ENC_LB | Left Motor Encoder B | TIM2 CH2 — Hardware Encoder Mode 3 |
+| **PA6** | ENC_RA | Right Motor Encoder A | TIM3 CH1 — Hardware Encoder Mode 3 |
+| **PA7** | ENC_RB | Right Motor Encoder B | TIM3 CH2 — Hardware Encoder Mode 3 |
+| **PA8** | PWM_A | TB6612FNG PWMA | TIM1 CH1 — 20kHz PWM (register-level) |
+| **PA9** | PWM_B | TB6612FNG PWMB | TIM1 CH2 — 20kHz PWM (register-level) |
+| **PB12** | AIN1 | TB6612FNG AIN1 | Digital output — Motor A direction |
+| **PB13** | AIN2 | TB6612FNG AIN2 | Digital output — Motor A direction |
+| **PB15** | BIN1 | TB6612FNG BIN1 | Digital output — Motor B direction |
+| **PA10** | BIN2 | TB6612FNG BIN2 | Digital output — Motor B direction |
+| **PB14** | STBY | TB6612FNG STBY | HIGH = enabled |
+| **PB8** | SCL | I2C1 Clock | MPU6050 + All VL53L0X (400kHz) |
+| **PB9** | SDA | I2C1 Data | MPU6050 + All VL53L0X (400kHz) |
+| **PA4** | XSHUT_1 | VL53L0X #1 XSHUT (Front) | Active LOW shutdown |
+| **PA5** | XSHUT_2 | VL53L0X #2 XSHUT (Left) | Active LOW shutdown |
+| **PB3** | XSHUT_3 | VL53L0X #3 XSHUT (Right) | Active LOW shutdown |
+| **PB0** | VBAT_ADC | Battery voltage divider | ADC input — for low-voltage cutoff |
+| **PB5** | BTN_START | Push Button 1 | INPUT_PULLUP |
+| **PB4** | BTN_RESET | Push Button 2 | INPUT_PULLUP (optional) |
+| **PB1** | BUZZER | Passive Buzzer | Optional |
 | **PA15** | STATUS_LED | LED + 330Ω → GND | Optional |
-| **PA4** | MPU_INT | MPU6050 INT pin | Optional — for DMP interrupt mode |
-| **PA5** | VBAT_ADC | Battery voltage divider | ADC input — for low-voltage cutoff |
 | **PA11/PA12** | USB D-/D+ | USB (if using serial debug) | |
 
 > [!NOTE]
@@ -115,13 +117,13 @@ Each XSHUT also has 10kΩ pull-up to 3.3V
 ```
 STM32                   TB6612FNG           Motors
 ──────                  ─────────           ──────
-PA6 (PWM_A)   ───────→  PWMA
-PB0 (AIN1)    ───────→  AIN1                      ┌─ AO1 ──→ Left Motor (+)
-PB1 (AIN2)    ───────→  AIN2                      └─ AO2 ──→ Left Motor (-)
-PA7 (PWM_B)   ───────→  PWMB
-PB4 (BIN1)    ───────→  BIN1                      ┌─ BO1 ──→ Right Motor (+)
-PB5 (BIN2)    ───────→  BIN2                      └─ BO2 ──→ Right Motor (-)
-PB6           ───────→  STBY (HIGH = active)
+PA8  (PWM_A)  ───────→  PWMA  (TIM1 CH1, 20kHz)
+PB12 (AIN1)   ───────→  AIN1                      ┌─ AO1 ──→ Left Motor (+)
+PB13 (AIN2)   ───────→  AIN2                      └─ AO2 ──→ Left Motor (-)
+PA9  (PWM_B)  ───────→  PWMB  (TIM1 CH2, 20kHz)
+PB15 (BIN1)   ───────→  BIN1                      ┌─ BO1 ──→ Right Motor (+)
+PA10 (BIN2)   ───────→  BIN2                      └─ BO2 ──→ Right Motor (-)
+PB14          ───────→  STBY (HIGH = active)
 3.3V          ───────→  VCC  (logic power)
 7.4V          ───────→  VM   (motor power)
 GND           ───────→  GND
@@ -130,13 +132,20 @@ GND           ───────→  GND
 ---
 
 ### Encoder Wiring (per motor)
+
+> [!NOTE]
+> Encoders use **hardware encoder mode** (TIM2/TIM3 in Encoder Mode 3), NOT software interrupts (EXTI).
+> This gives 4× resolution (both edges of both channels) with zero CPU overhead.
+
 ```
-N20 Motor Encoder       STM32
-─────────────────       ─────
+N20 Motor Encoder       STM32              Timer
+─────────────────       ─────              ─────
+Left Encoder A   ─────→ PA0                TIM2 CH1 (32-bit counter)
+Left Encoder B   ─────→ PA1                TIM2 CH2
+Right Encoder A  ─────→ PA6                TIM3 CH1 (16-bit counter)
+Right Encoder B  ─────→ PA7                TIM3 CH2
 VCC (3.3V or 5V) ─────→ 3.3V
 GND              ─────→ GND
-Channel A        ─────→ PA0 (Left A) or PA2 (Right A)
-Channel B        ─────→ PA1 (Left B) or PA3 (Right B)
 ```
 
 > Some N20 encoders operate on 5V — check your datasheet. If 5V output signals, add voltage divider (10kΩ + 20kΩ) before STM32 pins to protect 3.3V GPIO.
@@ -222,29 +231,23 @@ Before powering on:
 
 ## Timer & Peripheral Conflict Map (STM32F411)
 
-> [!WARNING]
-> Some pin functions share hardware timers. Verify no conflicts exist in your configuration.
+> [!NOTE]
+> All timer assignments verified against working testing code. No conflicts.
 
 | Timer | Channels Used | Pins | Purpose | Conflict? |
 |-------|---------------|------|---------|----------|
-| **EXTI** | Lines 0, 1 | PA0, PA1 | Left encoder (software interrupt) | ❌ No |
-| **EXTI** | Lines 2, 3 | PA2, PA3 | Right encoder (software interrupt) | ❌ No |
-| **TIM3** | CH1, CH2 | PA6, PA7 | Motor PWM output | ❌ No |
-| **I2C1** | SCL, SDA | PB8, PB9 | Sensors + IMU | ❌ No |
-| **ADC1** | CH5 | PA5 | Battery voltage reading | ❌ No |
+| **TIM1** | CH1, CH2 | PA8, PA9 | Motor PWM (20kHz, register-level) | ❌ No |
+| **TIM2** | CH1, CH2 | PA0, PA1 | Left encoder (Hardware Encoder Mode 3, 32-bit) | ❌ No |
+| **TIM3** | CH1, CH2 | PA6, PA7 | Right encoder (Hardware Encoder Mode 3, 16-bit) | ❌ No |
+| **I2C1** | SCL, SDA | PB8, PB9 | Sensors + IMU (400kHz Fast I2C) | ❌ No |
+| **ADC1** | CH8 | PB0 | Battery voltage reading | ❌ No |
 | **USB** | D-, D+ | PA11, PA12 | Serial debug | ❌ No |
 
 **All timers are independent — no conflicts in this configuration.** ✅
 
-### Alternate Pin Options (if you need to rearrange):
-
-| Function | Primary | Alternate 1 | Alternate 2 |
-|----------|---------|-------------|-------------|
-| I2C SCL | PB8 | PB6 | PA8 |
-| I2C SDA | PB9 | PB7 | PA9 |
-| Motor PWM A | PA6 (TIM3) | PB4 (TIM3) | PA8 (TIM1) |
-| Motor PWM B | PA7 (TIM3) | PB5 (TIM3) | PA9 (TIM1) |
-| Encoder L-A | PA0 (EXTI0) | PA5 (EXTI5) | PA15 (EXTI15) |
-
 > [!TIP]
-> If you remap I2C to PB6/PB7, you free up PB8/PB9 for additional PWM or interrupts. But be aware PB6 conflicts with the STBY pin assignment in this guide.
+> Using hardware encoder mode (TIM2/TIM3) instead of software EXTI interrupts is a major upgrade:
+> - **Zero CPU overhead** — counting happens in hardware
+> - **4× resolution** — counts both edges of both channels (Encoder Mode 3)
+> - **No missed pulses** at high RPM — hardware never misses edges
+> - TIM2 is 32-bit (no overflow for long distances), TIM3 is 16-bit (handle with delta accumulation)

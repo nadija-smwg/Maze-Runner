@@ -333,7 +333,7 @@ MAX_TURN_SPEED_MM_S     300.0f     // Linear speed during arc turns
 
 ## 🤝 Team
 
-Built by SLIIT students for the **MicroMaze 3** inter-university competition.
+Built by UOM Efac students for the **MicroMaze 3** inter-university competition.
 
 ---
 
