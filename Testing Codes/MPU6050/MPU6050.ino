@@ -4,9 +4,10 @@
 #define MPU_ADDR 0x68
 
 void writeRegister(byte reg, byte value);
+int16_t readWord(byte reg);
 
-int16_t ax,ay,az;
-int16_t gx,gy,gz;
+int16_t ax, ay, az;
+int16_t gx, gy, gz;
 int16_t tempRaw;
 
 float accelBiasX, accelBiasY, accelBiasZ;
@@ -23,37 +24,35 @@ float dt;
 const float alphaAcc = 0.95;
 const float alphaGyro = 0.85;
 
-void readMPU()
-{
+void readMPU() {
     uint8_t buffer[14];
 
     Wire.beginTransmission(MPU_ADDR);
     Wire.write(0x3B);
     Wire.endTransmission(false);
 
-    Wire.requestFrom(MPU_ADDR,14);
+    Wire.requestFrom(MPU_ADDR, 14);
 
-    for(int i=0;i<14;i++)
-    {
-        if(Wire.available())
+    for (int i = 0; i < 14; i++) {
+        if (Wire.available()) {
             buffer[i] = Wire.read();
-        else
+        } else {
             buffer[i] = 0;
+        }
     }
 
-    ax=(buffer[0]<<8)|buffer[1];
-    ay=(buffer[2]<<8)|buffer[3];
-    az=(buffer[4]<<8)|buffer[5];
+    ax = (buffer[0] << 8) | buffer[1];
+    ay = (buffer[2] << 8) | buffer[3];
+    az = (buffer[4] << 8) | buffer[5];
 
-    tempRaw=(buffer[6]<<8)|buffer[7];
+    tempRaw = (buffer[6] << 8) | buffer[7];
 
-    gx=(buffer[8]<<8)|buffer[9];
-    gy=(buffer[10]<<8)|buffer[11];
-    gz=(buffer[12]<<8)|buffer[13];
+    gx = (buffer[8] << 8) | buffer[9];
+    gy = (buffer[10] << 8) | buffer[11];
+    gz = (buffer[12] << 8) | buffer[13];
 }
 
-void calibrateMPU()
-{
+void calibrateMPU() {
     Serial.println();
     Serial.println("================================");
     Serial.println("MPU6050 Calibration");
@@ -73,8 +72,7 @@ void calibrateMPU()
 
     const int samples = 1000;
 
-    for(int i = 0; i < samples; i++)
-    {
+    for (int i = 0; i < samples; i++) {
         readMPU();
 
         axSum += ax;
@@ -120,8 +118,7 @@ void calibrateMPU()
     Serial.println();
 }
 
-void setup()
-{
+void setup() {
     Serial.begin(115200);
 
     Wire.setSDA(PB9);
@@ -134,16 +131,16 @@ void setup()
     writeRegister(0x6B, 0x00);
 
     // Sample Rate = 1000Hz
-    writeRegister(0x19,0x07);
+    writeRegister(0x19, 0x07);
 
     // DLPF = 44Hz
-    writeRegister(0x1A,0x03);
+    writeRegister(0x1A, 0x03);
 
     // Gyro ±500
-    writeRegister(0x1B,0x08);
+    writeRegister(0x1B, 0x08);
 
     // Accel ±2g
-    writeRegister(0x1C,0x00);
+    writeRegister(0x1C, 0x00);
     
     delay(1000);
     Serial.println("Configuration Complete");
@@ -153,14 +150,14 @@ void setup()
     lastTime = micros();
 }
 
-void loop()
-{
+void loop() {
     unsigned long now = micros();
     dt = (now - lastTime) / 1000000.0;
     lastTime = now;
 
-    if(dt <= 0 || dt > 0.05)
+    if (dt <= 0 || dt > 0.05) {
         dt = 0.01;
+    }
 
     readMPU();
 
@@ -183,7 +180,7 @@ void loop()
 
     // angles
     float rollAcc = atan2(AyFilt, AzFilt) * 180.0 / PI;
-    float pitchAcc = atan2(-AxFilt, sqrt(AyFilt*AyFilt + AzFilt*AzFilt)) * 180.0 / PI;
+    float pitchAcc = atan2(-AxFilt, sqrt(AyFilt * AyFilt + AzFilt * AzFilt)) * 180.0 / PI;
 
     roll  = 0.98 * (roll + GxFilt * dt) + 0.02 * rollAcc;
     pitch = 0.98 * (pitch + GyFilt * dt) + 0.02 * pitchAcc;
@@ -191,8 +188,8 @@ void loop()
     yaw += GzFilt * dt;
 
     // normalize yaw
-    if(yaw > 180) yaw -= 360;
-    if(yaw < -180) yaw += 360;
+    if (yaw > 180) yaw -= 360;
+    if (yaw < -180) yaw += 360;
 
     Serial.print(AxFilt, 3);
     Serial.print(" ");
@@ -222,31 +219,21 @@ void loop()
     delay(10);
 }
 
-
-
- 
-
-
-void writeRegister(byte reg, byte value)
-{
+void writeRegister(byte reg, byte value) {
     Wire.beginTransmission(MPU_ADDR);
     Wire.write(reg);
     Wire.write(value);
     Wire.endTransmission();
 }
 
-int16_t readWord(byte reg)
-{
+int16_t readWord(byte reg) {
     Wire.beginTransmission(MPU_ADDR);
-
     Wire.write(reg);
-
     Wire.endTransmission(false);
-
-    Wire.requestFrom(MPU_ADDR,2);
+    Wire.requestFrom(MPU_ADDR, 2);
 
     byte high = Wire.read();
     byte low = Wire.read();
 
-    return (high<<8)|low;
+    return (high << 8) | low;
 }
