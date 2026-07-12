@@ -339,21 +339,126 @@ int32_t getRightDelta() {
   return (int32_t)delta;
 }
 
-const float MM_PER_COUNT = 0.178f;
+// ******** Motor Specifications ********
+const float GEAR_RATIO = 65.0f;   
+const float PPR = 7.0f;             
+const float QUADRATURE = 4.0f;
 
-float getLeftDistance() {
-  return getLeftCount() * MM_PER_COUNT;
+const float CPR = PPR * GEAR_RATIO * QUADRATURE;
+
+const float WHEEL_DIAMETER = 34.0f;     
+const float WHEEL_CIRCUMFERENCE = PI * WHEEL_DIAMETER;
+
+float countsToRPM(float countsPerSecond)
+{
+    return (countsPerSecond * 60.0f) / CPR;
 }
 
-float getRightDistance() {
-  // If you travel long distances, base this on an accumulated counter variable 
-  // instead of getRightCount() directly, to bypass the 16-bit limit.
-  return getRightCount() * MM_PER_COUNT; 
+float rpmToSpeed(float rpm)
+{
+    return rpm * WHEEL_CIRCUMFERENCE / 60.0f;
 }
 
-float getRobotDistance() {
-  return (getLeftDistance() + getRightDistance()) / 2.0f;
+void characterizeMotor(uint16_t pwm)
+{
+    // Start motor
+    robotForward(pwm);
+
+    // Allow motor to reach steady speed
+    delay(1000);
+
+    // Reset encoders AFTER acceleration
+    resetEncoders();
+
+    uint32_t start = millis();
+
+    // Measure for exactly 2 seconds
+    delay(2000);
+
+    uint32_t elapsed = millis() - start;
+
+    robotStop();
+
+    int32_t leftCounts  = getLeftCount();
+    int32_t rightCounts = getRightCount();
+
+    // Counts per second
+    float leftCPS  = leftCounts  * 1000.0f / elapsed;
+    float rightCPS = rightCounts * 1000.0f / elapsed;
+
+    // Wheel RPM
+    float leftRPM  = countsToRPM(leftCPS);
+    float rightRPM = countsToRPM(rightCPS);
+
+    // Linear speed
+    float leftSpeed  = rpmToSpeed(leftRPM);
+    float rightSpeed = rpmToSpeed(rightRPM);
+
+    Serial.println("--------------------------------");
+
+    Serial.print("PWM = ");
+    Serial.println(pwm);
+
+    Serial.print("Elapsed(ms) = ");
+    Serial.println(elapsed);
+
+    Serial.print("Left Counts = ");
+    Serial.println(leftCounts);
+
+    Serial.print("Right Counts = ");
+    Serial.println(rightCounts);
+
+    Serial.print("Left CPS = ");
+    Serial.println(leftCPS);
+
+    Serial.print("Right CPS = ");
+    Serial.println(rightCPS);
+
+    Serial.print("Left RPM = ");
+    Serial.println(leftRPM);
+
+    Serial.print("Right RPM = ");
+    Serial.println(rightRPM);
+
+    Serial.print("Left Speed (mm/s) = ");
+    Serial.println(leftSpeed);
+
+    Serial.print("Right Speed (mm/s) = ");
+    Serial.println(rightSpeed);
+
+    Serial.println("--------------------------------");
+
+    delay(3000);
 }
+
+void accelerationTest()
+{
+    resetEncoders();
+
+    robotForward(4999);
+
+    uint32_t start = millis();
+
+    while(millis()-start < 3000)
+    {
+        delay(200);
+
+        int32_t L = getLeftCount();
+        int32_t R = getRightCount();
+
+        Serial.print("Time=");
+        Serial.print(millis()-start);
+
+        Serial.print(" L=");
+        Serial.print(L);
+
+        Serial.print(" R=");
+        Serial.println(R);
+    }
+
+    robotStop();
+}
+
 
 void setup() {
   Serial.begin(115200);
@@ -361,55 +466,29 @@ void setup() {
   setupPWM();
   setupLeftEncoder();
   setupRightEncoder();
+  resetEncoders();
   
   Serial.println("System Initialized. Starting test sequence...");
   delay(2000); // Give the user time to open the serial monitor
 }
 
-void loop() {
-  // --- Test Sequence: Forward ---
-  Serial.println("Moving: FORWARD");
-  robotForward(2500); // 50% Speed (Max ARR is 4999)
-  delay(1500);
-  printStats();
-
-  // --- Test Sequence: Stop ---
-  Serial.println("Moving: STOP");
-  robotStop();
-  delay(1000);
-  printStats();
-
-  // --- Test Sequence: Reverse ---
-  Serial.println("Moving: REVERSE");
-  robotReverse(2500); // 50% Speed
-  // delay(1500);
-  printStats();
-
-  // --- Test Sequence: Stop ---
-  Serial.println("Moving: STOP");
-  robotStop();
-  delay(1000);
-  printStats();
-  
-  // --- Test Sequence: Turn ---
-  Serial.println("Moving: TURN LEFT");
-  robotTurnLeft(2000); // 40% Speed
-  delay(1000);
-  printStats();
-  
-  Serial.println("Moving: STOP");
-  robotStop();
-  delay(2000); // Pause before restarting the loop
+void loop(){
+  characterizeMotor(500);
+  characterizeMotor(1000);
+  characterizeMotor(1500);
+  characterizeMotor(2000);
+  characterizeMotor(2500);
+  characterizeMotor(3000);
+  characterizeMotor(3500);
+  characterizeMotor(4000);
+  characterizeMotor(4500);
+  characterizeMotor(4999);
 }
 
-// Helper function to keep loop() clean
-void printStats() {
-  Serial.print("Encoders -> L: ");
-  Serial.print(getLeftCount());
-  Serial.print(" | R: ");
-  Serial.print(getRightCount());
-  Serial.print(" | Robot Dist: ");
-  Serial.print(getRobotDistance());
-  Serial.println(" mm");
-  Serial.println("-----------------------------------");
-}
+// void loop()
+// {
+//     accelerationTest();
+
+//     while(1);
+// }
+
