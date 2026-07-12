@@ -1,10 +1,18 @@
 #include <Wire.h>
 #include "Adafruit_VL53L0X.h"
 
+// Define the XSHUT pin (Using PA0 as an example, change to your specific STM32 pin if needed)
+#define XSHUT_PIN PA4
+
 // Create an instance of the sensor object
 Adafruit_VL53L0X lox = Adafruit_VL53L0X();
 
 void setup() {
+  // Initialize XSHUT pin and pull it HIGH to enable the sensor
+  pinMode(XSHUT_PIN, OUTPUT);
+  digitalWrite(XSHUT_PIN, HIGH);
+  delay(10); // Short delay to allow the sensor to boot up
+
   // Initialize serial communication for the Serial Monitor
   Serial.begin(115200);
 
@@ -16,7 +24,7 @@ void setup() {
   Serial.println("VL53L0X ToF Sensor Custom Pin Test");
 
   // Explicitly set the I2C pins for STM32 before starting the sensor
-  // Connect SCL to PB6 and SDA to PB7
+  // Connect SCL to PB8 and SDA to PB9
   Wire.setSCL(PB8);
   Wire.setSDA(PB9);
   
@@ -44,6 +52,5 @@ void loop() {
   }
     
   // Wait 100ms before taking the next reading
-  delay(100);
-}
+  delay(20);
 }
