@@ -75,14 +75,17 @@ void loop() {
 ```cpp
 // STAGE 3: Motor driver test
 // Tests: Forward, Reverse, Brake, both motors independently
+// Pin mapping matches actual tested hardware (TIM1 PWM at 20kHz)
 
-#define PWMA  PA6
-#define AIN1  PB0
-#define AIN2  PB1
-#define PWMB  PA7
-#define BIN1  PB4
-#define BIN2  PB5
-#define STBY  PB6
+#define PWMA  PA8     // TIM1 CH1
+#define AIN1  PB12
+#define AIN2  PB13
+
+#define PWMB  PA9     // TIM1 CH2
+#define BIN1  PB15
+#define BIN2  PA10
+
+#define STBY  PB14
 
 void setMotorA(int speed) {
   // speed: -255 to +255
@@ -165,59 +168,113 @@ void loop() {
 
 **Purpose:** Confirm quadrature encoder reading and direction detection.
 
+> [!NOTE]
+> This project uses **hardware encoder mode** (TIM2/TIM3 Encoder Mode 3) instead of software EXTI interrupts.
+> This is superior: zero CPU overhead, 4× resolution, no missed pulses at high RPM.
+> Left encoder uses TIM2 (PA0/PA1, 32-bit). Right encoder uses TIM3 (PA6/PA7, 16-bit).
+
 ```cpp
 // STAGE 4: Encoder reading test
-// Uses external interrupt (EXTI) on encoder pins
+// Uses TIM2/TIM3 hardware encoder mode (register-level setup)
 
-volatile long encoderL = 0;
-volatile long encoderR = 0;
+#include <Arduino.h>
 
-// Left encoder pins
-#define ENC_LA PA0
-#define ENC_LB PA1
-// Right encoder pins
-#define ENC_RA PA2
-#define ENC_RB PA3
+void setupLeftEncoder() {
+  RCC->AHB1ENR |= RCC_AHB1ENR_GPIOAEN;
+  RCC->APB1ENR |= RCC_APB1ENR_TIM2EN;
 
-void encoderL_ISR() {
-  int b = digitalRead(ENC_LB);
-  encoderL += (b == HIGH) ? 1 : -1;
+  // PA0 PA1 Alternate Function (TIM2 CH1 and CH2)
+  GPIOA->MODER &= ~(3 << (0 * 2));
+  GPIOA->MODER &= ~(3 << (1 * 2));
+  GPIOA->MODER |= (2 << (0 * 2));
+  GPIOA->MODER |= (2 << (1 * 2));
+
+  // AF1 for TIM2
+  GPIOA->AFR[0] &= ~(0xF << 0);
+  GPIOA->AFR[0] &= ~(0xF << 4);
+  GPIOA->AFR[0] |= (1 << 0);
+  GPIOA->AFR[0] |= (1 << 4);
+
+  // Reset and configure timer
+  TIM2->CR1 = 0; TIM2->CR2 = 0; TIM2->SMCR = 0;
+  TIM2->CCMR1 = 0; TIM2->CCER = 0;
+  TIM2->PSC = 0;
+  TIM2->ARR = 0xFFFFFFFF; // TIM2 is 32-bit
+
+  // Encoder Mode 3 (count on both edges of both channels)
+  TIM2->SMCR |= TIM_SMCR_SMS_0 | TIM_SMCR_SMS_1;
+  TIM2->CCMR1 |= TIM_CCMR1_CC1S_0 | TIM_CCMR1_CC2S_0;
+  TIM2->CCMR1 |= (3 << 4) | (3 << 12); // Input filter
+
+  TIM2->CNT = 0;
+  TIM2->CR1 |= TIM_CR1_CEN;
 }
 
-void encoderR_ISR() {
-  int b = digitalRead(ENC_RB);
-  encoderR += (b == HIGH) ? -1 : 1;  // Right motor mirrored
+void setupRightEncoder() {
+  RCC->AHB1ENR |= RCC_AHB1ENR_GPIOAEN;
+  RCC->APB1ENR |= RCC_APB1ENR_TIM3EN;
+
+  // PA6 PA7 Alternate Function (TIM3 CH1 and CH2)
+  GPIOA->MODER &= ~(3 << (6 * 2));
+  GPIOA->MODER &= ~(3 << (7 * 2));
+  GPIOA->MODER |= (2 << (6 * 2));
+  GPIOA->MODER |= (2 << (7 * 2));
+
+  // AF2 for TIM3
+  GPIOA->AFR[0] &= ~(0xF << (6 * 4));
+  GPIOA->AFR[0] &= ~(0xF << (7 * 4));
+  GPIOA->AFR[0] |= (2 << (6 * 4));
+  GPIOA->AFR[0] |= (2 << (7 * 4));
+
+  // Reset and configure timer
+  TIM3->CR1 = 0; TIM3->CR2 = 0; TIM3->SMCR = 0;
+  TIM3->CCMR1 = 0; TIM3->CCER = 0;
+  TIM3->PSC = 0;
+  TIM3->ARR = 0xFFFF; // TIM3 is 16-bit
+
+  // Encoder Mode 3
+  TIM3->SMCR |= TIM_SMCR_SMS_0 | TIM_SMCR_SMS_1;
+  TIM3->CCMR1 |= TIM_CCMR1_CC1S_0 | TIM_CCMR1_CC2S_0;
+  TIM3->CCMR1 |= (3 << 4) | (3 << 12); // Input filter
+
+  TIM3->CNT = 0;
+  TIM3->CR1 |= TIM_CR1_CEN;
+}
+
+int32_t getLeftCount() {
+  return (int32_t)TIM2->CNT;
+}
+
+int32_t getRightCount() {
+  return (int32_t)(int16_t)TIM3->CNT; // 16-bit sign extension
 }
 
 void setup() {
   Serial.begin(115200);
-  pinMode(ENC_LA, INPUT_PULLUP);
-  pinMode(ENC_LB, INPUT_PULLUP);
-  pinMode(ENC_RA, INPUT_PULLUP);
-  pinMode(ENC_RB, INPUT_PULLUP);
-  attachInterrupt(digitalPinToInterrupt(ENC_LA), encoderL_ISR, RISING);
-  attachInterrupt(digitalPinToInterrupt(ENC_RA), encoderR_ISR, RISING);
+  setupLeftEncoder();
+  setupRightEncoder();
   Serial.println("Encoder Test — spin wheels by hand");
 }
 
 void loop() {
   Serial.print("Left: ");
-  Serial.print(encoderL);
+  Serial.print(getLeftCount());
   Serial.print("  Right: ");
-  Serial.println(encoderR);
-  delay(200);
+  Serial.println(getRightCount());
+  delay(100);
 }
 ```
 
 **Expected:**
-- Spinning left wheel forward → encoderL increases
-- Spinning left wheel backward → encoderL decreases
+- Spinning left wheel forward → count increases
+- Spinning left wheel backward → count decreases
 - Same for right
-- If direction is wrong: swap ENC_LB logic in ISR
+- If direction is wrong: swap encoder A/B wires physically
 
 **Pulses per revolution:**
 - Manually spin wheel exactly once → note encoder count
 - This is your **CPR (counts per revolution)**
+- With hardware encoder mode 3, you get 4× the base PPR
 - Record this value for odometry calculations
 
 **✅ PASS:** Forward spin increases count, backward decreases. Consistent CPR. | **❌ FAIL:** Count stays at 0, or inconsistent
@@ -505,79 +562,100 @@ void loop() {
 
 ```cpp
 // STAGE 7: PID speed control test
-// Run each motor at 50% speed and check it holds steady
+// Uses hardware encoder mode (TIM2/TIM3) and motor driver from Stages 3 & 4
+// Pin mapping matches actual tested hardware
 
-// Include motor + encoder setup from stages 3 & 4
+// Include motor driver setup from Stage 3 (PA8/PA9, PB12/PB13/PB15/PA10, PB14)
+// Include encoder setup from Stage 4 (TIM2: PA0/PA1, TIM3: PA6/PA7)
 // Then add:
 
-#define TARGET_RPM 150.0       // Target RPM for both motors
-#define ENCODER_CPR 210.0      // Counts per revolution (measure in stage 4!)
-#define WHEEL_DIAMETER 34.0    // mm — measure your actual wheel
-#define PID_INTERVAL 20        // ms (50Hz PID loop)
+#define COUNTS_PER_REV 600.0    // Counts per revolution (measure in stage 4!)
+#define MM_PER_COUNT   0.178f   // Calibrated mm per encoder count
+#define SAMPLE_TIME    0.01f    // 10ms PID loop
 
 // PID gains — tune these (start low!)
-float Kp = 2.0, Ki = 0.5, Kd = 0.1;
+float Kp = 1.8, Ki = 0.8, Kd = 0.02;
 
-float errorL = 0, errorR = 0;
-float integralL = 0, integralR = 0;
-float prevErrorL = 0, prevErrorR = 0;
-long prevEncL = 0, prevEncR = 0;
+float targetLeftSpeed = 300.0f;   // mm/s
+float targetRightSpeed = 300.0f;  // mm/s
+float leftSpeed = 0, rightSpeed = 0;
+float leftPWM = 0, rightPWM = 0;
+
+int32_t lastLeftCount = 0;
+int16_t lastRightCount = 0;
 unsigned long lastPID = 0;
 
-float pwmL = 0, pwmR = 0;
+struct PIDController {
+  float kp, ki, kd;
+  float error, previousError, integral, derivative;
+};
 
-void pidLoop() {
-  if (millis() - lastPID < PID_INTERVAL) return;
-  lastPID = millis();
-  
-  float dt = PID_INTERVAL / 1000.0;
-  
-  // Calculate actual RPM from encoder delta
-  long dL = encoderL - prevEncL;
-  long dR = encoderR - prevEncR;
-  prevEncL = encoderL;
-  prevEncR = encoderR;
-  
-  float rpmL = (dL / ENCODER_CPR) * (60.0 / dt);
-  float rpmR = (dR / ENCODER_CPR) * (60.0 / dt);
-  
-  // PID for left motor
-  errorL = TARGET_RPM - rpmL;
-  integralL += errorL * dt;
-  integralL = constrain(integralL, -100, 100);  // Anti-windup
-  float derivL = (errorL - prevErrorL) / dt;
-  prevErrorL = errorL;
-  pwmL = Kp*errorL + Ki*integralL + Kd*derivL;
-  pwmL = constrain(pwmL, 0, 255);
-  
-  // PID for right motor (same structure)
-  errorR = TARGET_RPM - rpmR;
-  integralR += errorR * dt;
-  integralR = constrain(integralR, -100, 100);
-  float derivR = (errorR - prevErrorR) / dt;
-  prevErrorR = errorR;
-  pwmR = Kp*errorR + Ki*integralR + Kd*derivR;
-  pwmR = constrain(pwmR, 0, 255);
-  
-  setMotorA((int)pwmL);
-  setMotorB((int)pwmR);
-  
-  // Debug
-  Serial.print("RPM L: "); Serial.print(rpmL, 1);
-  Serial.print(" R: "); Serial.print(rpmR, 1);
-  Serial.print(" | PWM L: "); Serial.print(pwmL);
-  Serial.print(" R: "); Serial.println(pwmR);
+PIDController leftPID, rightPID;
+
+void setupPID() {
+  leftPID.kp = Kp;  leftPID.ki = Ki;  leftPID.kd = Kd;
+  leftPID.error = 0; leftPID.previousError = 0;
+  leftPID.integral = 0; leftPID.derivative = 0;
+  rightPID = leftPID;
+}
+
+float calculatePID(PIDController &pid, float target, float actual) {
+  pid.error = target - actual;
+  pid.integral += pid.error * SAMPLE_TIME;
+  pid.integral = constrain(pid.integral, -500, 500);  // Anti-windup
+  pid.derivative = (pid.error - pid.previousError) / SAMPLE_TIME;
+  float output = pid.kp * pid.error + pid.ki * pid.integral + pid.kd * pid.derivative;
+  pid.previousError = pid.error;
+  return output;
+}
+
+void updateSpeed() {
+  int32_t currentLeft = TIM2->CNT;
+  int32_t leftDelta = currentLeft - lastLeftCount;
+  lastLeftCount = currentLeft;
+
+  int16_t currentRight = (int16_t)TIM3->CNT;
+  int16_t rightDelta = -(currentRight - lastRightCount); // Negate if needed
+  lastRightCount = currentRight;
+
+  leftSpeed = (leftDelta * MM_PER_COUNT) / SAMPLE_TIME;
+  rightSpeed = (rightDelta * MM_PER_COUNT) / SAMPLE_TIME;
+}
+
+void updateMotorPID() {
+  updateSpeed();
+  leftPWM += calculatePID(leftPID, targetLeftSpeed, leftSpeed);
+  rightPWM += calculatePID(rightPID, targetRightSpeed, rightSpeed);
+  leftPWM = constrain(leftPWM, 0, 4999);
+  rightPWM = constrain(rightPWM, 0, 4999);
+  // Apply to TIM1 compare registers directly
+  TIM1->CCR1 = (uint16_t)leftPWM;
+  TIM1->CCR2 = (uint16_t)rightPWM;
 }
 
 void setup() {
-  // ... motor + encoder setup from stages 3 & 4 ...
   Serial.begin(115200);
-  // Enable motors
-  digitalWrite(STBY, HIGH);
+  analogWriteResolution(13);  // 0-8191 range for PWM
+  setupMotorDriver();  // From Stage 3
+  setupLeftEncoder();  // From Stage 4
+  setupRightEncoder();
+  setupPID();
+  delay(2000);
+
+  // Set motors forward
+  digitalWrite(AIN1, HIGH); digitalWrite(AIN2, LOW);
+  digitalWrite(BIN1, HIGH); digitalWrite(BIN2, LOW);
 }
 
 void loop() {
-  pidLoop();
+  if (millis() - lastPID >= 10) {
+    lastPID = millis();
+    updateMotorPID();
+
+    Serial.print("Target:"); Serial.print(targetLeftSpeed);
+    Serial.print(",Left:"); Serial.print(leftSpeed);
+    Serial.print(",Right:"); Serial.println(rightSpeed);
+  }
 }
 ```
 
