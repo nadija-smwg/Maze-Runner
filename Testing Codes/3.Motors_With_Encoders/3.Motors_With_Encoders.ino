@@ -1,4 +1,13 @@
 #include <Arduino.h>
+#include <Wire.h>
+#include <Adafruit_GFX.h>
+#include <Adafruit_SSD1306.h>
+
+#define SCREEN_WIDTH 128
+#define SCREEN_HEIGHT 64
+#define OLED_RESET -1
+
+Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
 
 void setupLeftEncoder() {
   RCC->AHB1ENR |= RCC_AHB1ENR_GPIOAEN;
@@ -147,14 +156,65 @@ float getRobotDistance() {
 
 void setup() {
   Serial.begin(115200);
+
+  Wire.setSDA(PB9);
+  Wire.setSCL(PB8);
+
+  Wire.begin();
+  Wire.setClock(400000);
+
+  if (!display.begin(SSD1306_SWITCHCAPVCC, 0x3C)) {
+    Serial.println("OLED Failed");
+    while (1);
+  }
+
+  display.clearDisplay();
+  display.setTextColor(SSD1306_WHITE);
+  display.setTextSize(1);
+
+  display.setCursor(10, 25);
+  display.println("Encoder Test");
+  display.display();
+
+  delay(1000);
+
   setupLeftEncoder();
   setupRightEncoder(); // Added right encoder setup
 }
 
 void loop() {
+
+  int32_t left = getLeftCount();
+  int32_t right = getRightCount();
+
+  // Serial Monitor
   Serial.print("Left : ");
-  Serial.print(getLeftCount());
-  Serial.print(" Right : ");
-  Serial.println(getRightCount());
+  Serial.print(left);
+  Serial.print("   Right : ");
+  Serial.println(right);
+
+  // OLED
+  display.clearDisplay();
+
+  display.setTextSize(1);
+
+  display.setCursor(0,0);
+  display.println("Encoder Values");
+
+  display.setCursor(0,18);
+  display.print("Left : ");
+  display.println(left);
+
+  display.setCursor(0,36);
+  display.print("Right: ");
+  display.println(right);
+
+  display.setCursor(0,54);
+  display.print("Dist:");
+  display.print(getRobotDistance(),1);
+  display.print("mm");
+
+  display.display();
+
   delay(100);
 }

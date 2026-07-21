@@ -1,4 +1,7 @@
 #include <Arduino.h>
+#include <Wire.h>
+#include <Adafruit_GFX.h>
+#include <Adafruit_SSD1306.h>
 
 #define PWMA   PA8
 #define AIN1   PB12
@@ -9,6 +12,14 @@
 #define BIN2   PA10
 
 #define STBY   PB14
+
+#define PWM_MAX 4999  // Change to 4199 for F401 or keep 4999 for F411
+
+#define SCREEN_WIDTH 128
+#define SCREEN_HEIGHT 64
+#define OLED_RESET -1
+
+Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
 
 void setupMotorDriver() {
   pinMode(AIN1, OUTPUT);
@@ -52,7 +63,7 @@ void setupPWM() {
 
   // 20 kHz PWM
   TIM1->PSC = 0;
-  TIM1->ARR = 4999;
+  TIM1->ARR = PWM_MAX;
   TIM1->CNT = 0;
 
   // Duty cycle = 0%
@@ -125,15 +136,15 @@ void rightCoast() {
 }
 
 void setLeftPWM(uint16_t pwm) {
-  if (pwm > 4999) {
-    pwm = 4999;
+  if (pwm > PWM_MAX) {
+    pwm = PWM_MAX;
   }
   TIM1->CCR1 = pwm;
 }
 
 void setRightPWM(uint16_t pwm) {
-  if (pwm > 4999) {
-    pwm = 4999;
+  if (pwm > PWM_MAX) {
+    pwm = PWM_MAX;
   }
   TIM1->CCR2 = pwm;
 }
@@ -144,12 +155,12 @@ void setMotorPWM(uint16_t left, uint16_t right) {
 }
 
 void setLeftMotor(int16_t pwm) {
-  if (pwm > 4999) {
-    pwm = 4999;
+  if (pwm > PWM_MAX) {
+    pwm = PWM_MAX;
   }
 
-  if (pwm < -4999) {
-    pwm = -4999;
+  if (pwm < -PWM_MAX) {
+    pwm = -PWM_MAX;
   }
 
   if (pwm > 0) {
@@ -165,12 +176,12 @@ void setLeftMotor(int16_t pwm) {
 }
 
 void setRightMotor(int16_t pwm) {
-  if (pwm > 4999) {
-    pwm = 4999;
+  if (pwm > PWM_MAX) {
+    pwm = PWM_MAX;
   }
 
-  if (pwm < -4999) {
-    pwm = -4999;
+  if (pwm < -PWM_MAX) {
+    pwm = -PWM_MAX;
   }
 
   if (pwm > 0) {
@@ -428,6 +439,36 @@ void characterizeMotor(uint16_t pwm)
 
     Serial.println("--------------------------------");
 
+    display.clearDisplay();
+    display.setTextSize(1);
+    display.setTextColor(SSD1306_WHITE);
+
+    display.setCursor(0,0);
+    display.print("PWM: ");
+    display.println(pwm);
+
+    display.setCursor(0,12);
+    display.print("L:");
+    display.print(leftCounts);
+    display.print(" R:");
+    display.println(rightCounts);
+
+    display.setCursor(0,24);
+    display.print("LRPM:");
+    display.print(leftRPM,1);
+
+    display.setCursor(0,36);
+    display.print("RRPM:");
+    display.print(rightRPM,1);
+
+    display.setCursor(0,48);
+    display.print("LS:");
+    display.print(leftSpeed,0);
+    display.print(" RS:");
+    display.print(rightSpeed,0);
+
+    display.display();
+
     delay(3000);
 }
 
@@ -435,7 +476,7 @@ void accelerationTest()
 {
     resetEncoders();
 
-    robotForward(4999);
+    robotForward(PWM_MAX);
 
     uint32_t start = millis();
 
@@ -462,6 +503,28 @@ void accelerationTest()
 
 void setup() {
   Serial.begin(115200);
+  
+  Wire.setSDA(PB9);
+  Wire.setSCL(PB8);
+
+  Wire.begin();
+  Wire.setClock(400000);
+
+  if (!display.begin(SSD1306_SWITCHCAPVCC, 0x3C)){
+      Serial.println("SSD1306 allocation failed");
+      while (1);
+  }
+
+  display.clearDisplay();
+  display.setTextSize(1);
+  display.setTextColor(SSD1306_WHITE);
+
+  display.setCursor(15, 25);
+  display.println("OLED Ready");
+  display.display();
+
+  delay(1000);
+
   setupMotorDriver();
   setupPWM();
   setupLeftEncoder();
@@ -475,14 +538,7 @@ void setup() {
 void loop(){
   characterizeMotor(500);
   characterizeMotor(1000);
-  characterizeMotor(1500);
-  characterizeMotor(2000);
-  characterizeMotor(2500);
-  characterizeMotor(3000);
-  characterizeMotor(3500);
-  characterizeMotor(4000);
-  characterizeMotor(4500);
-  characterizeMotor(4999);
+  while(1){}
 }
 
 // void loop()

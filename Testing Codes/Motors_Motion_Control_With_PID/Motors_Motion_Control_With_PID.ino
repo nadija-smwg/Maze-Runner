@@ -11,6 +11,8 @@
 
 #define STBY  PB14
 
+#define PWM_MAX 4999  // Change to 4199 for F401 or keep 4999 for F411
+
 // --- SYSTEM CONSTANTS ---
 const float WHEEL_DIAMETER = 34.0f;       // mm
 const float COUNTS_PER_REV = 600.0f;
@@ -218,8 +220,8 @@ void updateMotorPID()
     leftPWM += calculatePID(leftPID, targetLeftSpeed, leftSpeed);
     rightPWM += calculatePID(rightPID, targetRightSpeed, rightSpeed);
 
-    leftPWM = constrain(leftPWM, 0, 4999);
-    rightPWM = constrain(rightPWM, 0, 4999);
+    leftPWM = constrain(leftPWM, 0, PWM_MAX);
+    rightPWM = constrain(rightPWM, 0, PWM_MAX);
 
     setMotorPWM((uint16_t)leftPWM, (uint16_t)rightPWM);
 }

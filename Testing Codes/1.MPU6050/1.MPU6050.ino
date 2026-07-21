@@ -1,7 +1,16 @@
 #include <Wire.h>
 #include <math.h>
 
+#include <Adafruit_GFX.h>
+#include <Adafruit_SSD1306.h>
+
 #define MPU_ADDR 0x68
+
+#define SCREEN_WIDTH 128
+#define SCREEN_HEIGHT 64
+#define OLED_RESET -1
+
+Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
 
 void writeRegister(byte reg, byte value);
 int16_t readWord(byte reg);
@@ -127,6 +136,21 @@ void setup() {
     Wire.begin();
     Wire.setClock(400000);
 
+    if (!display.begin(SSD1306_SWITCHCAPVCC, 0x3C)){
+        Serial.println("SSD1306 allocation failed");
+        while (1);
+    }
+
+    display.clearDisplay();
+    display.setTextSize(1);
+    display.setTextColor(SSD1306_WHITE);
+
+    display.setCursor(15, 25);
+    display.println("OLED Ready");
+    display.display();
+
+    delay(1000);
+
     // Wake up
     writeRegister(0x6B, 0x00);
 
@@ -190,6 +214,30 @@ void loop() {
     // normalize yaw
     if (yaw > 180) yaw -= 360;
     if (yaw < -180) yaw += 360;
+
+    display.clearDisplay();
+
+    display.setTextSize(1);
+
+    display.setCursor(0,0);
+    display.print("Roll : ");
+    display.print(roll,1);
+
+    display.setCursor(0,16);
+    display.print("Pitch: ");
+    display.print(pitch,1);
+
+    display.setCursor(0,32);
+    display.print("Yaw  : ");
+    display.print(yaw,1);
+
+    display.setCursor(0,48);
+    display.print("AX:");
+    display.print(AxFilt,2);
+    display.print(" AZ:");
+    display.print(AzFilt,2);
+
+    display.display();
 
     Serial.print(AxFilt, 3);
     Serial.print(" ");

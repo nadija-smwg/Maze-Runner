@@ -8,6 +8,8 @@
 
 #define STBY   PB14
 
+#define PWM_MAX 4999  // Change to 4199 for F401 or keep 4999 for F411
+
 void setupMotorDriver() {
   pinMode(AIN1, OUTPUT);
   pinMode(AIN2, OUTPUT);
@@ -50,7 +52,7 @@ void setupPWM() {
 
   // 20 kHz PWM
   TIM1->PSC = 0;
-  TIM1->ARR = 4999;
+  TIM1->ARR = PWM_MAX;
   TIM1->CNT = 0;
 
   // Duty cycle = 0%
@@ -123,15 +125,15 @@ void rightCoast() {
 }
 
 void setLeftPWM(uint16_t pwm) {
-  if (pwm > 4999) {
-    pwm = 4999;
+  if (pwm > PWM_MAX) {
+    pwm = PWM_MAX;
   }
   TIM1->CCR1 = pwm;
 }
 
 void setRightPWM(uint16_t pwm) {
-  if (pwm > 4999) {
-    pwm = 4999;
+  if (pwm > PWM_MAX) {
+    pwm = PWM_MAX;
   }
   TIM1->CCR2 = pwm;
 }
@@ -142,12 +144,12 @@ void setMotorPWM(uint16_t left, uint16_t right) {
 }
 
 void setLeftMotor(int16_t pwm) {
-  if (pwm > 4999) {
-    pwm = 4999;
+  if (pwm > PWM_MAX) {
+    pwm = PWM_MAX;
   }
 
-  if (pwm < -4999) {
-    pwm = -4999;
+  if (pwm < -PWM_MAX) {
+    pwm = -PWM_MAX;
   }
 
   if (pwm > 0) {
@@ -163,12 +165,12 @@ void setLeftMotor(int16_t pwm) {
 }
 
 void setRightMotor(int16_t pwm) {
-  if (pwm > 4999) {
-    pwm = 4999;
+  if (pwm > PWM_MAX) {
+    pwm = PWM_MAX;
   }
 
-  if (pwm < -4999) {
-    pwm = -4999;
+  if (pwm < -PWM_MAX) {
+    pwm = -PWM_MAX;
   }
 
   if (pwm > 0) {
