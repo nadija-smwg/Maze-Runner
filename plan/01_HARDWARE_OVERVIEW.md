@@ -3,15 +3,15 @@
 
 ---
 
-## 1. Microcontroller: STM32F411CEU6 (BlackPill)
+## 1. Microcontroller: STM32F401CCU6 (BlackPill)
 
 ### Specs:
-- **MCU:** STM32F411CEU6
+- **MCU:** STM32F401CCU6
 - **Flash:** 512KB
 - **RAM:** 128KB
 - **Clock Speed:** 100 MHz
 
-**Why STM32F411CEU6?**
+**Why STM32F401CCU6?**
 - 100 MHz clock speed → fast sensor reads, fast PID loops
 - Hardware timers for precise encoder counting
 - I2C hardware support for MPU6050 + multiple VL53L0X
@@ -193,7 +193,7 @@ VCC   → Logic power (3.3V from STM32)
 
 | Component | Approx Weight |
 |-----------|---------------|
-| STM32F411CEU6 (BlackPill) | 5g |
+| STM32F401CCU6 (BlackPill) | 5g |
 | 2× N20 motors + encoders | 20g |
 | TB6612FNG breakout | 3g |
 | MPU6050 breakout | 2g |

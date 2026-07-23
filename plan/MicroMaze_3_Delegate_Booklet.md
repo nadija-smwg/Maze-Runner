@@ -14,7 +14,7 @@ Guiding the innovators with a roadmap to turn their ideas and visions into reali
 ---
 
 ## Past Events
-* **ROBOTNEXUS 3:** A four-day robotics and IoT workshop series focused on the design and development of a wall-following micromouse. Participants were introduced to STM32F411CEU6 programming, C/C++ basics, circuit assembly, algorithm design, and maze-based testing.
+* **ROBOTNEXUS 3:** A four-day robotics and IoT workshop series focused on the design and development of a wall-following micromouse. Participants were introduced to STM32F401CCU6 programming, C/C++ basics, circuit assembly, algorithm design, and maze-based testing.
 * **TECHTREK 3:** An interactive workshop series designed to connect IEEE RAS student members with industry professionals while exploring cutting-edge technologies.
 * **VERTEX'25:** A pioneering one-day event that brought together passionate students to explore the fields of Robotics and Automation.
 * **TRACKTION:** An immersive two-day hands-on robotics workshop that guides participants through the process of designing, building, and programming line-following robots.
@@ -40,7 +40,7 @@ Following the remarkable success of previous editions, MicroMaze III aims to del
 * **20.06.2026:** Registrations Open
 * **30.06.2026:** Registrations Closed
 * **01.07.2026:** Induction Session
-* **18.07.2026:** Workshop 1 (STM32F411CEU6 Programming)
+* **18.07.2026:** Workshop 1 (STM32F401CCU6 Programming)
 * **01.08.2026:** Workshop 2 (Sensors & Integration)
 * **10.08.2026:** Competition Guideline
 * **14.08.2026 & 15.08.2026:** Free Practice Race

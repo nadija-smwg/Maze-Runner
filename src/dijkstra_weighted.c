@@ -7,7 +7,7 @@
  *   dist[1024]   = 2048 bytes (uint16_t per state)
  *   parent[1024] = 2048 bytes (uint16_t per state, stores parent state index)
  *   heap[1024]   = 4096 bytes (HeapNode: state_idx + cost)
- *   Total: ~8KB — well within STM32F411's 128KB RAM.
+ *   Total: ~8KB — well within STM32F401's 64KB RAM.
  */
 
 #include "dijkstra_weighted.h"

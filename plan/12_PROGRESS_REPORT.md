@@ -4,7 +4,7 @@
 Based on the completed bring-up phase, the hardware foundation is essentially finished. This constitutes approximately 25–30% of a competition micromouse. The remaining work focuses predominantly on robotics algorithms, control systems, localization, and maze solving.
 
 ### Completed Milestones (Hardware Bring-up)
-- [x] STM32F411 running reliably
+- [x] STM32F401 running reliably
 - [x] Register-level PWM (TIM1)
 - [x] Hardware quadrature encoders (TIM2/TIM3)
 - [x] MPU6050 with calibration and complementary filter

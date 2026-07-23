@@ -81,7 +81,7 @@ silicon.
 // TIM2 CH1 = Encoder A, TIM2 CH2 = Encoder B (left motor)
 // TIM3 CH1/CH2 = right motor encoder
 htim2.Instance = TIM2;
-htim2.Init.Period = 0xFFFFFFFF;  // TIM2 is 32-bit on F411 — full range, rarely wraps
+htim2.Init.Period = 0xFFFFFFFF;  // TIM2 is 32-bit on F401 — full range, rarely wraps
 htim2.Init.Prescaler = 0;
 TIM_Encoder_InitTypeDef sConfig = {0};
 sConfig.EncoderMode = TIM_ENCODERMODE_TI12;  // decode both edges of both channels = 4x resolution

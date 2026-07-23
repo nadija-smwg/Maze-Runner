@@ -131,7 +131,7 @@ slightly off-center, and never maintains sustained wall contact.
 
 ## 5.3 Memory Optimization & Debugging Hard Faults
 
-### Memory discipline on the F411 (128KB RAM, 512KB Flash)
+### Memory discipline on the F401 (64KB RAM, 256KB Flash)
 - **No dynamic allocation (`malloc`/`new`) after initialization**, ideally
   none at all. Pre-allocate every buffer (maze array, sensor buffers, PID
   objects) as static/global or on the stack at a known bounded depth.

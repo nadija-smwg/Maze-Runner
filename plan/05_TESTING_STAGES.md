@@ -45,17 +45,17 @@ No code needed — just a multimeter.
 
 ```cpp
 // STAGE 2: Basic blink test
-// Board: Generic STM32F4xx (STM32F411CEU6 BlackPill)
+// Board: Generic STM32F4xx (STM32F401CCU6 BlackPill)
 // Upload via: STLink
 
 void setup() {
-  pinMode(PC13, OUTPUT);  // Built-in LED on STM32F411CEU6
+  pinMode(PC13, OUTPUT);  // Built-in LED on STM32F401CCU6
   Serial.begin(115200);
   Serial.println("STM32 Alive!");
 }
 
 void loop() {
-  digitalWrite(PC13, LOW);   // LED ON (active low on STM32F411CEU6)
+  digitalWrite(PC13, LOW);   // LED ON (active low on STM32F401CCU6)
   delay(500);
   digitalWrite(PC13, HIGH);  // LED OFF
   delay(500);

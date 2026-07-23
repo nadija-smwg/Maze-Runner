@@ -200,7 +200,7 @@ int main(void)
 {
     printf("╔══════════════════════════════════════════════════════════════╗\n");
     printf("║   MICROMOUSE MAZE SOLVER — Algorithm Test Suite             ║\n");
-    printf("║   SLIIT ROBOFEST 2026 | STM32F411 Black Pill               ║\n");
+    printf("║   SLIIT ROBOFEST 2026 | STM32F401 Black Pill               ║\n");
     printf("╚══════════════════════════════════════════════════════════════╝\n");
 
     /* ── Phase 1: Build test maze ──────────────────────────────────────── */

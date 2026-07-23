@@ -399,7 +399,7 @@ extern "C" void HardFault_Handler(void) {
 ```
 - Don't use large local arrays in functions called from ISRs
 - The flood fill BFS uses std::queue which allocates on heap —
-  ensure heap is large enough (default 8KB on STM32F411 is usually fine)
+  ensure heap is large enough (default 8KB on STM32F401 is usually fine)
 - Monitor stack usage: add canary values at the bottom of stack
 ```
 

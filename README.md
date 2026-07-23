@@ -4,7 +4,7 @@
     <strong>A championship-grade autonomous maze-solving robot built for MicroMaze 3 (IIT IEEE RAS)</strong>
   </p>
   <p align="center">
-    <img src="https://img.shields.io/badge/MCU-STM32F411-blue?style=flat-square&logo=stmicroelectronics" alt="STM32"/>
+    <img src="https://img.shields.io/badge/MCU-STM32F401-blue?style=flat-square&logo=stmicroelectronics" alt="STM32"/>
     <img src="https://img.shields.io/badge/Language-C%20%7C%20C++-00599C?style=flat-square&logo=c" alt="C"/>
     <img src="https://img.shields.io/badge/IDE-Arduino%20%2B%20GCC-green?style=flat-square" alt="IDE"/>
     <img src="https://img.shields.io/badge/Competition-MicroMaze%203-red?style=flat-square" alt="Competition"/>
@@ -93,7 +93,7 @@ Built for the **MicroMaze 3** competition organized by the Informatics Institute
 
 | Component | Part | Specification |
 |---|---|---|
-| **MCU** | STM32F411CEU6 "Black Pill" | 100 MHz ARM Cortex-M4F, 512KB Flash, 128KB RAM |
+| **MCU** | STM32F401CCU6 "Black Pill" | 84 MHz ARM Cortex-M4F, 256KB Flash, 64KB RAM |
 | **Motor Driver** | TB6612FNG | Dual H-bridge, 1.2A continuous per channel |
 | **Motors** | N20 micro gearmotors | 300 RPM with magnetic quadrature encoders |
 | **Wall Sensors** | VL53L0X (ToF) | 3–5× I2C Time-of-Flight distance sensors |

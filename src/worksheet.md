@@ -61,7 +61,7 @@ The following sections explain the exact math, data structures, and C-code logic
 
 ### 1. Memory Model & Core Data Structures (`maze.h`, `config.h`)
 
-In embedded systems with limited RAM (STM32F411 has 128KB), using dynamic memory (`malloc()`) is dangerous. It leads to heap fragmentation and hard-fault crashes. **This entire algorithmic suite uses 0 bytes of dynamic memory.** Every structure is fixed-size and statically allocated.
+In embedded systems with limited RAM (STM32F401 has 64KB), using dynamic memory (`malloc()`) is dangerous. It leads to heap fragmentation and hard-fault crashes. **This entire algorithmic suite uses 0 bytes of dynamic memory.** Every structure is fixed-size and statically allocated.
 
 #### The Maze Map (`MazeMap`)
 The core data structure is the maze representation. A standard competition maze is 16x16 cells.

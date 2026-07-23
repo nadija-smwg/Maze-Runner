@@ -31,12 +31,12 @@ breakpoint in `main()` with GDB before moving on.
 ## 1.2 Black Pill Pinout, Clock Tree, GPIO
 
 ### Clock Configuration
-The F411 runs its core off `SYSCLK`, derived from `PLL` sourced from `HSE`
+The F401 runs its core off `SYSCLK`, derived from `PLL` sourced from `HSE`
 (25 MHz external crystal on most Black Pill boards) or `HSI` (internal 16 MHz,
 less accurate — avoid for competition timing precision).
 
 ```
-HSE (25 MHz) → PLL → SYSCLK (100 MHz max on F411)
+HSE (25 MHz) → PLL → SYSCLK (84 MHz max on F401)
 SYSCLK → AHB prescaler → HCLK (up to 100 MHz)
 HCLK → APB1 prescaler → PCLK1 (max 50 MHz) — Timers 2-5, I2C, USART2/3
 HCLK → APB2 prescaler → PCLK2 (max 100 MHz) — Timers 1/9-11, ADC1, SPI1
@@ -146,7 +146,7 @@ You'll use them for 4 distinct jobs:
 | Precise time-of-flight / ranging delays (if not using I2C ToF sensor) | Input Capture | optional |
 
 ### Timer Interrupt for the Control Loop
-The F411 has TIM1 (advanced), TIM2/TIM5 (32-bit general purpose), TIM3/TIM4
+The F401 has TIM1 (advanced), TIM2/TIM5 (32-bit general purpose), TIM3/TIM4
 (16-bit general purpose), and TIM9-11 (basic). Reserve **TIM2 and TIM3 for
 encoders** (Phase 2), **TIM1 or TIM4 for motor PWM**, and use e.g. **TIM10** as
 a pure interrupt source for your control loop tick.

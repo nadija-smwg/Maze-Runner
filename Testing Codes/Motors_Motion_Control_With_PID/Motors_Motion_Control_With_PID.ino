@@ -11,7 +11,7 @@
 
 #define STBY  PB14
 
-#define PWM_MAX 4999  // Change to 4199 for F401 or keep 4999 for F411
+#define PWM_MAX 4199  // Change to 4199 for F401 or keep 4999 for F411
 
 // --- SYSTEM CONSTANTS ---
 const float WHEEL_DIAMETER = 34.0f;       // mm

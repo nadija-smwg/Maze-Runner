@@ -8,7 +8,7 @@ everything before it.
 ## Target Hardware Assumptions
 | Component | Part | Notes |
 |---|---|---|
-| MCU | STM32F411CEU6 "Black Pill" | 100 MHz Cortex-M4F, 512KB Flash, 128KB RAM |
+| MCU | STM32F401CCU6 "Black Pill" | 84 MHz Cortex-M4F, 256KB Flash, 64KB RAM |
 | Motor Driver | TB6612FNG | Dual H-bridge, better efficiency than L298N |
 | Motors | N20 micro gearmotors w/ magnetic encoders | ~1000+ CPR after gearbox |
 | Wall Sensors | 3–5x IR (Sharp/analog) or VL53L0X ToF | Front + front-diagonal + side pairs |

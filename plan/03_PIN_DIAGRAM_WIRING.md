@@ -1,9 +1,9 @@
 # 03 — Pin Diagram & Wiring Guide
-## STM32F411CEU6 (BlackPill) — Complete Connection Map
+## STM32F401CCU6 (BlackPill) — Complete Connection Map
 
 ---
 
-## Pin Assignment Table (STM32F411CEU6)
+## Pin Assignment Table (STM32F401CCU6)
 
 > [!NOTE]
 > **Updated to match actual tested hardware wiring** (confirmed by working Testing Codes).
@@ -36,7 +36,7 @@
 | **PA11/PA12** | USB D-/D+ | USB (if using serial debug) | |
 
 > [!NOTE]
-> **Pin utilization:** 22 pins used / ~20 pins free on STM32F411CEU6. Plenty of room for expansion (OLED, Bluetooth, extra sensors).
+> **Pin utilization:** 22 pins used / ~20 pins free on STM32F401CCU6. Plenty of room for expansion (OLED, Bluetooth, extra sensors).
 
 ---
 
@@ -229,7 +229,7 @@ Before powering on:
 
 ---
 
-## Timer & Peripheral Conflict Map (STM32F411)
+## Timer & Peripheral Conflict Map (STM32F401)
 
 > [!NOTE]
 > All timer assignments verified against working testing code. No conflicts.

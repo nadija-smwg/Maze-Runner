@@ -186,7 +186,7 @@ integration drifts too, from bias residual and integration error accumulating
 over time. **Complementary filter** is the standard lightweight fix — no need
 for a full Kalman filter at this scale (a Kalman filter is defensible if you
 want to push further, but a complementary filter gets you 90% of the benefit
-at 10% of the complexity and CPU cost, which matters on an F411 running a
+at 10% of the complexity and CPU cost, which matters on an F401 running a
 1kHz loop with maze logic also competing for cycles).
 
 ```cpp

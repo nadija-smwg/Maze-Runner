@@ -27,7 +27,7 @@
 
 **Your Robot Stack:**
 ```
-STM32F411CEU6 (BlackPill)
+STM32F401CCU6 (BlackPill)
 ├── Sensors:    3–5× VL53L0X (ToF distance)  +  MPU6050 (IMU)
 ├── Motors:     2× N20 300RPM with encoders
 ├── Driver:     TB6612FNG dual motor driver
