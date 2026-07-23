@@ -44,7 +44,7 @@ void timer_init(ControlLoopCallback callback) {
      * TODO: Store the callback.
      * TODO: Configure TIM4 for 1kHz interrupt:
      *       - Enable TIM4 clock (RCC->APB1ENR |= RCC_APB1ENR_TIM4EN)
-     *       - Set PSC for desired tick (e.g., PSC=99 for 1MHz tick at 100MHz)
+     *       - Set PSC for desired tick (e.g., PSC=83 for 1MHz tick at 84MHz)
      *       - Set ARR=999 for 1kHz from 1MHz tick
      *       - Enable update interrupt (DIER |= UIE)
      *       - Set NVIC priority and enable

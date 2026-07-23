@@ -6,7 +6,7 @@
  * using direct register-level programming. TIM1 is an advanced timer
  * with MOE (Main Output Enable) that must be set for output to work.
  *
- * PWM frequency: 100MHz / (PSC+1) / (ARR+1) = 100MHz / 1 / 5000 = 20kHz
+ * PWM frequency: 84MHz / (PSC+1) / (ARR+1) = 84MHz / 1 / 4200 = 20kHz
  *
  * Dependencies: pin_config, robot_config
  */
@@ -34,7 +34,7 @@
  *       3. Set PA8, PA9 to Alternate Function mode
  *       4. Set AF1 (TIM1) in GPIOA->AFR[1]
  *       5. Reset all TIM1 registers
- *       6. Set PSC=0, ARR=PWM_MAX (4999)
+ *       6. Set PSC=0, ARR=PWM_MAX (4199)
  *       7. Set CCR1=0, CCR2=0 (0% duty)
  *       8. Configure PWM Mode 1 on CH1 and CH2 (CCMR1)
  *       9. Enable preload on CH1 and CH2

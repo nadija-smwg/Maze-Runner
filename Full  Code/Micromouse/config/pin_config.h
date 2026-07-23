@@ -5,7 +5,7 @@
  * All hardware pin definitions live here. Every module that touches a
  * physical pin must include this file instead of hard-coding pin numbers.
  *
- * Platform: STM32F411CEU6 (Black Pill)
+ * Platform: STM32F401CCU6 (Black Pill)
  * Framework: Arduino Core for STM32
  *
  * @note Pin assignments marked TODO need to be filled in once the PCB

@@ -22,7 +22,7 @@ extern "C" {
  * After return, every reachable cell's `flood_value` is its shortest
  * distance (in cells) to the nearest goal cell, respecting known walls.
  *
- * Complexity: O(MAZE_SIZE²) = O(256), runs in < 10µs on Cortex-M4 @ 100MHz.
+ * Complexity: O(MAZE_SIZE²) = O(256), runs in < 10µs on Cortex-M4 @ 84MHz.
  */
 void flood_fill_compute(MazeMap *m,
                         const uint8_t goal_cells[][2],

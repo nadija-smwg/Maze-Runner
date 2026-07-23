@@ -95,13 +95,13 @@
 
 /**
  * PWM auto-reload value (determines frequency).
- * At 100MHz APB2 clock, PSC=0, ARR=4999 → 20kHz PWM.
+ * At 84MHz APB2 clock, PSC=0, ARR=4199 → 20kHz PWM.
  */
-#define PWM_MAX                 4999    /**< TIM1 ARR value (0–4999 range)  */
+#define PWM_MAX                 4199    /**< TIM1 ARR value (0–4199 range)  */
 
 /**
  * PWM frequency (Hz).
- * f_PWM = f_CLK / (PSC+1) / (ARR+1) = 100MHz / 1 / 5000 = 20kHz
+ * f_PWM = f_CLK / (PSC+1) / (ARR+1) = 84MHz / 1 / 4200 = 20kHz
  */
 #define PWM_FREQUENCY_HZ        20000
 

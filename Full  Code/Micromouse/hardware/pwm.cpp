@@ -21,7 +21,7 @@ void pwm_init(void) {
      *   GPIOA->MODER  — PA8, PA9 alternate function mode
      *   GPIOA->AFR[1] — AF1 for TIM1
      *   TIM1->PSC     — Prescaler = 0
-     *   TIM1->ARR     — Auto-reload = PWM_MAX (4999)
+     *   TIM1->ARR     — Auto-reload = PWM_MAX (4199)
      *   TIM1->CCMR1   — PWM Mode 1, preload enable
      *   TIM1->CCER    — Output enable
      *   TIM1->BDTR    — Main Output Enable (required for TIM1)

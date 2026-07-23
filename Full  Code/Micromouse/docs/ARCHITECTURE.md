@@ -1,8 +1,7 @@
 # Micromouse Software Architecture
 
 ## Overview
-
-The Micromouse software is designed with a layered architecture, abstracting hardware details from the high-level maze-solving logic. The system prioritizes deterministic control loops, modularity, and memory efficiency suitable for an STM32F411 microcontroller running the Arduino Core.
+The Micromouse software is designed with a layered architecture, abstracting hardware details from the high-level maze-solving logic. The system prioritizes deterministic control loops, modularity, and memory efficiency suitable for an STM32F401CCU6 microcontroller running the Arduino Core.
 
 ## Layers
 

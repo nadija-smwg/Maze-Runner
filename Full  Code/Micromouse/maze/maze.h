@@ -3,7 +3,7 @@
  * @brief Maze data structures, direction utilities, and the MazeMap class.
  *
  * Embedded-safe: all fixed-size, zero heap allocation, pure value types.
- * Designed for STM32F411 (128KB RAM) — total maze footprint < 2KB.
+ * Designed for STM32F401CCU6 (64KB RAM) — total maze footprint < 2KB.
  */
 
 #ifndef MAZE_H

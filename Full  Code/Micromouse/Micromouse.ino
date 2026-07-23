@@ -55,7 +55,7 @@ void setup() {
     LOG_INFO("Micromouse Booting...");
 
     // 1. Hardware Initialization
-    gpio_init();
+    gpio_init_motor_pins();
     pwm_init();
     encoder_init();
     motor_init();
@@ -84,6 +84,7 @@ void setup() {
     motion_controller_init();
     mission_manager_init();
     menu_init();
+    fsm_init();
 
     // 5. Start Control Loop Interrupt
     timer_init(motion_controller_update);
