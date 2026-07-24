@@ -9,7 +9,7 @@
 #ifndef MAZE_H
 #define MAZE_H
 
-#include "config.h"
+#include "../config/config.h"
 #include <stdint.h>
 #include <stdbool.h>
 #include <string.h>  /* memset */

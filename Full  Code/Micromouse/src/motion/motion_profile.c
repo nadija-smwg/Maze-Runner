@@ -12,7 +12,7 @@
  */
 
 #include "motion_profile.h"
-#include "maze.h"  /* for CommandType enum */
+#include "../maze/maze.h"  /* for CommandType enum */
 #include <math.h>
 
 /* ═══════════════════════════════════════════════════════════════════════════

@@ -10,44 +10,44 @@
 #include <Arduino.h>
 #include <Wire.h>
 
-#include "config/pin_config.h"
-#include "config/robot_config.h"
+#include "src/config/pin_config.h"
+#include "src/config/robot_config.h"
 
 // Hardware
-#include "hardware/battery.h"
-#include "hardware/button.h"
-#include "hardware/buzzer.h"
-#include "hardware/encoder.h"
-#include "hardware/gpio.h"
-#include "hardware/led.h"
-#include "hardware/motor.h"
-#include "hardware/pwm.h"
-#include "hardware/timer.h"
+#include "src/hardware/battery.h"
+#include "src/hardware/button.h"
+#include "src/hardware/buzzer.h"
+#include "src/hardware/encoder.h"
+#include "src/hardware/gpio.h"
+#include "src/hardware/led.h"
+#include "src/hardware/motor.h"
+#include "src/hardware/pwm.h"
+#include "src/hardware/timer.h"
 
 // Sensors
-#include "sensors/calibration.h"
-#include "sensors/sensor_fusion.h"
-#include "sensors/sensor_manager.h"
+#include "src/sensors/calibration.h"
+#include "src/sensors/sensor_fusion.h"
+#include "src/sensors/sensor_manager.h"
 
 // Localization
-#include "localization/odometry.h"
-#include "localization/position_estimator.h"
+#include "src/localization/odometry.h"
+#include "src/localization/position_estimator.h"
 
 // Control
-#include "control/motion_controller.h"
+#include "src/control/motion_controller.h"
 
 // Robot
-#include "robot/mission_manager.h"
-#include "robot/robot_state_machine.h"
+#include "src/robot/mission_manager.h"
+#include "src/robot/robot_state_machine.h"
 
 // Display
-#include "display/menu.h"
-#include "display/oled_driver.h"
-#include "display/status_screen.h"
+#include "src/display/menu.h"
+#include "src/display/oled_driver.h"
+#include "src/display/status_screen.h"
 
 // Utils
-#include "utils/logger.h"
-#include "utils/serial_debug.h"
+#include "src/utils/logger.h"
+#include "src/utils/serial_debug.h"
 
 void setup() {
   Serial.begin(115200);

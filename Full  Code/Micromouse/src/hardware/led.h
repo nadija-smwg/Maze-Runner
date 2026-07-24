@@ -11,6 +11,7 @@
 #define LED_H
 
 #include <stdbool.h>
+#include <stdint.h>
 #include "../config/pin_config.h"
 
 /** @brief LED identifier enum. */

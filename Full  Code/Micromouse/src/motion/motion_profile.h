@@ -18,7 +18,7 @@
 #ifndef MOTION_PROFILE_H
 #define MOTION_PROFILE_H
 
-#include "config.h"
+#include "../config/config.h"
 #include <stdbool.h>
 #include <math.h>
 

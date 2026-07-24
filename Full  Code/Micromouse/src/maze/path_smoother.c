@@ -18,7 +18,7 @@
  */
 
 #include "path_smoother.h"
-#include "motion_profile.h"
+#include "../motion/motion_profile.h"
 
 /* ═══════════════════════════════════════════════════════════════════════════
  *  Helper: append a command to the result (with bounds check).
