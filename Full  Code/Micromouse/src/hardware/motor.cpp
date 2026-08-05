@@ -24,81 +24,84 @@
  * ═══════════════════════════════════════════════════════════════════════════ */
 
 void motor_init(void) {
-    /**
-     * TODO: Initialize motor direction pins as outputs:
-     *   - AIN1 (PB12), AIN2 (PB13) for left motor
-     *   - BIN1 (PB15), BIN2 (PA10) for right motor
-     *   - STBY (PB14) for driver enable
-     *
-     * TODO: Set STBY HIGH to enable the motor driver.
-     * TODO: Set all direction pins LOW (coast mode) initially.
-     */
-}
-
-/* ═══════════════════════════════════════════════════════════════════════════
- *  Motor Control
- * ═══════════════════════════════════════════════════════════════════════════ */
-
-void motor_set_speed(MotorID motor, int16_t pwm) {
-    /**
-     * TODO: Clamp pwm to [-PWM_MAX, PWM_MAX].
-     * TODO: Determine direction from sign of pwm.
-     * TODO: Set direction pins via motor_set_direction().
-     * TODO: Set PWM duty cycle via TIM1->CCR1 (left) or TIM1->CCR2 (right).
-     * TODO: If pwm == 0, apply active braking.
-     */
+    gpio_init_motor_pins();
+    gpio_set_standby(true);
+    motor_stop();
 }
 
 void motor_set_direction(MotorID motor, MotorDirection dir) {
-    /**
-     * TODO: Based on motor ID and direction, set the correct IN1/IN2 pins:
-     *
-     *   FORWARD: IN1=HIGH, IN2=LOW
-     *   REVERSE: IN1=LOW,  IN2=HIGH
-     *   BRAKE:   IN1=HIGH, IN2=HIGH
-     *   COAST:   IN1=LOW,  IN2=LOW
-     */
+    uint8_t in1 = LOW;
+    uint8_t in2 = LOW;
+
+    switch (dir) {
+        case MOTOR_DIR_FORWARD:
+            in1 = HIGH; in2 = LOW;
+            break;
+        case MOTOR_DIR_REVERSE:
+            in1 = LOW;  in2 = HIGH;
+            break;
+        case MOTOR_DIR_BRAKE:
+            in1 = HIGH; in2 = HIGH;
+            break;
+        case MOTOR_DIR_COAST:
+            in1 = LOW;  in2 = LOW;
+            break;
+    }
+
+    if (motor == MOTOR_LEFT) {
+        gpio_set_left_direction(in1, in2);
+    } else {
+        gpio_set_right_direction(in1, in2);
+    }
+}
+
+void motor_set_speed(MotorID motor, int16_t pwm) {
+    // 1. Clamp PWM to safe maximum limits [-PWM_MAX, PWM_MAX]
+    if (pwm > (int16_t)PWM_MAX)  pwm = PWM_MAX;
+    if (pwm < -(int16_t)PWM_MAX) pwm = -((int16_t)PWM_MAX);
+
+    // 2. Set H-bridge direction and apply unsigned PWM duty cycle
+    if (pwm > 0) {
+        motor_set_direction(motor, MOTOR_DIR_FORWARD);
+        if (motor == MOTOR_LEFT) pwm_set_left((uint16_t)pwm);
+        else                     pwm_set_right((uint16_t)pwm);
+    } else if (pwm < 0) {
+        motor_set_direction(motor, MOTOR_DIR_REVERSE);
+        if (motor == MOTOR_LEFT) pwm_set_left((uint16_t)(-pwm));
+        else                     pwm_set_right((uint16_t)(-pwm));
+    } else {
+        motor_set_direction(motor, MOTOR_DIR_BRAKE);
+        if (motor == MOTOR_LEFT) pwm_set_left(0);
+        else                     pwm_set_right(0);
+    }
 }
 
 void motor_set_both(int16_t left_pwm, int16_t right_pwm) {
-    /**
-     * TODO: Call motor_set_speed(MOTOR_LEFT, left_pwm).
-     * TODO: Call motor_set_speed(MOTOR_RIGHT, right_pwm).
-     */
+    motor_set_speed(MOTOR_LEFT, left_pwm);
+    motor_set_speed(MOTOR_RIGHT, right_pwm);
 }
 
 void motor_stop(void) {
-    /**
-     * TODO: Set both motors to brake mode with 0 PWM.
-     */
+    motor_set_speed(MOTOR_LEFT, 0);
+    motor_set_speed(MOTOR_RIGHT, 0);
 }
 
 void motor_enable(bool enable) {
-    /**
-     * TODO: Set STBY pin HIGH (enable) or LOW (disable).
-     */
+    gpio_set_standby(enable);
 }
 
 void motor_forward(uint16_t pwm) {
-    /**
-     * TODO: Drive both motors forward at the given PWM.
-     */
+    motor_set_both((int16_t)pwm, (int16_t)pwm);
 }
 
 void motor_reverse(uint16_t pwm) {
-    /**
-     * TODO: Drive both motors in reverse at the given PWM.
-     */
+    motor_set_both(-((int16_t)pwm), -((int16_t)pwm));
 }
 
 void motor_turn_left(uint16_t pwm) {
-    /**
-     * TODO: Spin left: left motor reverse, right motor forward.
-     */
+    motor_set_both(-((int16_t)pwm), (int16_t)pwm);
 }
 
 void motor_turn_right(uint16_t pwm) {
-    /**
-     * TODO: Spin right: left motor forward, right motor reverse.
-     */
+    motor_set_both((int16_t)pwm, -((int16_t)pwm));
 }

@@ -145,19 +145,17 @@
 /** @} */ // end BatteryPins
 
 /* ═══════════════════════════════════════════════════════════════════════════
- *  User Interface — Buttons, Buzzer, LEDs
+ *  User Interface — Buttons and LEDs
  * ═══════════════════════════════════════════════════════════════════════════ */
 
 /** @defgroup UIPins User Interface Pin Assignments
- *  Buttons, buzzer, and LED indicators.
+ *  Buttons and LED indicators.
  *  @{
  */
 
 /* TODO: Assign UI pins once hardware is finalized */
 #define PIN_BUTTON_START        PB5     /**< TODO: Start button pin         */
 #define PIN_BUTTON_MODE         PB6     /**< TODO: Mode select button pin   */
-
-#define PIN_BUZZER              PB7     /**< TODO: Buzzer output pin        */
 
 #define PIN_LED_STATUS          PC13    /**< Onboard LED (Black Pill)       */
 #define PIN_LED_DEBUG           PA5     /**< TODO: External debug LED pin   */

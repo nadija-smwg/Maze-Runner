@@ -15,11 +15,10 @@ This plan breaks down the implementation of the remaining `TODO`s into logical, 
 ## Proposed Changes: Phased Implementation
 
 ### Phase 1: Hardware Abstraction & Basic I/O (Easiest)
-This phase gets the simplest hardware working. We can test this by turning on LEDs, reading the button, and making sounds on the robot.
+This phase gets the simplest hardware working. We can test this by turning on LEDs and reading the buttons on the robot.
 *   **[MODIFY]** `hardware/gpio.cpp` - Setup motor and standard pins.
 *   **[MODIFY]** `hardware/led.cpp` - Implement LED toggling and states.
 *   **[MODIFY]** `hardware/button.cpp` - Implement button reading and debounce logic.
-*   **[MODIFY]** `hardware/buzzer.cpp` - Implement tone generation for startup sounds.
 *   **[MODIFY]** `hardware/battery.cpp` - Implement ADC reads to calculate battery voltage and percentage.
 *   **[MODIFY]** `hardware/timer.cpp` - Implement hardware/software timer for the control loop interrupt.
 
