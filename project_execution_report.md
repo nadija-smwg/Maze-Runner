@@ -79,18 +79,18 @@ After examining every source file in the project, here is the actual implementat
 │ • Algorithm suite COMPLETE & tested │ • Motion controller = empty shell    │
 │   on desktop (flood, Dijkstra,      │ • Sensor fusion not written          │
 │   smoother, profiles)               │ • No code tested on actual HW yet   │
-│ • Pin config well-documented        │ • Only 1 person knows firmware       │
+│ • Pin config fully documented       │ • Only 1 person knows firmware       │
 │ • Architecture is clean & modular   │ • Algorithm code is C, firmware C++  │
-│ • Hardware partially assembled      │ • XSHUT pins still marked TODO      │
-│                                     │ • robot_config.h has unmeasured vals │
+│ • Hardware partially assembled      │                                      │
+│ • Config constants pre-configured   │                                      │
 ├─────────────────────────────────────┼──────────────────────────────────────┤
 │         OPPORTUNITIES               │          THREATS                     │
 │                                     │                                      │
 │ • Skeleton files have clear TODO    │ • 48 hours is EXTREMELY tight        │
 │   docs → faster implementation     │ • I2C bus contention (6 devices)     │
 │ • PID already done → just wire up  │ • Untested ToF multi-sensor init     │
-│ • Can use existing Pololu VL53L0X   │ • Hardware wiring errors likely      │
-│   library instead of raw driver     │ • PID tuning is time-consuming       │
+│ • Adafruit VL53L0X lib can be used  │ • Hardware wiring errors likely      │
+│   instead of raw driver             │ • PID tuning is time-consuming       │
 │ • Testing codes prove HW works      │ • Knowledge bottleneck on Member 1   │
 │ • Simplified first run possible     │ • Power noise → sensor instability  │
 │   (skip OLED, skip fast-run)        │ • If 1 ToF fails, wall detect fails │

@@ -96,7 +96,7 @@ Built for the **MicroMaze 3** competition organized by the Informatics Institute
 | **MCU** | STM32F401CCU6 "Black Pill" | 84 MHz ARM Cortex-M4F, 256KB Flash, 64KB RAM |
 | **Motor Driver** | TB6612FNG | Dual H-bridge, 1.2A continuous per channel |
 | **Motors** | N20 micro gearmotors | 300 RPM with magnetic quadrature encoders |
-| **Wall Sensors** | VL53L0X (ToF) | 3–5× I2C Time-of-Flight distance sensors |
+| **Wall Sensors** | VL53L0X (ToF) | 5× I2C Time-of-Flight distance sensors |
 | **IMU** | MPU6050 | 6-axis accelerometer + gyroscope for yaw correction |
 | **Power** | 2× 3.7V LiPo | 7.4V total, buck-regulated to 3.3V/5V rails |
 | **IDE** | Arduino IDE + GCC | STM32duino core for HAL, GCC for algorithm testing |
@@ -112,8 +112,13 @@ Built for the **MicroMaze 3** competition organized by the Informatics Institute
 | Motor Driver Standby | `PB14` | GPIO |
 | Left Encoder (A/B) | `PA0`, `PA1` | TIM2 CH1/CH2 (Encoder Mode 3) |
 | Right Encoder (A/B) | `PA6`, `PA7` | TIM3 CH1/CH2 (Encoder Mode 3) |
-| VL53L0X XSHUT | `PA4` | GPIO |
+| VL53L0X XSHUT | `PA4`, `PA15`, `PB3`, `PB1`, `PC14` | GPIO (Front, L-45, R-45, L-90, R-90) |
 | I2C (IMU + ToF) | `PB8` (SCL), `PB9` (SDA) | I2C1 |
+| Status LED (Ext) | `PA5` | GPIO (Active HIGH) |
+| Debug LED (Onbd) | `PC13` | GPIO (Active LOW) |
+| Start Button | `PB5` | GPIO (INPUT_PULLUP) |
+| Mode Button | `PB4` | GPIO (INPUT_PULLUP) |
+| Battery Sense | `PB0` | ADC Input |
 
 ---
 
