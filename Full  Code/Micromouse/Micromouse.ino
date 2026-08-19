@@ -50,7 +50,7 @@
 
 // Phase testing mode flags (set to 1 for active test mode)
 #define PHASE_1_TEST_MODE 0
-#define PHASE_2_TEST_MODE 1
+#define PHASE_2_TEST_MODE 0
 
 #if PHASE_1_TEST_MODE == 1
 volatile uint32_t phase1_timer_ticks = 0;
@@ -92,7 +92,7 @@ void setup() {
   // Initialize timer with 1kHz test callback
   timer_init(phase1_timer_callback);
   timer_start();
-  LOG_INFO("Press BTN_START for LED_DEBUG toggle, BTN_MODE for LED_STATUS toggle.");
+  LOG_INFO("Press BTN_START to test debug LED, BTN_MODE to toggle status LED.");
   return;
 #endif
 

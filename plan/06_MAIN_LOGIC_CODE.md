@@ -147,10 +147,12 @@ int chooseNextDirection() {
 
 ```cpp
 #include <Wire.h>
-#include <VL53L0X.h>
+#include "Adafruit_VL53L0X.h"
 #include <MPU6050.h>
 
-VL53L0X sensorFront, sensorLeft, sensorRight;
+Adafruit_VL53L0X loxFront = Adafruit_VL53L0X();
+Adafruit_VL53L0X loxLeft = Adafruit_VL53L0X();
+Adafruit_VL53L0X loxRight = Adafruit_VL53L0X();
 MPU6050 mpu;
 
 // Wall detection thresholds (mm) — tune for your maze!
@@ -173,7 +175,7 @@ int readSensorFiltered(VL53L0X& sensor) {
 }
 
 struct SensorData {
-  int front, left, right;
+  int front, l45, r45, l90, r90;
   bool wallFront, wallLeft, wallRight;
 };
 
@@ -181,17 +183,21 @@ SensorData readSensors() {
   SensorData s;
   // Use median filter for noise-free readings
   s.front = readSensorFiltered(sensorFront);
-  s.left  = readSensorFiltered(sensorLeft);
-  s.right = readSensorFiltered(sensorRight);
+  s.l45   = readSensorFiltered(sensorL45);
+  s.r45   = readSensorFiltered(sensorR45);
+  s.l90   = readSensorFiltered(sensorL90);
+  s.r90   = readSensorFiltered(sensorR90);
   
   // Clamp out-of-range readings
   if (s.front > 1200 || s.front == 65535) s.front = 1200;
-  if (s.left  > 1200 || s.left  == 65535) s.left  = 1200;
-  if (s.right > 1200 || s.right == 65535) s.right = 1200;
+  if (s.l45   > 1200 || s.l45   == 65535) s.l45   = 1200;
+  if (s.r45   > 1200 || s.r45   == 65535) s.r45   = 1200;
+  if (s.l90   > 1200 || s.l90   == 65535) s.l90   = 1200;
+  if (s.r90   > 1200 || s.r90   == 65535) s.r90   = 1200;
   
   s.wallFront = (s.front < WALL_PRESENT_THRESHOLD);
-  s.wallLeft  = (s.left  < WALL_PRESENT_THRESHOLD);
-  s.wallRight = (s.right < WALL_PRESENT_THRESHOLD);
+  s.wallLeft  = (s.l90 < WALL_PRESENT_THRESHOLD);
+  s.wallRight = (s.r90 < WALL_PRESENT_THRESHOLD);
   
   return s;
 }
@@ -239,11 +245,11 @@ void updateWallMap(SensorData& s) {
 // ---- ROBOT PARAMETERS (TUNE THESE!) ----
 
 #define WHEEL_DIAMETER_MM  34.0
-#define WHEELBASE_MM       70.0    // Center-to-center wheel distance
-#define ENCODER_CPR        600.0   // Counts per revolution (hardware encoder mode)
-
-#define MM_PER_COUNT  0.178f        // Calibrated: mm per encoder count
-#define CELL_SIZE_MM  180.0         // IEEE maze cell size
+#define WHEELBASE_MM       75.0    // Center-to-center wheel distance
+#define ENCODER_CPR        1820.0  // Counts per revolution (hardware encoder mode)
+#define GEAR_RATIO         65.0    // Used if CPR is not directly measured
+#define MM_PER_COUNT       0.05869 // Calibrated: mm per encoder count
+#define CELL_SIZE_MM       180.0   // IEEE maze cell size
 
 // ---- PID GAINS ----
 
@@ -467,6 +473,8 @@ using namespace std;
 #define XSHUT_1 PA4
 #define XSHUT_2 PA15
 #define XSHUT_3 PB3
+#define XSHUT_4 PC13
+#define XSHUT_5 PC14
 #define BTN_START PB5
 
 enum RobotState { IDLE, EXPLORING, RETURNING, SPEED_RUN, DONE };
@@ -477,8 +485,8 @@ void initSensors() {
   Wire.setClock(400000);
   
   // VL53L0X address assignment
-  pinMode(XSHUT_1, OUTPUT); pinMode(XSHUT_2, OUTPUT); pinMode(XSHUT_3, OUTPUT);
-  digitalWrite(XSHUT_1, LOW); digitalWrite(XSHUT_2, LOW); digitalWrite(XSHUT_3, LOW);
+  pinMode(XSHUT_1, OUTPUT); pinMode(XSHUT_2, OUTPUT); pinMode(XSHUT_3, OUTPUT); pinMode(XSHUT_4, OUTPUT); pinMode(XSHUT_5, OUTPUT);
+  digitalWrite(XSHUT_1, LOW); digitalWrite(XSHUT_2, LOW); digitalWrite(XSHUT_3, LOW); digitalWrite(XSHUT_4, LOW); digitalWrite(XSHUT_5, LOW);
   delay(10);
   
   digitalWrite(XSHUT_1, HIGH); delay(10);
@@ -487,14 +495,24 @@ void initSensors() {
   sensorFront.startContinuous();
   
   digitalWrite(XSHUT_2, HIGH); delay(10);
-  sensorLeft.init(); sensorLeft.setAddress(0x31);
-  sensorLeft.setMeasurementTimingBudget(20000);
-  sensorLeft.startContinuous();
+  sensorL45.init(); sensorL45.setAddress(0x31);
+  sensorL45.setMeasurementTimingBudget(20000);
+  sensorL45.startContinuous();
   
   digitalWrite(XSHUT_3, HIGH); delay(10);
-  sensorRight.init(); sensorRight.setAddress(0x32);
-  sensorRight.setMeasurementTimingBudget(20000);
-  sensorRight.startContinuous();
+  sensorR45.init(); sensorR45.setAddress(0x32);
+  sensorR45.setMeasurementTimingBudget(20000);
+  sensorR45.startContinuous();
+
+  digitalWrite(XSHUT_4, HIGH); delay(10);
+  sensorL90.init(); sensorL90.setAddress(0x33);
+  sensorL90.setMeasurementTimingBudget(20000);
+  sensorL90.startContinuous();
+
+  digitalWrite(XSHUT_5, HIGH); delay(10);
+  sensorR90.init(); sensorR90.setAddress(0x34);
+  sensorR90.setMeasurementTimingBudget(20000);
+  sensorR90.startContinuous();
   
   // MPU6050
   mpu.initialize();
@@ -609,8 +627,6 @@ void checkMotorStall() {
   if (motorsActive && encodersStopped) {
     setMotors(0, 0);
     Serial.println("!!! STALL DETECTED — Motors stopped for safety !!!");
-    // Buzz warning if buzzer available
-    tone(PA10, 2000, 500);
     delay(1000);
   }
   

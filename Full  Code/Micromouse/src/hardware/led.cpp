@@ -16,8 +16,6 @@ static bool _led_state[2]      = { false, false };
 void led_init(void) {
     pinMode(PIN_LED_STATUS, OUTPUT);
     pinMode(PIN_LED_DEBUG, OUTPUT);
-
-    // Initialize both LEDs to OFF
     led_set(LED_STATUS, false);
     led_set(LED_DEBUG, false);
 }
@@ -30,11 +28,11 @@ void led_set(LedID led, bool on) {
     _led_state[led] = on;
 
     if (led == LED_STATUS) {
-        // Black Pill PC13 is active-LOW (LOW = ON, HIGH = OFF)
-        digitalWrite(PIN_LED_STATUS, on ? LOW : HIGH);
+        // External LED on PA5 is active-HIGH (HIGH = ON, LOW = OFF)
+        digitalWrite(PIN_LED_STATUS, on ? HIGH : LOW);
     } else {
-        // External debug LED is active-HIGH (HIGH = ON, LOW = OFF)
-        digitalWrite(PIN_LED_DEBUG, on ? HIGH : LOW);
+        // Onboard LED on PC13 is active-LOW (LOW = ON, HIGH = OFF)
+        digitalWrite(PIN_LED_DEBUG, on ? LOW : HIGH);
     }
 }
 
@@ -44,9 +42,9 @@ void led_toggle(LedID led) {
     _led_state[led] = new_state;
 
     if (led == LED_STATUS) {
-        digitalWrite(PIN_LED_STATUS, new_state ? LOW : HIGH);
+        digitalWrite(PIN_LED_STATUS, new_state ? HIGH : LOW);
     } else {
-        digitalWrite(PIN_LED_DEBUG, new_state ? HIGH : LOW);
+        digitalWrite(PIN_LED_DEBUG, new_state ? LOW : HIGH);
     }
 }
 
@@ -71,11 +69,12 @@ void led_update(void) {
                 bool new_state = !_led_state[i];
                 _led_state[i] = new_state;
                 if (i == LED_STATUS) {
-                    digitalWrite(PIN_LED_STATUS, new_state ? LOW : HIGH);
+                    digitalWrite(PIN_LED_STATUS, new_state ? HIGH : LOW);
                 } else {
-                    digitalWrite(PIN_LED_DEBUG, new_state ? HIGH : LOW);
+                    digitalWrite(PIN_LED_DEBUG, new_state ? LOW : HIGH);
                 }
             }
         }
     }
 }
+

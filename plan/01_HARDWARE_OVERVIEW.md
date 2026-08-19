@@ -69,7 +69,7 @@ Upload Method: STLink or Serial
 
 ---
 
-## 4. VL53L0X — Time-of-Flight Distance Sensors (3 or 5)
+## 4. VL53L0X — Time-of-Flight Distance Sensors (5)
 
 ### Specs:
 - Ranging: 50mm – 2000mm (accurate up to ~1200mm)
@@ -86,16 +86,11 @@ All VL53L0X start at 0x29. You MUST assign unique addresses at startup using **X
 1. Pull ALL XSHUT pins LOW (disable all sensors)
 2. Enable sensor 1 (XSHUT1 HIGH), assign address 0x30
 3. Enable sensor 2 (XSHUT2 HIGH), assign address 0x31
-4. Repeat for each sensor
+4. Enable sensor 3 (XSHUT3 HIGH), assign address 0x32
+5. Enable sensor 4 (XSHUT4 HIGH), assign address 0x33
+6. Enable sensor 5 (XSHUT5 HIGH), assign address 0x34
 
-### Placement (3-sensor config):
-```
-        [FRONT CENTER]  ← detects wall ahead
-       /               \
-[LEFT 45°]           [RIGHT 45°]  ← detects side walls
-```
-
-### Placement (5-sensor config — recommended):
+### Placement (5-sensor config):
 ```
      [FL 45°] [FRONT] [FR 45°]
      [LEFT 90°]       [RIGHT 90°]
@@ -245,15 +240,21 @@ graph TD
         LDO --> VL1[VL53L0X #1]
         LDO --> VL2[VL53L0X #2]
         LDO --> VL3[VL53L0X #3]
+        LDO --> VL4[VL53L0X #4]
+        LDO --> VL5[VL53L0X #5]
         
         STM -- I2C PB8/PB9 --> MPU
         STM -- I2C PB8/PB9 --> VL1
         STM -- I2C PB8/PB9 --> VL2
         STM -- I2C PB8/PB9 --> VL3
+        STM -- I2C PB8/PB9 --> VL4
+        STM -- I2C PB8/PB9 --> VL5
         
-        STM -- XSHUT PC13 --> VL1
-        STM -- XSHUT PC14 --> VL2
-        STM -- XSHUT PC15 --> VL3
+        STM -- XSHUT PA4 --> VL1
+        STM -- XSHUT PA15 --> VL2
+        STM -- XSHUT PB3 --> VL3
+        STM -- XSHUT PC13 --> VL4
+        STM -- XSHUT PC14 --> VL5
     end
 
     subgraph Actuators

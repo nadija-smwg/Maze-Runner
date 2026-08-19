@@ -2,11 +2,11 @@
 #include "Adafruit_VL53L0X.h"
 
 // Define XSHUT pins for each sensor (Adjust GPIO pins to match your STM32 wiring)
-#define XSHUT_FRONT       PA0
-#define XSHUT_FRONT_RIGHT PA1
-#define XSHUT_FRONT_LEFT  PA2
-#define XSHUT_RIGHT       PA3
-#define XSHUT_LEFT        PA4
+#define XSHUT_FRONT       PA4
+#define XSHUT_FRONT_RIGHT PB3
+#define XSHUT_FRONT_LEFT  PA15
+#define XSHUT_RIGHT       PC14
+#define XSHUT_LEFT        PB1
 
 // Define unique I2C addresses (Base default is 0x29)
 #define ADDR_FRONT       0x30

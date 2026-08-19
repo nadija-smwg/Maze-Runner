@@ -11,7 +11,7 @@
 - **`encoder`**: TIM2/TIM3 hardware quadrature encoder reading.
 - **`timer`**: TIM4 1kHz interrupt for the control loop.
 - **`battery`**: ADC reading for 2S LiPo voltage.
-- **`button`**, **`buzzer`**, **`led`**: Basic UI hardware abstractions.
+- **`button`**, **`led`**: Basic UI hardware abstractions.
 
 ## `sensors/`
 - **`mpu6050`**: I2C reading of gyro/accel, gyro zero-rate calibration.

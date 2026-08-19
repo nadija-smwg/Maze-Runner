@@ -26,13 +26,15 @@
 | **PB8** | SCL | I2C1 Clock | MPU6050 + All VL53L0X (400kHz) |
 | **PB9** | SDA | I2C1 Data | MPU6050 + All VL53L0X (400kHz) |
 | **PA4** | XSHUT_1 | VL53L0X #1 XSHUT (Front) | Active LOW shutdown |
-| **PA15** | XSHUT_2 | VL53L0X #2 XSHUT (Left) | Active LOW shutdown |
-| **PB3** | XSHUT_3 | VL53L0X #3 XSHUT (Right) | Active LOW shutdown |
+| **PA15** | XSHUT_2 | VL53L0X #2 XSHUT (L-45°) | Active LOW shutdown |
+| **PB3** | XSHUT_3 | VL53L0X #3 XSHUT (R-45°) | Active LOW shutdown |
+| **PB1** | XSHUT_4 | VL53L0X #4 XSHUT (L-90°) | Active LOW shutdown |
+| **PC14** | XSHUT_5 | VL53L0X #5 XSHUT (R-90°) | Active LOW shutdown |
 | **PB0** | VBAT_ADC | Battery voltage divider | ADC input — for low-voltage cutoff |
 | **PB5** | BTN_START | Push Button 1 | INPUT_PULLUP |
 | **PB4** | BTN_RESET | Push Button 2 | INPUT_PULLUP (optional) |
-| **PB1** | BUZZER | Passive Buzzer | Optional |
-| **PA5** | STATUS_LED | LED + 330Ω → GND | Optional |
+| **PA5** | STATUS_LED | External LED + 330Ω | Active HIGH |
+| **PC13** | DEBUG_LED | Onboard LED | Active LOW |
 | **PA11/PA12** | USB D-/D+ | USB (if using serial debug) | |
 
 > [!NOTE]
@@ -95,17 +97,25 @@ flowchart LR
     
     SCL --> VL3[VL53L0X #3]
     SDA --> VL3
+    
+    SCL --> VL4[VL53L0X #4]
+    SDA --> VL4
+    
+    SCL --> VL5[VL53L0X #5]
+    SDA --> VL5
 ```
 
 > Note: Only 2 pull-up resistors needed per I2C bus (one on SCL, one on SDA). Don't add per-device.
 
 ---
 
-### VL53L0X XSHUT Wiring (3-sensor example)
+### VL53L0X XSHUT Wiring (5-sensor config)
 ```
-STM32 PC13 ──→ VL53L0X #1 XSHUT   (Front Center)
-STM32 PC14 ──→ VL53L0X #2 XSHUT   (Left)
-STM32 PC15 ──→ VL53L0X #3 XSHUT   (Right)
+STM32 PA4  ──→ VL53L0X #1 XSHUT   (Front Center)
+STM32 PA15 ──→ VL53L0X #2 XSHUT   (L-45°)
+STM32 PB3  ──→ VL53L0X #3 XSHUT   (R-45°)
+STM32 PB1  ──→ VL53L0X #4 XSHUT   (L-90°)
+STM32 PC14 ──→ VL53L0X #5 XSHUT   (R-90°)
 
 Each XSHUT also has 10kΩ pull-up to 3.3V
 (keeps sensor active even if STM32 pin is floating during boot)
@@ -161,28 +171,13 @@ GND   ────→ GND
 SCL   ────→ PB8
 SDA   ────→ PB9
 AD0   ────→ GND  (sets I2C address to 0x68)
-INT   ────→ PA4  (optional — for DMP interrupt mode)
 ```
 
 ---
 
 ## Sensor Placement Angles
 
-### 3-Sensor Config (Minimum):
-```
-         Front wall
-    ─────────────────────
-    │                   │
-    │   ← Robot →      │
-    │                   │
-         [FRONT] ← 0°
-     [L-45°]  [R-45°]
-
-L-45° sensor mounted 45° left of forward axis
-R-45° sensor mounted 45° right of forward axis
-```
-
-### 5-Sensor Config (Recommended):
+### 5-Sensor Config:
 ```
     [L-90°] [L-45°] [FRONT] [R-45°] [R-90°]
       ←─────────── robot ──────────→

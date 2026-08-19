@@ -7,7 +7,7 @@ The Micromouse software is designed with a layered architecture, abstracting har
 
 1. **Hardware Layer (`hardware/`)**
    - Directly interacts with MCU registers and pins.
-   - Provides abstracted interfaces for Motors, Encoders, PWM, Timers, Buttons, Buzzer, and LEDs.
+   - Provides abstracted interfaces for Motors, Encoders, PWM, Timers, Buttons, and LEDs.
    - Hides STM32-specific register manipulations.
 
 2. **Sensor Layer (`sensors/`)**

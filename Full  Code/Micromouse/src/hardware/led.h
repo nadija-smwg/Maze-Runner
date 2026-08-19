@@ -16,8 +16,8 @@
 
 /** @brief LED identifier enum. */
 typedef enum {
-    LED_STATUS = 0, /**< Onboard LED (PC13 on Black Pill) */
-    LED_DEBUG  = 1  /**< External debug LED */
+    LED_STATUS = 0, /**< External status LED (PA5) */
+    LED_DEBUG  = 1  /**< Onboard debug LED (PC13) */
 } LedID;
 
 /** @brief Initialize LED pins as outputs. TODO: Implement. */

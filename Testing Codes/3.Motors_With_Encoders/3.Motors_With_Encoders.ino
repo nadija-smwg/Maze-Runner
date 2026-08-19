@@ -138,7 +138,7 @@ int32_t getRightDelta() {
   return (int32_t)delta;
 }
 
-const float MM_PER_COUNT = 0.178f;
+const float MM_PER_COUNT = 0.05869f;
 
 float getLeftDistance() {
   return getLeftCount() * MM_PER_COUNT;

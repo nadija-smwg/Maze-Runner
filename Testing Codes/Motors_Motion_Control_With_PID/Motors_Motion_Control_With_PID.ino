@@ -16,7 +16,7 @@
 // --- SYSTEM CONSTANTS ---
 const float WHEEL_DIAMETER = 34.0f;       // mm
 const float COUNTS_PER_REV = 600.0f;
-const float MM_PER_COUNT = 0.178f;
+const float MM_PER_COUNT = 0.05869f;
 const float SAMPLE_TIME = 0.01f;          // 10 ms control loop
 
 // --- GLOBAL VARIABLES ---

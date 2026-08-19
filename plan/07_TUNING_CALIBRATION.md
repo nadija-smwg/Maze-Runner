@@ -32,8 +32,8 @@ Update WHEELBASE_MM in code.
 Update ENCODER_CPR in code.
 
 Cross-check: N20 300RPM usually has 7 PPR on motor shaft.
-If gear ratio is 30:1 → CPR = 7 × 30 × 4 (if quadrature) = 840
-Or with single-edge interrupt: 7 × 30 = 210
+If gear ratio is 65:1 → CPR = 7 × 65 × 4 (if quadrature) = 1820
+Or with single-edge interrupt: 7 × 65 = 455
 ```
 
 ---

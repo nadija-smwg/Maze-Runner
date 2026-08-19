@@ -19,4 +19,4 @@ The top-level behavior is governed by `robot_state_machine`.
   - Executes high-speed rolling turns and s-curve straights.
 - **`STATE_ERROR`**:
   - Battery critical, sensor failed, or picked up (wheels free-spinning).
-  - Motors disabled, buzzer sounds alarm.
+  - Motors disabled.

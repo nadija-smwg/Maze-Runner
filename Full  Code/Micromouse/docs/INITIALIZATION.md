@@ -4,7 +4,7 @@ The Arduino `setup()` function in `Micromouse.ino` orchestrates the boot sequenc
 
 1. **Hardware Init**:
    - `gpio_init()`, `pwm_init()`, `encoder_init()`
-   - `button_init()`, `led_init()`, `buzzer_init()`
+   - `button_init()`, `led_init()`
    - `battery_init()`
 
 2. **I2C & Display Init**:

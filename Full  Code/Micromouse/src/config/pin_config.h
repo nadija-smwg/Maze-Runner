@@ -7,9 +7,6 @@
  *
  * Platform: STM32F401CCU6 (Black Pill)
  * Framework: Arduino Core for STM32
- *
- * @note Pin assignments marked TODO need to be filled in once the PCB
- *       layout is finalized.
  */
 
 #ifndef PIN_CONFIG_H
@@ -112,12 +109,12 @@
  *  @{
  */
 
-/* TODO: Assign XSHUT pins once PCB layout is finalized */
-#define PIN_TOF_XSHUT_FRONT         PB0     /**< TODO: Front sensor XSHUT       */
-#define PIN_TOF_XSHUT_FRONT_LEFT    PB1     /**< TODO: Front-left sensor XSHUT  */
-#define PIN_TOF_XSHUT_FRONT_RIGHT   PB2     /**< TODO: Front-right sensor XSHUT */
-#define PIN_TOF_XSHUT_LEFT          PB3     /**< TODO: Left sensor XSHUT        */
-#define PIN_TOF_XSHUT_RIGHT         PB4     /**< TODO: Right sensor XSHUT       */
+/* Assigned XSHUT pins based on wiring plan */
+#define PIN_TOF_XSHUT_FRONT         PA4     /**< Front sensor XSHUT       */
+#define PIN_TOF_XSHUT_FRONT_LEFT    PA15    /**< Front-left (L-45°) sensor XSHUT  */
+#define PIN_TOF_XSHUT_FRONT_RIGHT   PB3     /**< Front-right (R-45°) sensor XSHUT */
+#define PIN_TOF_XSHUT_LEFT          PB1     /**< Left (L-90°) sensor XSHUT        */
+#define PIN_TOF_XSHUT_RIGHT         PC14    /**< Right (R-90°) sensor XSHUT       */
 
 /* Assigned I2C addresses (default is 0x29, reassigned during init) */
 #define TOF_ADDR_FRONT              0x30    /**< Front sensor I2C address       */
@@ -139,8 +136,7 @@
  *  @{
  */
 
-/* TODO: Assign battery voltage sense pin once hardware is finalized */
-#define PIN_BATTERY_SENSE       PA4     /**< TODO: Battery ADC input pin    */
+#define PIN_BATTERY_SENSE       PB0     /**< Battery ADC input pin (VBAT_ADC) */
 
 /** @} */ // end BatteryPins
 
@@ -153,12 +149,11 @@
  *  @{
  */
 
-/* TODO: Assign UI pins once hardware is finalized */
-#define PIN_BUTTON_START        PB5     /**< TODO: Start button pin         */
-#define PIN_BUTTON_MODE         PB6     /**< TODO: Mode select button pin   */
+#define PIN_BUTTON_START        PB5     /**< Start button pin         */
+#define PIN_BUTTON_MODE         PB4     /**< Mode/Reset button pin    */
 
-#define PIN_LED_ONBOARD         PC13    /**< Onboard LED (Black Pill)       */
-#define PIN_LED_STATUS          PA5     /**< TODO: External status LED pin  */
+#define PIN_LED_STATUS          PA5     /**< External status LED pin (active HIGH) */
+#define PIN_LED_DEBUG           PC13    /**< Onboard debug LED pin (active LOW)    */
 
 /** @} */ // end UIPins
 

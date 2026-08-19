@@ -4,7 +4,7 @@
 const float WHEEL_DIAMETER = 34.0f;          // mm
 const float WHEEL_CIRCUMFERENCE = PI * WHEEL_DIAMETER;
 const float COUNTS_PER_REV = 600.0f;
-const float MM_PER_COUNT = 0.178f;
+const float MM_PER_COUNT = 0.05869f;
 
 // --- GLOBAL VARIABLES ---
 int32_t lastLeftCount = 0;

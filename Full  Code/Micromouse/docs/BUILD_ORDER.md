@@ -4,7 +4,7 @@ This document outlines the recommended order for implementing the bodies of the 
 
 ## Phase 1: Hardware Bring-Up
 1. `config/pin_config.h` & `config/robot_config.h` (Verify pins)
-2. `hardware/led.cpp`, `hardware/button.cpp`, `hardware/buzzer.cpp`
+2. `hardware/led.cpp`, `hardware/button.cpp`
 3. `hardware/motor.cpp` & `hardware/pwm.cpp` (Test spinning motors)
 4. `hardware/encoder.cpp` (Test reading ticks)
 5. `tests/test_motors.cpp` & `tests/test_encoders.cpp`

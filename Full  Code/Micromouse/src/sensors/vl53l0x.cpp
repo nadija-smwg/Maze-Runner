@@ -3,16 +3,16 @@
  * @brief VL53L0X driver implementation.
  * @see vl53l0x.h
  *
- * Note: You may want to wrap an existing library (like Pololu VL53L0X)
- * inside this implementation file, or write the I2C register access directly.
+ * Note: Wrap the Adafruit_VL53L0X library inside this implementation
+ * file, or write the I2C register access directly.
  */
 
 #include "vl53l0x.h"
 #include <Arduino.h>
 #include <Wire.h>
+#include "Adafruit_VL53L0X.h"
 
-/* TODO: Include Pololu VL53L0X library header here if you choose to use it,
-         or implement register-level I2C access. */
+/* TODO: Implement sensor array using Adafruit_VL53L0X instances. */
 
 uint8_t vl53l0x_init_all(VL53L0X_Sensor *sensors, uint8_t count) {
     /**

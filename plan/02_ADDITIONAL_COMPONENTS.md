@@ -99,11 +99,7 @@ Without these, your motors will cause noise that crashes sensors.
   - Button 1: Start/stop maze run
   - Button 2: Reset / return to start
 
-### 13. Buzzer (Optional but very useful)
-- Passive buzzer for audio feedback
-- Useful for: startup confirmation, wall detection debugging, maze complete signal
-
-### 14. OLED Display (Optional)
+### 13. OLED Display (Optional)
 - **0.96" SSD1306 I2C OLED**
 - Shows: cell position, heading, sensor values during debug
 - Very useful during development
@@ -112,19 +108,19 @@ Without these, your motors will cause noise that crashes sensors.
 
 ## 🟢 Nice to Have
 
-### 15. Logic Analyzer
+### 14. Logic Analyzer
 - **8-channel logic analyzer** (~$5 clone)
 - Essential for debugging I2C, encoder signals, PWM
 - Works with PulseView (free software)
 
-### 16. Multimeter
+### 15. Multimeter
 - For voltage checking, continuity testing
 
-### 17. Hot Glue / Kapton Tape
+### 16. Hot Glue / Kapton Tape
 - Secure sensors at correct angles
 - Insulate bare solder joints
 
-### 18. HC-05 Bluetooth Module (for wireless debugging)
+### 17. HC-05 Bluetooth Module (for wireless debugging)
 - Stream sensor data and PID values to laptop in real-time
 - Remotely start/stop runs
 - ~$2–3 cost, massive time savings during tuning
@@ -156,7 +152,6 @@ STRONGLY RECOMMENDED:
 
 OPTIONAL BUT HELPFUL:
 [ ] SSD1306 OLED 0.96"                         Search: "SSD1306 I2C OLED 0.96 inch"
-[ ] Passive buzzer                             Search: "passive buzzer module 3.3V"
 [ ] USB Logic Analyzer                         Search: "8 channel USB logic analyzer"
 [ ] HC-05 Bluetooth module                     Search: "HC-05 Bluetooth serial module"
 ```

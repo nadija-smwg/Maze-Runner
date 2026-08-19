@@ -1,7 +1,7 @@
 #include <Wire.h>
 #include "Adafruit_VL53L0X.h"
 
-// Define the XSHUT pin (Using PA0 as an example, change to your specific STM32 pin if needed)
+// Define the XSHUT pin (Using PA4 for Front sensor)
 #define XSHUT_PIN PA4
 
 // Create an instance of the sensor object
@@ -34,7 +34,7 @@ void setup() {
     while(1); // Halt execution if sensor is not detected
   }
   
-  Serial.println(F("VL53L0X initialized successfully on PB6/PB7."));
+  Serial.println(F("VL53L0X initialized successfully on PB8/PB9."));
 }
 
 void loop() {

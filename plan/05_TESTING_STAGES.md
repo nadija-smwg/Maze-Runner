@@ -408,54 +408,90 @@ void loop() {
 
 ## Stage 6 — VL53L0X Sensor Test
 
-**Install library:** Library Manager → "VL53L0X" by Pololu
+1. Open Arduino IDE -> Sketch -> Include Library -> Manage Libraries
+2. Search for **Adafruit VL53L0X** and install it.
+
+### Basic Single Sensor Test
 
 ```cpp
-// STAGE 6: VL53L0X sensor test with address assignment
 #include <Wire.h>
-#include <VL53L0X.h>
+#include "Adafruit_VL53L0X.h"
 
-// For 3-sensor config
-#define XSHUT_1 PC13   // Front
-#define XSHUT_2 PC14   // Left  
-#define XSHUT_3 PC15   // Right
+Adafruit_VL53L0X lox = Adafruit_VL53L0X();
 
-#define ADDR_1 0x30
-#define ADDR_2 0x31
-#define ADDR_3 0x32
+void setup() {
+  Serial.begin(115200);
+  Wire.begin();
+  
+  if (!lox.begin()) {
+    Serial.println(F("Failed to boot VL53L0X"));
+    while(1);
+  }
+}
 
-VL53L0X sensor1, sensor2, sensor3;
+void loop() {
+  VL53L0X_RangingMeasurementData_t measure;
+  lox.rangingTest(&measure, false);
+  
+  if (measure.RangeStatus != 4) {
+    Serial.print("Distance: "); Serial.print(measure.RangeMilliMeter); Serial.println(" mm");
+  } else {
+    Serial.println("Out of range");
+  }
+  delay(100);
+}
+```
+
+### 5-Sensor Initialization (XSHUT Routing)
+
+```cpp
+#include <Wire.h>
+#include "Adafruit_VL53L0X.h"
+
+// Define XSHUT pins
+#define XSHUT_1 PA4  // Front
+#define XSHUT_2 PA15 // Front-Left
+#define XSHUT_3 PB3  // Front-Right
+#define XSHUT_4 PB1  // Left
+#define XSHUT_5 PC14 // Right
+
+// Object for each sensor
+Adafruit_VL53L0X lox1 = Adafruit_VL53L0X();
+Adafruit_VL53L0X lox2 = Adafruit_VL53L0X();
+Adafruit_VL53L0X lox3 = Adafruit_VL53L0X();
+Adafruit_VL53L0X lox4 = Adafruit_VL53L0X();
+Adafruit_VL53L0X lox5 = Adafruit_VL53L0X();
 
 void assignSensorAddresses() {
   // Shut all down first
-  pinMode(XSHUT_1, OUTPUT);
-  pinMode(XSHUT_2, OUTPUT);
-  pinMode(XSHUT_3, OUTPUT);
-  digitalWrite(XSHUT_1, LOW);
-  digitalWrite(XSHUT_2, LOW);
-  digitalWrite(XSHUT_3, LOW);
+  pinMode(XSHUT_1, OUTPUT); pinMode(XSHUT_2, OUTPUT); pinMode(XSHUT_3, OUTPUT); pinMode(XSHUT_4, OUTPUT); pinMode(XSHUT_5, OUTPUT);
+  digitalWrite(XSHUT_1, LOW); digitalWrite(XSHUT_2, LOW); digitalWrite(XSHUT_3, LOW); digitalWrite(XSHUT_4, LOW); digitalWrite(XSHUT_5, LOW);
   delay(10);
   
-  // Enable sensor 1, assign address
-  digitalWrite(XSHUT_1, HIGH);
-  delay(10);
-  sensor1.init();
-  sensor1.setAddress(ADDR_1);
+  // Enable sensor 1 (Front)
+  digitalWrite(XSHUT_1, HIGH); delay(10);
+  sensor1.init(); sensor1.setAddress(ADDR_1);
   Serial.println("Sensor 1 (Front) initialized at 0x30");
   
-  // Enable sensor 2
-  digitalWrite(XSHUT_2, HIGH);
-  delay(10);
-  sensor2.init();
-  sensor2.setAddress(ADDR_2);
-  Serial.println("Sensor 2 (Left) initialized at 0x31");
+  // Enable sensor 2 (L-45)
+  digitalWrite(XSHUT_2, HIGH); delay(10);
+  sensor2.init(); sensor2.setAddress(ADDR_2);
+  Serial.println("Sensor 2 (L-45) initialized at 0x31");
   
-  // Enable sensor 3
-  digitalWrite(XSHUT_3, HIGH);
-  delay(10);
-  sensor3.init();
-  sensor3.setAddress(ADDR_3);
-  Serial.println("Sensor 3 (Right) initialized at 0x32");
+  // Enable sensor 3 (R-45)
+  digitalWrite(XSHUT_3, HIGH); delay(10);
+  sensor3.init(); sensor3.setAddress(ADDR_3);
+  Serial.println("Sensor 3 (R-45) initialized at 0x32");
+
+  // Enable sensor 4 (L-90)
+  digitalWrite(XSHUT_4, HIGH); delay(10);
+  sensor4.init(); sensor4.setAddress(ADDR_4);
+  Serial.println("Sensor 4 (L-90) initialized at 0x33");
+
+  // Enable sensor 5 (R-90)
+  digitalWrite(XSHUT_5, HIGH); delay(10);
+  sensor5.init(); sensor5.setAddress(ADDR_5);
+  Serial.println("Sensor 5 (R-90) initialized at 0x34");
 }
 
 void setup() {
@@ -469,10 +505,14 @@ void setup() {
   sensor1.setMeasurementTimingBudget(20000);  // 20ms per reading
   sensor2.setMeasurementTimingBudget(20000);
   sensor3.setMeasurementTimingBudget(20000);
+  sensor4.setMeasurementTimingBudget(20000);
+  sensor5.setMeasurementTimingBudget(20000);
   
   sensor1.startContinuous();
   sensor2.startContinuous();
   sensor3.startContinuous();
+  sensor4.startContinuous();
+  sensor5.startContinuous();
   
   Serial.println("Sensors ready. Move objects in front of them.");
 }
@@ -481,10 +521,14 @@ void loop() {
   int d1 = sensor1.readRangeContinuousMillimeters();
   int d2 = sensor2.readRangeContinuousMillimeters();
   int d3 = sensor3.readRangeContinuousMillimeters();
+  int d4 = sensor4.readRangeContinuousMillimeters();
+  int d5 = sensor5.readRangeContinuousMillimeters();
   
-  Serial.print("Front: "); Serial.print(d1); Serial.print("mm  ");
-  Serial.print("Left: ");  Serial.print(d2); Serial.print("mm  ");
-  Serial.print("Right: "); Serial.print(d3); Serial.println("mm");
+  Serial.print("L-90: "); Serial.print(d4); Serial.print("mm ");
+  Serial.print("L-45: "); Serial.print(d2); Serial.print("mm ");
+  Serial.print("Front: "); Serial.print(d1); Serial.print("mm ");
+  Serial.print("R-45: "); Serial.print(d3); Serial.print("mm ");
+  Serial.print("R-90: "); Serial.print(d5); Serial.println("mm");
   
   // 65535 = out of range / timeout
   delay(50);
@@ -570,7 +614,7 @@ void loop() {
 // Then add:
 
 #define COUNTS_PER_REV 600.0    // Counts per revolution (measure in stage 4!)
-#define MM_PER_COUNT   0.178f   // Calibrated mm per encoder count
+#define MM_PER_COUNT   0.05869f // Calibrated mm per encoder count
 #define SAMPLE_TIME    0.01f    // 10ms PID loop
 
 // PID gains — tune these (start low!)
