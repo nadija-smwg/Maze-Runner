@@ -504,13 +504,13 @@ void loop() {
 
 **Purpose:** Read battery voltage via ADC for low-voltage protection.
 
-**Wiring:** Create a voltage divider: Battery+ → 20kΩ → PA5 → 10kΩ → GND
+**Wiring:** Create a voltage divider: Battery+ → 20kΩ → PB0 → 10kΩ → GND
 (This divides 8.4V max down to 2.8V — safe for 3.3V ADC)
 
 ```cpp
 // STAGE 6.5: Battery voltage monitor
 
-#define VBAT_PIN PA5
+#define VBAT_PIN PB0
 #define DIVIDER_RATIO 3.0    // (20k + 10k) / 10k = 3.0
 #define ADC_REF 3.3
 #define ADC_MAX 4095.0       // 12-bit ADC

@@ -157,8 +157,8 @@
 #define PIN_BUTTON_START        PB5     /**< TODO: Start button pin         */
 #define PIN_BUTTON_MODE         PB6     /**< TODO: Mode select button pin   */
 
-#define PIN_LED_STATUS          PC13    /**< Onboard LED (Black Pill)       */
-#define PIN_LED_DEBUG           PA5     /**< TODO: External debug LED pin   */
+#define PIN_LED_ONBOARD         PC13    /**< Onboard LED (Black Pill)       */
+#define PIN_LED_STATUS          PA5     /**< TODO: External status LED pin  */
 
 /** @} */ // end UIPins
 

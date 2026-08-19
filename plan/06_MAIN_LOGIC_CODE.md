@@ -465,7 +465,7 @@ using namespace std;
 // ... (all definitions and functions from above) ...
 
 #define XSHUT_1 PA4
-#define XSHUT_2 PA5
+#define XSHUT_2 PA15
 #define XSHUT_3 PB3
 #define BTN_START PB5
 
@@ -621,7 +621,7 @@ void checkMotorStall() {
 
 ### Battery Voltage Monitor
 ```cpp
-#define VBAT_PIN PA5
+#define VBAT_PIN PB0
 #define VBAT_LOW 6.4        // 3.2V per cell — stop immediately
 #define VBAT_WARN 7.0       // 3.5V per cell — warn
 #define DIVIDER_RATIO 3.0   // Voltage divider: 20kΩ + 10kΩ
@@ -644,7 +644,7 @@ void checkBattery() {
     Serial.println("V — STOPPING!");
     // Rapid LED blink as warning
     while (1) {
-      digitalWrite(PA15, !digitalRead(PA15));
+      digitalWrite(PA5, !digitalRead(PA5));
       tone(PA10, 3000, 100);
       delay(200);
     }

@@ -26,13 +26,13 @@
 | **PB8** | SCL | I2C1 Clock | MPU6050 + All VL53L0X (400kHz) |
 | **PB9** | SDA | I2C1 Data | MPU6050 + All VL53L0X (400kHz) |
 | **PA4** | XSHUT_1 | VL53L0X #1 XSHUT (Front) | Active LOW shutdown |
-| **PA5** | XSHUT_2 | VL53L0X #2 XSHUT (Left) | Active LOW shutdown |
+| **PA15** | XSHUT_2 | VL53L0X #2 XSHUT (Left) | Active LOW shutdown |
 | **PB3** | XSHUT_3 | VL53L0X #3 XSHUT (Right) | Active LOW shutdown |
 | **PB0** | VBAT_ADC | Battery voltage divider | ADC input — for low-voltage cutoff |
 | **PB5** | BTN_START | Push Button 1 | INPUT_PULLUP |
 | **PB4** | BTN_RESET | Push Button 2 | INPUT_PULLUP (optional) |
 | **PB1** | BUZZER | Passive Buzzer | Optional |
-| **PA15** | STATUS_LED | LED + 330Ω → GND | Optional |
+| **PA5** | STATUS_LED | LED + 330Ω → GND | Optional |
 | **PA11/PA12** | USB D-/D+ | USB (if using serial debug) | |
 
 > [!NOTE]

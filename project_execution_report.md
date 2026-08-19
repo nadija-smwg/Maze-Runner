@@ -38,31 +38,31 @@ After examining every source file in the project, here is the actual implementat
 
 | Module | Files | Status | Implementation |
 |--------|-------|--------|----------------|
-| **Hardware — Motor** | [motor.cpp](file:///c:/Users/ADMIN/Desktop/Maze-Runner/Full%20%20Code/Micromouse/src/hardware/motor.cpp), [encoder.cpp](file:///c:/Users/ADMIN/Desktop/Maze-Runner/Full%20%20Code/Micromouse/src/hardware/encoder.cpp), [pwm.cpp](file:///c:/Users/ADMIN/Desktop/Maze-Runner/Full%20%20Code/Micromouse/src/hardware/pwm.cpp) | ✅ IMPLEMENTED | Tested in Phase 1 & 2 test modes |
-| **Hardware — GPIO/LED/Button** | [gpio.cpp](file:///c:/Users/ADMIN/Desktop/Maze-Runner/Full%20%20Code/Micromouse/src/hardware/gpio.cpp), [led.cpp](file:///c:/Users/ADMIN/Desktop/Maze-Runner/Full%20%20Code/Micromouse/src/hardware/led.cpp), [button.cpp](file:///c:/Users/ADMIN/Desktop/Maze-Runner/Full%20%20Code/Micromouse/src/hardware/button.cpp) | ✅ IMPLEMENTED | Tested in Phase 1 test mode |
-| **Hardware — Battery** | [battery.cpp](file:///c:/Users/ADMIN/Desktop/Maze-Runner/Full%20%20Code/Micromouse/src/hardware/battery.cpp) | ✅ IMPLEMENTED | ADC voltage reading working |
-| **Hardware — Timer** | [timer.cpp](file:///c:/Users/ADMIN/Desktop/Maze-Runner/Full%20%20Code/Micromouse/src/hardware/timer.cpp) | ✅ IMPLEMENTED | 1kHz interrupt callback working |
-| **Sensor — MPU6050** | [mpu6050.cpp](file:///c:/Users/ADMIN/Desktop/Maze-Runner/Full%20%20Code/Micromouse/src/sensors/mpu6050.cpp) | ⚠️ SKELETON | All functions have `TODO` — raw I2C code not written |
-| **Sensor — VL53L0X** | [vl53l0x.cpp](file:///c:/Users/ADMIN/Desktop/Maze-Runner/Full%20%20Code/Micromouse/src/sensors/vl53l0x.cpp) | ⚠️ SKELETON | XSHUT init sequence and read are `TODO` |
-| **Sensor — Distance Mgr** | [distance_manager.cpp](file:///c:/Users/ADMIN/Desktop/Maze-Runner/Full%20%20Code/Micromouse/src/sensors/distance_manager.cpp) | ⚠️ SKELETON | Wall detection, centering error all `TODO` |
-| **Sensor — Fusion** | [sensor_fusion.cpp](file:///c:/Users/ADMIN/Desktop/Maze-Runner/Full%20%20Code/Micromouse/src/sensors/sensor_fusion.cpp) | ⚠️ SKELETON | Complementary filter not written |
-| **Sensor — Calibration** | [calibration.cpp](file:///c:/Users/ADMIN/Desktop/Maze-Runner/Full%20%20Code/Micromouse/src/sensors/calibration.cpp) | ⚠️ SKELETON | Empty |
-| **Control — PID** | [pid.cpp](file:///c:/Users/ADMIN/Desktop/Maze-Runner/Full%20%20Code/Micromouse/src/control/pid.cpp) | ✅ IMPLEMENTED | Full PID with anti-windup + derivative-on-measurement |
-| **Control — Speed Ctrl** | [speed_controller.cpp](file:///c:/Users/ADMIN/Desktop/Maze-Runner/Full%20%20Code/Micromouse/src/control/speed_controller.cpp) | ⚠️ SKELETON | PID integration `TODO` |
-| **Control — Heading Ctrl** | [heading_controller.cpp](file:///c:/Users/ADMIN/Desktop/Maze-Runner/Full%20%20Code/Micromouse/src/control/heading_controller.cpp) | ⚠️ SKELETON | PID integration `TODO` |
-| **Control — Wall Follower** | [wall_follower.cpp](file:///c:/Users/ADMIN/Desktop/Maze-Runner/Full%20%20Code/Micromouse/src/control/wall_follower.cpp) | ⚠️ SKELETON | PID integration `TODO` |
-| **Control — Cell Ctrl** | [cell_controller.cpp](file:///c:/Users/ADMIN/Desktop/Maze-Runner/Full%20%20Code/Micromouse/src/control/cell_controller.cpp) | ⚠️ SKELETON | Distance tracking `TODO` |
-| **Control — Turn Ctrl** | [turn_controller.cpp](file:///c:/Users/ADMIN/Desktop/Maze-Runner/Full%20%20Code/Micromouse/src/control/turn_controller.cpp) | ⚠️ SKELETON | Turn execution `TODO` |
-| **Control — Motion Ctrl** | [motion_controller.cpp](file:///c:/Users/ADMIN/Desktop/Maze-Runner/Full%20%20Code/Micromouse/src/control/motion_controller.cpp) | ⚠️ SKELETON | Orchestrator `TODO` |
-| **Localization — Odometry** | [odometry.cpp](file:///c:/Users/ADMIN/Desktop/Maze-Runner/Full%20%20Code/Micromouse/src/localization/odometry.cpp) | ⚠️ SKELETON | Math documented but commented out |
-| **Robot — FSM** | [robot_state_machine.cpp](file:///c:/Users/ADMIN/Desktop/Maze-Runner/Full%20%20Code/Micromouse/src/robot/robot_state_machine.cpp) | ⚠️ SKELETON | Empty switch cases |
-| **Robot — Search/Fast Run** | [search_mode.cpp](file:///c:/Users/ADMIN/Desktop/Maze-Runner/Full%20%20Code/Micromouse/src/robot/search_mode.cpp), [fast_run_mode.cpp](file:///c:/Users/ADMIN/Desktop/Maze-Runner/Full%20%20Code/Micromouse/src/robot/fast_run_mode.cpp) | ⚠️ SKELETON | Not connected to solver |
-| **Display — OLED** | [oled_driver.cpp](file:///c:/Users/ADMIN/Desktop/Maze-Runner/Full%20%20Code/Micromouse/src/display/oled_driver.cpp) | ⚠️ SKELETON | I2C driver not written |
-| **Algorithm — Flood Fill** | [flood_fill.c](file:///c:/Users/ADMIN/Desktop/Maze-Runner/src/flood_fill.c) | ✅ COMPLETE | BFS with straight-preference working |
-| **Algorithm — Dijkstra** | [dijkstra_weighted.c](file:///c:/Users/ADMIN/Desktop/Maze-Runner/src/dijkstra_weighted.c) | ✅ COMPLETE | Turn-penalized shortest path working |
-| **Algorithm — Solver** | [solver.c](file:///c:/Users/ADMIN/Desktop/Maze-Runner/src/solver.c) | ✅ COMPLETE | Full search + fast-run orchestrator |
-| **Algorithm — Path Smoother** | [path_smoother.c](file:///c:/Users/ADMIN/Desktop/Maze-Runner/src/path_smoother.c) | ✅ COMPLETE | Motion command generation working |
-| **Algorithm — Motion Profile** | [motion_profile.c](file:///c:/Users/ADMIN/Desktop/Maze-Runner/src/motion_profile.c) | ✅ COMPLETE | S-curve and arc profiles working |
+| **Hardware — Motor** | [motor.cpp](Full%20%20Code/Micromouse/src/hardware/motor.cpp), [encoder.cpp](Full%20%20Code/Micromouse/src/hardware/encoder.cpp), [pwm.cpp](Full%20%20Code/Micromouse/src/hardware/pwm.cpp) | ✅ IMPLEMENTED | Tested in Phase 1 & 2 test modes |
+| **Hardware — GPIO/LED/Button** | [gpio.cpp](Full%20%20Code/Micromouse/src/hardware/gpio.cpp), [led.cpp](Full%20%20Code/Micromouse/src/hardware/led.cpp), [button.cpp](Full%20%20Code/Micromouse/src/hardware/button.cpp) | ✅ IMPLEMENTED | Tested in Phase 1 test mode |
+| **Hardware — Battery** | [battery.cpp](Full%20%20Code/Micromouse/src/hardware/battery.cpp) | ✅ IMPLEMENTED | ADC voltage reading working |
+| **Hardware — Timer** | [timer.cpp](Full%20%20Code/Micromouse/src/hardware/timer.cpp) | ✅ IMPLEMENTED | 1kHz interrupt callback working |
+| **Sensor — MPU6050** | [mpu6050.cpp](Full%20%20Code/Micromouse/src/sensors/mpu6050.cpp) | ⚠️ SKELETON | All functions have `TODO` — raw I2C code not written |
+| **Sensor — VL53L0X** | [vl53l0x.cpp](Full%20%20Code/Micromouse/src/sensors/vl53l0x.cpp) | ⚠️ SKELETON | XSHUT init sequence and read are `TODO` |
+| **Sensor — Distance Mgr** | [distance_manager.cpp](Full%20%20Code/Micromouse/src/sensors/distance_manager.cpp) | ⚠️ SKELETON | Wall detection, centering error all `TODO` |
+| **Sensor — Fusion** | [sensor_fusion.cpp](Full%20%20Code/Micromouse/src/sensors/sensor_fusion.cpp) | ⚠️ SKELETON | Complementary filter not written |
+| **Sensor — Calibration** | [calibration.cpp](Full%20%20Code/Micromouse/src/sensors/calibration.cpp) | ⚠️ SKELETON | Empty |
+| **Control — PID** | [pid.cpp](Full%20%20Code/Micromouse/src/control/pid.cpp) | ✅ IMPLEMENTED | Full PID with anti-windup + derivative-on-measurement |
+| **Control — Speed Ctrl** | [speed_controller.cpp](Full%20%20Code/Micromouse/src/control/speed_controller.cpp) | ⚠️ SKELETON | PID integration `TODO` |
+| **Control — Heading Ctrl** | [heading_controller.cpp](Full%20%20Code/Micromouse/src/control/heading_controller.cpp) | ⚠️ SKELETON | PID integration `TODO` |
+| **Control — Wall Follower** | [wall_follower.cpp](Full%20%20Code/Micromouse/src/control/wall_follower.cpp) | ⚠️ SKELETON | PID integration `TODO` |
+| **Control — Cell Ctrl** | [cell_controller.cpp](Full%20%20Code/Micromouse/src/control/cell_controller.cpp) | ⚠️ SKELETON | Distance tracking `TODO` |
+| **Control — Turn Ctrl** | [turn_controller.cpp](Full%20%20Code/Micromouse/src/control/turn_controller.cpp) | ⚠️ SKELETON | Turn execution `TODO` |
+| **Control — Motion Ctrl** | [motion_controller.cpp](Full%20%20Code/Micromouse/src/control/motion_controller.cpp) | ⚠️ SKELETON | Orchestrator `TODO` |
+| **Localization — Odometry** | [odometry.cpp](Full%20%20Code/Micromouse/src/localization/odometry.cpp) | ⚠️ SKELETON | Math documented but commented out |
+| **Robot — FSM** | [robot_state_machine.cpp](Full%20%20Code/Micromouse/src/robot/robot_state_machine.cpp) | ⚠️ SKELETON | Empty switch cases |
+| **Robot — Search/Fast Run** | [search_mode.cpp](Full%20%20Code/Micromouse/src/robot/search_mode.cpp), [fast_run_mode.cpp](Full%20%20Code/Micromouse/src/robot/fast_run_mode.cpp) | ⚠️ SKELETON | Not connected to solver |
+| **Display — OLED** | [oled_driver.cpp](Full%20%20Code/Micromouse/src/display/oled_driver.cpp) | ⚠️ SKELETON | I2C driver not written |
+| **Algorithm — Flood Fill** | [flood_fill.c](src/flood_fill.c) | ✅ COMPLETE | BFS with straight-preference working |
+| **Algorithm — Dijkstra** | [dijkstra_weighted.c](src/dijkstra_weighted.c) | ✅ COMPLETE | Turn-penalized shortest path working |
+| **Algorithm — Solver** | [solver.c](src/solver.c) | ✅ COMPLETE | Full search + fast-run orchestrator |
+| **Algorithm — Path Smoother** | [path_smoother.c](src/path_smoother.c) | ✅ COMPLETE | Motion command generation working |
+| **Algorithm — Motion Profile** | [motion_profile.c](src/motion_profile.c) | ✅ COMPLETE | S-curve and arc profiles working |
 
 > [!CAUTION]
 > **CRITICAL FINDING:** Out of ~35 implementation files in the firmware, only **~8 are actually implemented**. The remaining **~27 files are skeletons with `TODO` comments**. The algorithms work in desktop simulation (`src/`) but are **not integrated** into the STM32 firmware (`Full Code/`). This is a massive gap with only 48 hours remaining.
@@ -163,7 +163,7 @@ After examining every source file in the project, here is the actual implementat
 
 > [!WARNING]
 > **Before splitting into teams, you MUST spend 30 minutes briefing M3 and M5 on:**
-> - The [pin_config.h](file:///c:/Users/ADMIN/Desktop/Maze-Runner/Full%20%20Code/Micromouse/src/config/pin_config.h) mapping (which wire goes where)
+> - The [pin_config.h](Full%20%20Code/Micromouse/src/config/pin_config.h) mapping (which wire goes where)
 > - Power rail layout (what gets 3.3V vs 5V)
 > - I2C bus topology (MPU6050, OLED, 5× VL53L0X all on PB8/PB9)
 > - XSHUT pin assignments for each ToF sensor
@@ -171,9 +171,9 @@ After examining every source file in the project, here is the actual implementat
 >
 > **And brief M2 on:**
 > - How the firmware architecture connects to their algorithms
-> - The existing PID class API in [pid.cpp](file:///c:/Users/ADMIN/Desktop/Maze-Runner/Full%20%20Code/Micromouse/src/control/pid.cpp)
+> - The existing PID class API in [pid.cpp](Full%20%20Code/Micromouse/src/control/pid.cpp)
 > - What `motion_controller_update()` needs to do (the pipeline in the TODO comment)
-> - How `solver.c` will be called from [robot_state_machine.cpp](file:///c:/Users/ADMIN/Desktop/Maze-Runner/Full%20%20Code/Micromouse/src/robot/robot_state_machine.cpp)
+> - How `solver.c` will be called from [robot_state_machine.cpp](Full%20%20Code/Micromouse/src/robot/robot_state_machine.cpp)
 
 ---
 
@@ -348,7 +348,7 @@ Your idea: 2 on hardware, 3 on software.
 | 1.4 | Wire VL53L0X SDA/SCL to PB9/PB8 I2C bus | M3 | 30 min | P0 | 1.2, 1.3 | HIGH | I2C scan detects devices |
 | 1.5 | Wire OLED SSD1306 to I2C (PB8/PB9) + power | M5 | 30 min | P1 | None | LOW | I2C scan shows 0x3C |
 | 1.6 | Wire Start button to PB5, Mode button to PB6 | M4 | 20 min | P1 | None | LOW | Digital read HIGH/LOW on press |
-| 1.7 | Wire Status LED (PC13 already onboard), Debug LED to PA5 | M4 | 15 min | P2 | None | LOW | LED toggle test |
+| 1.7 | Wire onboard LED (PC13), Status LED to PA5 | M4 | 15 min | P2 | None | LOW | LED toggle test |
 | 1.8 | Cable management + strain relief | M5 | 30 min | P1 | 1.1-1.7 | LOW | No loose wires, clean routing |
 | 1.9 | Full electrical inspection | M3 | 20 min | P0 | 1.1-1.8 | LOW | Checklist complete (see §8) |
 
@@ -457,53 +457,63 @@ HOUR   M1 (You)           M2 (CSE)              M3 (ENTC)           M4 (ENTC)   
 
 ### Implementation Order (Bottom-Up)
 
-```
-                         ┌─────────────────────────┐
-                 Step 8  │   COMPETITION RUN        │  M1+M2 — Hour 24+
-                         │   Full maze exploration  │
-                         └────────────┬────────────┘
-                                      │
-                         ┌────────────▼────────────┐
-                 Step 7  │   ROBOT STATE MACHINE    │  M1+M2 — Hour 8-10
-                         │   Boot→Idle→Search→Fast  │
-                         └────────────┬────────────┘
-                                      │
-                    ┌─────────────────┼─────────────────┐
-                    │                 │                  │
-          ┌─────────▼───────┐ ┌──────▼────────┐ ┌──────▼──────┐
-  Step 6  │  SEARCH MODE    │ │  FAST RUN     │ │ COMMAND     │  M2 — Hour 6-8
-          │  solver calls   │ │  smoother     │ │ EXECUTOR    │
-          └─────────┬───────┘ └──────┬────────┘ └──────┬──────┘
-                    │                │                  │
-          ┌─────────▼────────────────▼──────────────────▼──────┐
-  Step 5  │            MOTION CONTROLLER                        │  M1 — Hour 7-8
-          │  fusion → heading → wall_follow → speed → PWM      │
-          └───┬──────────┬──────────┬───────────┬──────────────┘
-              │          │          │           │
-      ┌───────▼──┐ ┌────▼─────┐ ┌─▼────────┐ ┌▼───────────┐
-Stp 4 │ CELL     │ │ TURN     │ │ WALL     │ │ VELOCITY   │  M2 — Hour 4-6
-      │ CTRL     │ │ CTRL     │ │ FOLLOWER │ │ CTRL       │
-      └───┬──────┘ └────┬─────┘ └──┬───────┘ └┬───────────┘
-          │              │          │          │
-      ┌───▼──────────────▼──────────▼──────────▼───────────┐
-Stp 3 │  SPEED CONTROLLER  │  HEADING CONTROLLER           │  M2 — Hour 2-4
-      │  (PID + motor)     │  (PID + gyro)                 │
-      └───────┬────────────┴──────┬────────────────────────┘
-              │                   │
-      ┌───────▼───────┐  ┌───────▼────────┐
-Stp 2 │  ODOMETRY     │  │  SENSOR FUSION │                    M1/M2 — Hour 2-7
-      │  (encoders)   │  │  (gyro+odom)   │
-      └───────┬───────┘  └───────┬────────┘
-              │                  │
-      ┌───────▼───────┐  ┌──────▼─────────┐  ┌─────────────┐
-Stp 1 │  ENCODER      │  │  MPU6050       │  │  VL53L0X    │  M1 — Hour 1-6
-      │  (DONE ✅)    │  │  DRIVER        │  │  DRIVER     │
-      └───────────────┘  └────────────────┘  └─────────────┘
-              │                  │                  │
-      ┌───────▼──────────────────▼──────────────────▼──────┐
-Stp 0 │        HARDWARE ABSTRACTION LAYER (DONE ✅)        │
-      │  motor.cpp  pwm.cpp  gpio.cpp  timer.cpp  battery  │
-      └────────────────────────────────────────────────────┘
+```mermaid
+graph TD
+    S8["Step 8: COMPETITION RUN<br>Full maze exploration<br>(M1+M2 — Hour 24+)"]
+    
+    S7["Step 7: ROBOT STATE MACHINE<br>Boot→Idle→Search→Fast<br>(M1+M2 — Hour 8-10)"]
+    
+    S6A["Step 6: SEARCH MODE<br>solver calls"]
+    S6B["FAST RUN<br>smoother"]
+    S6C["COMMAND EXECUTOR"]
+    
+    S5["Step 5: MOTION CONTROLLER<br>fusion → heading → wall_follow → speed → PWM<br>(M1 — Hour 7-8)"]
+    
+    S4A["Step 4: CELL CTRL"]
+    S4B["TURN CTRL"]
+    S4C["WALL FOLLOWER"]
+    S4D["VELOCITY CTRL"]
+    
+    S3A["Step 3: SPEED CONTROLLER<br>(PID + motor)"]
+    S3B["HEADING CONTROLLER<br>(PID + gyro)"]
+    
+    S2A["Step 2: ODOMETRY<br>(encoders)"]
+    S2B["SENSOR FUSION<br>(gyro+odom)"]
+    
+    S1A["Step 1: ENCODER<br>(DONE ✅)"]
+    S1B["MPU6050 DRIVER"]
+    S1C["VL53L0X DRIVER"]
+    
+    S0["Step 0: HARDWARE ABSTRACTION LAYER (DONE ✅)<br>motor.cpp pwm.cpp gpio.cpp timer.cpp battery"]
+    
+    S8 --> S7
+    S7 --> S6A
+    S7 --> S6B
+    S7 --> S6C
+    
+    S6A --> S5
+    S6B --> S5
+    S6C --> S5
+    
+    S5 --> S4A
+    S5 --> S4B
+    S5 --> S4C
+    S5 --> S4D
+    
+    S4A --> S3A
+    S4B --> S3B
+    S4C --> S3B
+    S4D --> S3B
+    
+    S3A --> S2A
+    S3B --> S2B
+    
+    S2A --> S1A
+    S2B --> S1B
+    
+    S1A --> S0
+    S1B --> S0
+    S1C --> S0
 ```
 
 ### Key Decision: Use Pololu VL53L0X Library
@@ -537,7 +547,7 @@ If time runs out, here's what to **skip** to still have a working robot:
 - [ ] Battery disconnected during all wiring
 - [ ] Multimeter available and working
 - [ ] Soldering iron temperature set correctly (350°C for lead, 380°C for lead-free)
-- [ ] [pin_config.h](file:///c:/Users/ADMIN/Desktop/Maze-Runner/Full%20%20Code/Micromouse/src/config/pin_config.h) printed out and on the workbench
+- [ ] [pin_config.h](Full%20%20Code/Micromouse/src/config/pin_config.h) printed out and on the workbench
 
 ### Motor Driver (TB6612FNG → STM32)
 
@@ -589,8 +599,8 @@ If time runs out, here's what to **skip** to still have a working robot:
 
 - [ ] Start button → PB5 with pull-up/pull-down resistor
 - [ ] Mode button → PB6 with pull-up/pull-down resistor
-- [ ] Debug LED + current-limiting resistor → PA5
-- [ ] Status LED = PC13 (onboard, already connected)
+- [ ] Status LED + current-limiting resistor → PA5
+- [ ] Onboard LED = PC13 (already connected)
 - [ ] **VERIFY**: `button_just_pressed(BUTTON_START)` returns true on press
 
 ### Power System
@@ -918,34 +928,94 @@ Since M1 and M2 touch different files, conflicts should be near-zero. The only s
 
 ### Gantt-Style Timeline (ASCII)
 
-```
-HOURS:  0    2    4    6    8   10   12   14   16   18   20   22   24
-        |    |    |    |    |    |    |    |    |    |    |    |    |
-M1 ─────[BRIEF][===MPU6050===][===VL53L0X===][DIST_MGR][FUSION][==MOTION_CTRL==][FIRST DRIVE]
-M2 ─────[BRIEF][ALGO PORT+FIX][SPEED+ODOM+HEADING][WALL+CELL+TURN][SEARCH+FSM][==PAIR w/M1==]
-M3 ─────[BRIEF][=====MOTOR WIRING====][===TOF WIRING===][BTN+LED][INSPECT]→[TEST SUPPORT]→
-M4 ─────[BRIEF][=====MOTOR WIRING====][===TOF WIRING===][OLED   ][CABLES ]→[TEST OPERATOR]→
-M5 ─────[BRIEF][MEASURE][===TOF POWER===][====OLED===][CABLES][CLEAN ]→[DOCUMENTATION ]→
+```mermaid
+gantt
+    title 48-Hour Execution Plan
+    dateFormat  YYYY-MM-DD HH:mm
+    axisFormat  %m-%d %H:%M
+    
+    section M1 (Firmware)
+    Briefing            :2026-08-06 00:00, 1h
+    MPU6050 Driver      :2026-08-06 01:00, 2h
+    VL53L0X Driver      :2026-08-06 03:00, 2h
+    DIST_MGR            :2026-08-06 05:00, 1h
+    FUSION              :2026-08-06 06:00, 1h
+    MOTION_CTRL         :2026-08-06 07:00, 2h
+    FIRST DRIVE         :2026-08-06 09:00, 1h
+    Integration Testing :2026-08-06 10:00, 14h
+    SLEEP               :2026-08-07 00:00, 4h
+    PID TUNE-SPEED      :2026-08-07 04:00, 3h
+    PID TUNE-TURN       :2026-08-07 07:00, 3h
+    WALL FOLLOW         :2026-08-07 10:00, 4h
+    MAZE EXPLORE        :2026-08-07 14:00, 6h
+    RELIABILITY         :2026-08-07 20:00, 4h
 
-        24   26   28   30   32   34   36   38   40   42   44   46   48
-        |    |    |    |    |    |    |    |    |    |    |    |    |
-        😴SLEEP😴 [PID TUNE-SPEED][PID TUNE-TURN][WALL FOLLOW][MAZE EXPLORE][RELIABILITY ]
-                  [LOG+PLOT DATA ][LOG GYRO DATA][ADJUST THSH][MONITOR ALGO][FIX BUGS    ]
-                  [HW FIX       ][SUPPORT      ][MAZE BUILD ][ROBOT OPER  ][SUPPORT     ]
-                  [HW FIX       ][SUPPORT      ][MAZE BUILD ][ROBOT OPER  ][SUPPORT     ]
-                  [DOCUMENT     ][SUPPORT      ][VIDEO      ][VIDEO       ][FINAL CHECK ]
+    section M2 (Algorithms)
+    Briefing            :2026-08-06 00:00, 1h
+    ALGO PORT+FIX       :2026-08-06 01:00, 2h
+    SPEED+ODOM+HEADING  :2026-08-06 03:00, 3h
+    WALL+CELL+TURN      :2026-08-06 06:00, 2h
+    SEARCH+FSM          :2026-08-06 08:00, 2h
+    PAIR w/M1           :2026-08-06 10:00, 14h
+    SLEEP               :2026-08-07 00:00, 4h
+    LOG+PLOT DATA       :2026-08-07 04:00, 3h
+    LOG GYRO DATA       :2026-08-07 07:00, 3h
+    ADJUST THSH         :2026-08-07 10:00, 4h
+    MONITOR ALGO        :2026-08-07 14:00, 6h
+    FIX BUGS            :2026-08-07 20:00, 4h
 
-        ◆ = CHECKPOINT    ★ = MILESTONE    ▼ = GO/NO-GO DECISION
-        
-        Hour 6: ★ Hardware Complete
-        Hour 10: ★ First Firmware Flash (full build)
-        Hour 14: ◆ First Robot Movement
-        Hour 30: ★ Straight Drive Working  ▼ GO/NO-GO: Can we tune turns?
-        Hour 34: ★ Turns Working           ▼ GO/NO-GO: Can we maze explore?
-        Hour 38: ★ Wall Following Working
-        Hour 42: ★ Maze Exploration Working ▼ GO/NO-GO: Competition ready?
-        Hour 46: ★ Reliability Proven
-        Hour 48: 🏁 Competition
+    section M3 (Hardware)
+    Briefing            :2026-08-06 00:00, 1h
+    MOTOR WIRING        :2026-08-06 01:00, 3h
+    TOF WIRING          :2026-08-06 04:00, 2h
+    BTN+LED             :2026-08-06 06:00, 1h
+    INSPECT             :2026-08-06 07:00, 1h
+    TEST SUPPORT        :2026-08-06 08:00, 16h
+    SLEEP               :2026-08-07 00:00, 4h
+    HW FIX              :2026-08-07 04:00, 3h
+    SUPPORT             :2026-08-07 07:00, 3h
+    MAZE BUILD          :2026-08-07 10:00, 4h
+    ROBOT OPER          :2026-08-07 14:00, 6h
+    SUPPORT             :2026-08-07 20:00, 4h
+
+    section M4 (Hardware/Test)
+    Briefing            :2026-08-06 00:00, 1h
+    MOTOR WIRING        :2026-08-06 01:00, 3h
+    TOF WIRING          :2026-08-06 04:00, 2h
+    OLED                :2026-08-06 06:00, 1h
+    CABLES              :2026-08-06 07:00, 1h
+    TEST OPERATOR       :2026-08-06 08:00, 16h
+    SLEEP               :2026-08-07 00:00, 4h
+    HW FIX              :2026-08-07 04:00, 3h
+    SUPPORT             :2026-08-07 07:00, 3h
+    MAZE BUILD          :2026-08-07 10:00, 4h
+    ROBOT OPER          :2026-08-07 14:00, 6h
+    SUPPORT             :2026-08-07 20:00, 4h
+
+    section M5 (Mech/Doc)
+    Briefing            :2026-08-06 00:00, 1h
+    MEASURE             :2026-08-06 01:00, 1h
+    TOF POWER           :2026-08-06 02:00, 2h
+    OLED                :2026-08-06 04:00, 2h
+    CABLES              :2026-08-06 06:00, 1h
+    CLEAN               :2026-08-06 07:00, 1h
+    DOCUMENTATION       :2026-08-06 08:00, 16h
+    SLEEP               :2026-08-07 00:00, 4h
+    DOCUMENT            :2026-08-07 04:00, 3h
+    SUPPORT             :2026-08-07 07:00, 3h
+    VIDEO               :2026-08-07 10:00, 10h
+    FINAL CHECK         :2026-08-07 20:00, 4h
+    
+    section Milestones
+    Hardware Complete       :milestone, 2026-08-06 06:00, 0h
+    First Firmware Flash    :milestone, 2026-08-06 10:00, 0h
+    First Robot Movement    :milestone, 2026-08-06 14:00, 0h
+    Straight Drive Working  :milestone, 2026-08-07 06:00, 0h
+    Turns Working           :milestone, 2026-08-07 10:00, 0h
+    Wall Following Working  :milestone, 2026-08-07 14:00, 0h
+    Maze Exploration Working:milestone, 2026-08-07 18:00, 0h
+    Reliability Proven      :milestone, 2026-08-07 22:00, 0h
+    Competition             :milestone, 2026-08-08 00:00, 0h
 ```
 
 ### Go/No-Go Decision Points
@@ -1022,7 +1092,7 @@ MVR PLAN:
 
 ### STM32 Best Practices for This Sprint
 
-1. **Use `PHASE_2_TEST_MODE` as your stepping stone.** It's already in [Micromouse.ino](file:///c:/Users/ADMIN/Desktop/Maze-Runner/Full%20%20Code/Micromouse/Micromouse.ino). Add a `PHASE_3_TEST_MODE` for sensor testing before attempting full integration.
+1. **Use `PHASE_2_TEST_MODE` as your stepping stone.** It's already in [Micromouse.ino](Full%20%20Code/Micromouse/Micromouse.ino). Add a `PHASE_3_TEST_MODE` for sensor testing before attempting full integration.
 
 2. **I2C Bus Management — Critical for 7 devices:**
    ```cpp
@@ -1074,7 +1144,7 @@ MVR PLAN:
 ### Firmware Debugging Strategy
 
 1. **Serial.print() is your best friend.** Add debug output to EVERY new function during development. Remove later.
-2. **Use `LOG_INFO` macro** already in your [logger.h](file:///c:/Users/ADMIN/Desktop/Maze-Runner/Full%20%20Code/Micromouse/src/utils/logger.h).
+2. **Use `LOG_INFO` macro** already in your [logger.h](Full%20%20Code/Micromouse/src/utils/logger.h).
 3. **Create a PHASE_3_TEST_MODE** for sensor-only testing before full integration.
 4. **Print encoder counts and gyro at 10Hz** during speed/heading tuning.
 5. **Plot Serial data** using Serial Plotter in Arduino IDE for PID tuning visualization.
@@ -1218,7 +1288,7 @@ Full Code/Micromouse/
 | Arduino STM32 Core | https://github.com/stm32duino/Arduino_Core_STM32 |
 | I2C Scanner Sketch | Arduino IDE → Examples → Wire → i2c_scanner |
 | PID Tuning Guide | Ziegler-Nichols method (Google it) |
-| Your Testing Codes | [Testing Codes/](file:///c:/Users/ADMIN/Desktop/Maze-Runner/Testing%20Codes) — reference implementations |
+| Your Testing Codes | [Testing Codes/](Testing%20Codes) — reference implementations |
 
 ---
 
