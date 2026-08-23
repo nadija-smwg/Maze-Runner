@@ -9,26 +9,44 @@
 #include "mpu6050.h"
 #include "../hardware/battery.h"
 #include "../hardware/encoder.h"
+#include <Arduino.h>
 
 void sensor_manager_init(void) {
-    /**
-     * TODO:
-     * mpu6050_init();
-     * distance_manager_init();
-     * battery_init();
-     * encoder_init();
-     */
+    battery_init();
+    encoder_init();
+
+    if (mpu6050_init()) {
+        Serial.println("[Sensor] MPU6050 Initialized.");
+    } else {
+        Serial.println("[Sensor] ERROR: MPU6050 failed to init.");
+    }
+
+    distance_manager_init();
 }
 
 void sensor_manager_update(void) {
-    /**
-     * TODO:
-     * distance_manager_update();
-     * // MPU6050 might be updated directly in the fast control loop (sensor_fusion)
-     * // instead of here, depending on timing requirements.
-     */
+    distance_manager_update();
+    // MPU6050 raw update can be done here, or in sensor_fusion loop
 }
 
 void sensor_manager_debug_print(void) {
-    /** TODO: Print distance, IMU, battery, encoder data to Serial */
+    Serial.print("[Sensor] F:");
+    Serial.print(distance_get_mm(TOF_FRONT));
+    Serial.print(" FL:");
+    Serial.print(distance_get_mm(TOF_FRONT_LEFT));
+    Serial.print(" FR:");
+    Serial.print(distance_get_mm(TOF_FRONT_RIGHT));
+    Serial.print(" L:");
+    Serial.print(distance_get_mm(TOF_LEFT));
+    Serial.print(" R:");
+    Serial.print(distance_get_mm(TOF_RIGHT));
+
+    IMUScaledData imu;
+    mpu6050_read_scaled(&imu);
+    Serial.print(" | GyroZ: ");
+    Serial.print(imu.gyro_z_dps, 1);
+    
+    Serial.print(" | Bat: ");
+    Serial.print(battery_get_voltage_mv());
+    Serial.println("mV");
 }

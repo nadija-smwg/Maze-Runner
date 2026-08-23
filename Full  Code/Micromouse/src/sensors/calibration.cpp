@@ -6,25 +6,41 @@
 
 #include "calibration.h"
 #include "mpu6050.h"
+#include "../display/oled_driver.h"
+#include <Arduino.h>
 
 bool calibrate_all(void) {
-    /**
-     * TODO:
-     * calibrate_gyro();
-     * // Other calibrations if needed
-     * return true;
-     */
-    return false;
+    oled_clear();
+    oled_print(0, 0, "Calibrating IMU");
+    oled_print(0, 15, "Hands off!");
+    oled_update();
+    
+    // Wait 2 seconds for the user to remove their hand and robot to stop shaking
+    delay(2000);
+    
+    oled_print(0, 30, "Calibrating...");
+    oled_update();
+
+    calibrate_gyro();
+
+    oled_clear();
+    oled_print(0, 0, "Calibration");
+    oled_print(0, 15, "Complete!");
+    oled_update();
+    delay(1000);
+
+    return true;
 }
 
 void calibrate_gyro(void) {
-    /** TODO: Call mpu6050_calibrate_gyro(500) */
+    // Collect 1000 samples for gyro calibration (~2 seconds)
+    mpu6050_calibrate_gyro(1000);
 }
 
 void calibrate_distance_sensors(void) {
-    /** TODO: Implement distance sensor offset measurement */
+    // Future implementation
 }
 
 void calibrate_encoders(void) {
-    /** TODO: Implement encoder tuning routine */
+    // Future implementation
 }

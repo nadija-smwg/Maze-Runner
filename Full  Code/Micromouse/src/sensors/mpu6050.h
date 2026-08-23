@@ -92,4 +92,10 @@ void mpu6050_calibrate_gyro(uint16_t samples);
  */
 bool mpu6050_is_calibrated(void);
 
+/**
+ * @brief Get the currently calibrated gyro Z bias
+ * @return The zero-offset bias for the Z axis
+ */
+float mpu6050_get_gyro_bias_z(void);
+
 #endif /* MPU6050_H */

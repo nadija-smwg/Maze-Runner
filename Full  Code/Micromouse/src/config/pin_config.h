@@ -110,11 +110,11 @@
  */
 
 /* Assigned XSHUT pins based on wiring plan */
-#define PIN_TOF_XSHUT_FRONT         PA4     /**< Front sensor XSHUT       */
-#define PIN_TOF_XSHUT_FRONT_LEFT    PA15    /**< Front-left (L-45°) sensor XSHUT  */
-#define PIN_TOF_XSHUT_FRONT_RIGHT   PB3     /**< Front-right (R-45°) sensor XSHUT */
-#define PIN_TOF_XSHUT_LEFT          PB1     /**< Left (L-90°) sensor XSHUT        */
-#define PIN_TOF_XSHUT_RIGHT         PC14    /**< Right (R-90°) sensor XSHUT       */
+#define PIN_TOF_XSHUT_FRONT         PA4     /**< Front sensor XSHUT               */
+#define PIN_TOF_XSHUT_FRONT_LEFT    PB1     /**< Front-left (L-45°) sensor XSHUT  */
+#define PIN_TOF_XSHUT_FRONT_RIGHT   PC14    /**< Front-right (R-45°) sensor XSHUT */
+#define PIN_TOF_XSHUT_LEFT          PA15    /**< Left (L-90°) sensor XSHUT        */
+#define PIN_TOF_XSHUT_RIGHT         PB3     /**< Right (R-90°) sensor XSHUT       */
 
 /* Assigned I2C addresses (default is 0x29, reassigned during init) */
 #define TOF_ADDR_FRONT              0x30    /**< Front sensor I2C address       */

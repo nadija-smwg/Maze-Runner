@@ -27,6 +27,8 @@
 #include "src/sensors/calibration.h"
 #include "src/sensors/sensor_fusion.h"
 #include "src/sensors/sensor_manager.h"
+#include "src/sensors/distance_manager.h"
+#include "src/sensors/mpu6050.h"
 
 // Localization
 #include "src/localization/odometry.h"
@@ -50,7 +52,8 @@
 
 // Phase testing mode flags (set to 1 for active test mode)
 #define PHASE_1_TEST_MODE 0
-#define PHASE_2_TEST_MODE 1
+#define PHASE_2_TEST_MODE 0
+#define PHASE_3_TEST_MODE 1
 
 #if PHASE_1_TEST_MODE == 1
 volatile uint32_t phase1_timer_ticks = 0;
@@ -60,6 +63,11 @@ void phase1_timer_callback(void) { phase1_timer_ticks++; }
 #if PHASE_2_TEST_MODE == 1
 volatile uint32_t phase2_timer_ticks = 0;
 void phase2_timer_callback(void) { phase2_timer_ticks++; }
+#endif
+
+#if PHASE_3_TEST_MODE == 1
+volatile uint32_t phase3_timer_ticks = 0;
+void phase3_timer_callback(void) { phase3_timer_ticks++; }
 #endif
 
 void setup() {
@@ -139,6 +147,41 @@ void setup() {
   LOG_INFO(" - Press BTN_MODE to zero/reset encoders.");
   return;
 #endif
+
+#if PHASE_3_TEST_MODE == 1
+  LOG_INFO("=== PHASE 3 SENSING TEST MODE ===");
+  button_init();
+  led_init();
+  battery_init();
+
+  Wire.setSCL(PIN_I2C_SCL);
+  Wire.setSDA(PIN_I2C_SDA);
+  Wire.begin();
+  Wire.setClock(400000);
+  if (oled_init()) {
+      oled_clear();
+      oled_print(0, 0, "Phase 3 Booting");
+      oled_update();
+  } else {
+      LOG_ERROR("OLED Init Failed");
+  }
+
+  // Initialize Sensors
+  sensor_manager_init();
+
+  // Calibrate Gyro
+  calibrate_all();
+
+  // Start 1kHz control loop timer
+  timer_init(phase3_timer_callback);
+  timer_start();
+
+  LOG_INFO("Phase 3 Ready!");
+  LOG_INFO(" - BTN_START: Re-calibrate Gyro");
+  LOG_INFO(" - BTN_MODE: Toggle Debug LED");
+  return;
+#endif
+
 
   // 1. Hardware Initialization (Motors, Pins, Encoders, Battery, etc.)
   gpio_init_motor_pins();
@@ -338,6 +381,81 @@ void loop() {
     Serial.print("mm, ");
     Serial.print(r_speed, 1);
     Serial.println("mm/s");
+  }
+
+  delay(5);
+  return;
+#endif
+
+#if PHASE_3_TEST_MODE == 1
+  button_update();
+  led_update();
+
+  if (button_just_pressed(BUTTON_START)) {
+      LOG_INFO("Re-calibrating Gyro...");
+      calibrate_all();
+  }
+  
+  if (button_just_pressed(BUTTON_MODE)) {
+      led_toggle(LED_DEBUG);
+  }
+
+  static uint32_t last_sensor_print = 0;
+  // Update sensors every 100ms (10Hz)
+  if ((phase3_timer_ticks - last_sensor_print) >= 100) {
+      last_sensor_print = phase3_timer_ticks;
+      
+      sensor_manager_update();
+      
+      IMUScaledData imu;
+      mpu6050_read_scaled(&imu);
+      
+      uint16_t dist_f = distance_get_mm(TOF_FRONT);
+      uint16_t dist_fl = distance_get_mm(TOF_FRONT_LEFT);
+      uint16_t dist_fr = distance_get_mm(TOF_FRONT_RIGHT);
+      uint16_t dist_l = distance_get_mm(TOF_LEFT);
+      uint16_t dist_r = distance_get_mm(TOF_RIGHT);
+      
+      char buf[32];
+      oled_clear();
+      oled_print(0, 0, "- Phase 3 Test -");
+      
+      sprintf(buf, "F:%u FL:%u FR:%u", dist_f, dist_fl, dist_fr);
+      oled_print(0, 15, buf);
+      
+      sprintf(buf, "L:%u R:%u", dist_l, dist_r);
+      oled_print(0, 25, buf);
+      
+      String gyroStr = String(imu.gyro_z_dps, 1);
+      sprintf(buf, "GyroZ: %s deg/s", gyroStr.c_str());
+      oled_print(0, 40, buf);
+      
+      sprintf(buf, "Bat: %u mV", battery_get_voltage_mv());
+      oled_print(0, 50, buf);
+      
+      oled_update();
+      
+      Serial.print("[Phase3] F:");
+      Serial.print(dist_f);
+      Serial.print(" FL:");
+      Serial.print(dist_fl);
+      Serial.print(" FR:");
+      Serial.print(dist_fr);
+      Serial.print(" L:");
+      Serial.print(dist_l);
+      Serial.print(" R:");
+      Serial.print(dist_r);
+      Serial.print(" | Gz:");
+      Serial.print(imu.gyro_z_dps, 1);
+      Serial.print(" | Bat:");
+      Serial.print(battery_get_voltage_mv());
+      Serial.print(" | BiasZ:");
+      Serial.print(mpu6050_get_gyro_bias_z(), 1);
+      
+      IMURawData raw;
+      mpu6050_read_raw(&raw);
+      Serial.print(" | RawZ:");
+      Serial.println(raw.gyro_z);
   }
 
   delay(5);
