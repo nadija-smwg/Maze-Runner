@@ -49,21 +49,17 @@
 #include "src/utils/serial_debug.h"
 
 // Phase testing mode flags (set to 1 for active test mode)
-#define PHASE_1_TEST_MODE 0
+#define PHASE_1_TEST_MODE 1
 #define PHASE_2_TEST_MODE 0
 
 #if PHASE_1_TEST_MODE == 1
 volatile uint32_t phase1_timer_ticks = 0;
-void phase1_timer_callback(void) {
-    phase1_timer_ticks++;
-}
+void phase1_timer_callback(void) { phase1_timer_ticks++; }
 #endif
 
 #if PHASE_2_TEST_MODE == 1
 volatile uint32_t phase2_timer_ticks = 0;
-void phase2_timer_callback(void) {
-    phase2_timer_ticks++;
-}
+void phase2_timer_callback(void) { phase2_timer_ticks++; }
 #endif
 
 void setup() {
@@ -114,7 +110,8 @@ void setup() {
   timer_start();
 
   LOG_INFO("Phase 2 Ready!");
-  LOG_INFO(" - Press BTN_START to cycle motor states (Stop -> Fwd -> Rev -> TurnL -> TurnR -> Stop).");
+  LOG_INFO(" - Press BTN_START to cycle motor states (Stop -> Fwd -> Rev -> "
+           "TurnL -> TurnR -> Stop).");
   LOG_INFO(" - Press BTN_MODE to zero/reset encoders.");
   return;
 #endif
@@ -194,25 +191,25 @@ void loop() {
 
   // Test button 0 (BUTTON_START)
   if (button_just_pressed(BUTTON_START)) {
-      LOG_INFO("BTN_START Pressed! Toggling debug LED.");
-      led_toggle(LED_DEBUG);
+    LOG_INFO("BTN_START Pressed! Toggling debug LED.");
+    led_toggle(LED_DEBUG);
   }
 
   // Test button 1 (BUTTON_MODE)
   if (button_just_pressed(BUTTON_MODE)) {
-      LOG_INFO("BTN_MODE Pressed! Toggling status LED.");
-      led_toggle(LED_STATUS);
+    LOG_INFO("BTN_MODE Pressed! Toggling status LED.");
+    led_toggle(LED_STATUS);
   }
 
   // Print timer heartbeat and battery status every 1000 ticks (~1 second)
   static uint32_t last_print_ticks = 0;
   if ((phase1_timer_ticks - last_print_ticks) >= 1000) {
-      last_print_ticks = phase1_timer_ticks;
-      Serial.print("[Heartbeat 1Hz] Timer Ticks: ");
-      Serial.print(phase1_timer_ticks);
-      Serial.print(" | Battery: ");
-      Serial.print(battery_get_voltage_mv());
-      Serial.println(" mV");
+    last_print_ticks = phase1_timer_ticks;
+    Serial.print("[Heartbeat 1Hz] Timer Ticks: ");
+    Serial.print(phase1_timer_ticks);
+    Serial.print(" | Battery: ");
+    Serial.print(battery_get_voltage_mv());
+    Serial.println(" mV");
   }
 
   delay(5);
@@ -225,59 +222,59 @@ void loop() {
 
   static int test_state = 0;
   if (button_just_pressed(BUTTON_START)) {
-      test_state = (test_state + 1) % 6;
-      switch (test_state) {
-          case 0:
-              motor_stop();
-              LOG_INFO("[State 0] Motors STOPPED.");
-              break;
-          case 1:
-              motor_forward(500);
-              LOG_INFO("[State 1] Motors FORWARD (PWM 500).");
-              break;
-          case 2:
-              motor_reverse(500);
-              LOG_INFO("[State 2] Motors REVERSE (PWM 500).");
-              break;
-          case 3:
-              motor_turn_left(500);
-              LOG_INFO("[State 3] Motors TURN LEFT (PWM 500).");
-              break;
-          case 4:
-              motor_turn_right(500);
-              LOG_INFO("[State 4] Motors TURN RIGHT (PWM 500).");
-              break;
-          case 5:
-              motor_stop();
-              LOG_INFO("[State 5] Motors STOPPED.");
-              break;
-      }
-      led_toggle(LED_DEBUG);
+    test_state = (test_state + 1) % 6;
+    switch (test_state) {
+    case 0:
+      motor_stop();
+      LOG_INFO("[State 0] Motors STOPPED.");
+      break;
+    case 1:
+      motor_forward(500);
+      LOG_INFO("[State 1] Motors FORWARD (PWM 500).");
+      break;
+    case 2:
+      motor_reverse(500);
+      LOG_INFO("[State 2] Motors REVERSE (PWM 500).");
+      break;
+    case 3:
+      motor_turn_left(500);
+      LOG_INFO("[State 3] Motors TURN LEFT (PWM 500).");
+      break;
+    case 4:
+      motor_turn_right(500);
+      LOG_INFO("[State 4] Motors TURN RIGHT (PWM 500).");
+      break;
+    case 5:
+      motor_stop();
+      LOG_INFO("[State 5] Motors STOPPED.");
+      break;
+    }
+    led_toggle(LED_DEBUG);
   }
 
   if (button_just_pressed(BUTTON_MODE)) {
-      encoder_reset_all();
-      LOG_INFO("Encoders Reset to 0!");
-      led_toggle(LED_STATUS);
+    encoder_reset_all();
+    LOG_INFO("Encoders Reset to 0!");
+    led_toggle(LED_STATUS);
   }
 
   static uint32_t last_enc_print = 0;
   if ((phase2_timer_ticks - last_enc_print) >= 500) {
-      last_enc_print = phase2_timer_ticks;
-      int32_t l_cnt = encoder_get_count(ENCODER_LEFT);
-      int32_t r_cnt = encoder_get_count(ENCODER_RIGHT);
-      float l_mm = encoder_counts_to_mm(l_cnt);
-      float r_mm = encoder_counts_to_mm(r_cnt);
+    last_enc_print = phase2_timer_ticks;
+    int32_t l_cnt = encoder_get_count(ENCODER_LEFT);
+    int32_t r_cnt = encoder_get_count(ENCODER_RIGHT);
+    float l_mm = encoder_counts_to_mm(l_cnt);
+    float r_mm = encoder_counts_to_mm(r_cnt);
 
-      Serial.print("[Phase 2 2Hz] L_Enc: ");
-      Serial.print(l_cnt);
-      Serial.print(" (");
-      Serial.print(l_mm, 1);
-      Serial.print(" mm) | R_Enc: ");
-      Serial.print(r_cnt);
-      Serial.print(" (");
-      Serial.print(r_mm, 1);
-      Serial.println(" mm)");
+    Serial.print("[Phase 2 2Hz] L_Enc: ");
+    Serial.print(l_cnt);
+    Serial.print(" (");
+    Serial.print(l_mm, 1);
+    Serial.print(" mm) | R_Enc: ");
+    Serial.print(r_cnt);
+    Serial.print(" (");
+    Serial.print(r_mm, 1);
+    Serial.println(" mm)");
   }
 
   delay(5);

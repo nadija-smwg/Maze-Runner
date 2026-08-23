@@ -17,7 +17,7 @@
  *  Private State
  * ═══════════════════════════════════════════════════════════════════════════ */
 
-/* TODO: Add any private state variables if needed (e.g., current direction) */
+/* No additional private state needed — direction is set via GPIO on each call */
 
 /* ═══════════════════════════════════════════════════════════════════════════
  *  Initialization

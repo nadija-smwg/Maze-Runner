@@ -28,21 +28,9 @@
  * Configures PA8 (TIM1_CH1) and PA9 (TIM1_CH2) for PWM Mode 1
  * at 20kHz using register-level access.
  *
- * TODO: Implement register-level TIM1 PWM setup:
- *       1. Enable GPIOA clock (RCC->AHB1ENR)
- *       2. Enable TIM1 clock (RCC->APB2ENR)
- *       3. Set PA8, PA9 to Alternate Function mode
- *       4. Set AF1 (TIM1) in GPIOA->AFR[1]
- *       5. Reset all TIM1 registers
- *       6. Set PSC=0, ARR=PWM_MAX (4199)
- *       7. Set CCR1=0, CCR2=0 (0% duty)
- *       8. Configure PWM Mode 1 on CH1 and CH2 (CCMR1)
- *       9. Enable preload on CH1 and CH2
- *      10. Enable output channels (CCER)
- *      11. Enable Main Output (BDTR |= MOE)
- *      12. Generate update event (EGR = UG)
- *      13. Enable auto-reload preload (CR1 |= ARPE)
- *      14. Start timer (CR1 |= CEN)
+ * Implementation uses register-level access:
+ * GPIOA clock, TIM1 clock, PA8/PA9 AF1, PSC=0, ARR=4199,
+ * PWM Mode 1 on CH1/CH2, preload, BDTR MOE, ARPE, CEN.
  */
 void pwm_init(void);
 
@@ -51,7 +39,7 @@ void pwm_init(void);
  *
  * @param duty Duty cycle value (0 to PWM_MAX)
  *
- * TODO: Clamp duty to [0, PWM_MAX], then set TIM1->CCR1 = duty.
+ * Clamps duty to [0, PWM_MAX] and writes to TIM1->CCR1.
  */
 void pwm_set_left(uint16_t duty);
 
@@ -60,7 +48,7 @@ void pwm_set_left(uint16_t duty);
  *
  * @param duty Duty cycle value (0 to PWM_MAX)
  *
- * TODO: Clamp duty to [0, PWM_MAX], then set TIM1->CCR2 = duty.
+ * Clamps duty to [0, PWM_MAX] and writes to TIM1->CCR2.
  */
 void pwm_set_right(uint16_t duty);
 
@@ -70,7 +58,7 @@ void pwm_set_right(uint16_t duty);
  * @param left_duty  Left motor duty (0 to PWM_MAX)
  * @param right_duty Right motor duty (0 to PWM_MAX)
  *
- * TODO: Set TIM1->CCR1 and TIM1->CCR2.
+ * Calls pwm_set_left() and pwm_set_right().
  */
 void pwm_set_both(uint16_t left_duty, uint16_t right_duty);
 

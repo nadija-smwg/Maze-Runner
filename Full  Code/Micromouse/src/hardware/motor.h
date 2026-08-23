@@ -14,7 +14,7 @@
  * Dependencies: pwm, gpio, pin_config, robot_config
  *
  * @see pwm.h for TIM1 PWM initialization
- * @see gpio.h for direction pin abstraction
+ * @see gpio.h for pin abstraction
  */
 
 #ifndef MOTOR_H
@@ -57,8 +57,7 @@ typedef enum {
  * Sets up direction pins as outputs and activates the STBY pin.
  * Must be called after pwm_init() since motors need PWM to function.
  *
- * TODO: Implement direction pin initialization via pinMode().
- * TODO: Set STBY pin HIGH to enable the motor driver.
+ * Calls gpio_init_motor_pins(), gpio_set_standby(true), and motor_stop().
  */
 void motor_init(void);
 
@@ -71,8 +70,7 @@ void motor_init(void);
  * @param motor Motor identifier (MOTOR_LEFT or MOTOR_RIGHT)
  * @param pwm   Signed PWM value (-PWM_MAX to PWM_MAX)
  *
- * TODO: Implement direction setting based on sign of pwm.
- * TODO: Implement PWM duty cycle setting via TIM1 CCR registers.
+ * Sets direction via gpio and duty via TIM1 CCR based on sign of pwm.
  */
 void motor_set_speed(MotorID motor, int16_t pwm);
 
@@ -82,11 +80,11 @@ void motor_set_speed(MotorID motor, int16_t pwm);
  * @param motor Motor identifier
  * @param dir   Desired direction
  *
- * TODO: Implement direction pin logic for TB6612FNG:
- *       FORWARD: IN1=HIGH, IN2=LOW
- *       REVERSE: IN1=LOW,  IN2=HIGH
- *       BRAKE:   IN1=HIGH, IN2=HIGH
- *       COAST:   IN1=LOW,  IN2=LOW
+ * Direction pin truth table for TB6612FNG:
+ *   FORWARD: IN1=HIGH, IN2=LOW
+ *   REVERSE: IN1=LOW,  IN2=HIGH
+ *   BRAKE:   IN1=HIGH, IN2=HIGH
+ *   COAST:   IN1=LOW,  IN2=LOW
  */
 void motor_set_direction(MotorID motor, MotorDirection dir);
 
@@ -98,14 +96,14 @@ void motor_set_direction(MotorID motor, MotorDirection dir);
  * @param left_pwm  Left motor PWM  (-PWM_MAX to PWM_MAX)
  * @param right_pwm Right motor PWM (-PWM_MAX to PWM_MAX)
  *
- * TODO: Implement as calls to motor_set_speed() for each motor.
+ * Delegates to motor_set_speed() for each motor.
  */
 void motor_set_both(int16_t left_pwm, int16_t right_pwm);
 
 /**
  * @brief Stop both motors with active braking.
  *
- * TODO: Implement by setting both motors to BRAKE and PWM to 0.
+ * Sets both motors to BRAKE direction with PWM=0.
  */
 void motor_stop(void);
 
@@ -114,7 +112,7 @@ void motor_stop(void);
  *
  * @param enable true = motors active, false = motors in standby
  *
- * TODO: Implement STBY pin control.
+ * Controls STBY pin via gpio_set_standby().
  */
 void motor_enable(bool enable);
 
@@ -123,7 +121,7 @@ void motor_enable(bool enable);
  *
  * @param pwm PWM value (0 to PWM_MAX)
  *
- * TODO: Implement as motor_set_both(pwm, pwm).
+ * Calls motor_set_both(pwm, pwm).
  */
 void motor_forward(uint16_t pwm);
 
@@ -132,7 +130,7 @@ void motor_forward(uint16_t pwm);
  *
  * @param pwm PWM value (0 to PWM_MAX)
  *
- * TODO: Implement as motor_set_both(-pwm, -pwm).
+ * Calls motor_set_both(-pwm, -pwm).
  */
 void motor_reverse(uint16_t pwm);
 
@@ -141,7 +139,7 @@ void motor_reverse(uint16_t pwm);
  *
  * @param pwm PWM value (0 to PWM_MAX)
  *
- * TODO: Implement as motor_set_both(-pwm, pwm).
+ * Calls motor_set_both(-pwm, pwm).
  */
 void motor_turn_left(uint16_t pwm);
 
@@ -150,7 +148,7 @@ void motor_turn_left(uint16_t pwm);
  *
  * @param pwm PWM value (0 to PWM_MAX)
  *
- * TODO: Implement as motor_set_both(pwm, -pwm).
+ * Calls motor_set_both(pwm, -pwm).
  */
 void motor_turn_right(uint16_t pwm);
 

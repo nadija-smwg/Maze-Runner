@@ -11,20 +11,22 @@
 #ifndef BATTERY_H
 #define BATTERY_H
 
-#include <stdint.h>
-#include <stdbool.h>
 #include "../config/pin_config.h"
 #include "../config/robot_config.h"
+#include <stdbool.h>
+#include <stdint.h>
+
 
 /* ═══════════════════════════════════════════════════════════════════════════
  *  Public API
- * ═══════════════════════════════════════════════════════════════════════════ */
+ * ═══════════════════════════════════════════════════════════════════════════
+ */
 
 /**
  * @brief Initialize the battery monitoring ADC.
  *
- * TODO: Configure the battery sense pin as analog input.
- * TODO: Initialize ADC if not already done by analogRead().
+ * Configures PIN_BATTERY_SENSE as analog input with 12-bit resolution
+ * and seeds the EMA smoothing filter with an initial reading.
  */
 void battery_init(void);
 
@@ -33,9 +35,8 @@ void battery_init(void);
  *
  * @return Battery voltage (mV)
  *
- * TODO: Read ADC value from PIN_BATTERY_SENSE.
- * TODO: Convert ADC value to voltage using BATTERY_DIVIDER_RATIO.
- * TODO: Apply smoothing filter to reduce noise.
+ * Reads 12-bit ADC, applies voltage divider ratio, and smooths
+ * with an exponential moving average filter (80/20 blend).
  */
 uint16_t battery_get_voltage_mv(void);
 
@@ -44,7 +45,7 @@ uint16_t battery_get_voltage_mv(void);
  *
  * @return Battery percentage (0–100)
  *
- * TODO: Map voltage between BATTERY_CRITICAL_MV and BATTERY_FULL_MV.
+ * Linearly maps voltage between BATTERY_CRITICAL_MV and BATTERY_FULL_MV.
  */
 uint8_t battery_get_percentage(void);
 
@@ -53,7 +54,7 @@ uint8_t battery_get_percentage(void);
  *
  * @return true if voltage < BATTERY_LOW_MV
  *
- * TODO: Implement threshold check.
+ * Compares smoothed voltage against BATTERY_LOW_MV threshold.
  */
 bool battery_is_low(void);
 
@@ -62,7 +63,7 @@ bool battery_is_low(void);
  *
  * @return true if voltage < BATTERY_CRITICAL_MV
  *
- * TODO: Implement threshold check.
+ * Compares smoothed voltage against BATTERY_CRITICAL_MV threshold.
  */
 bool battery_is_critical(void);
 

@@ -14,13 +14,15 @@
 #ifndef TIMER_H
 #define TIMER_H
 
-#include <stdint.h>
-#include <stdbool.h>
 #include "../config/robot_config.h"
+#include <stdbool.h>
+#include <stdint.h>
+
 
 /* ═══════════════════════════════════════════════════════════════════════════
  *  Control Loop Callback Type
- * ═══════════════════════════════════════════════════════════════════════════ */
+ * ═══════════════════════════════════════════════════════════════════════════
+ */
 
 /**
  * @brief Control loop callback function pointer type.
@@ -32,7 +34,8 @@ typedef void (*ControlLoopCallback)(void);
 
 /* ═══════════════════════════════════════════════════════════════════════════
  *  Public API
- * ═══════════════════════════════════════════════════════════════════════════ */
+ * ═══════════════════════════════════════════════════════════════════════════
+ */
 
 /**
  * @brief Initialize the control loop timer.
@@ -42,17 +45,8 @@ typedef void (*ControlLoopCallback)(void);
  *
  * @param callback Function to call at each control tick (1kHz)
  *
- * TODO: Implement using TIM4 or HardwareTimer from Arduino STM32:
- *       - Configure timer for 1kHz interrupt
- *       - Register callback in the ISR
- *       - Start the timer
- *
- * TODO: Alternative: Use register-level setup for TIM4:
- *       - Enable TIM4 clock
- *       - Set PSC and ARR for 1kHz
- *       - Enable update interrupt (DIER)
- *       - Set NVIC priority
- *       - Start timer
+ * Implementation: Uses TIM4 HardwareTimer with setOverflow(1000, HERTZ_FORMAT)
+ * and attachInterrupt() to fire a 1kHz ISR that invokes the callback.
  */
 void timer_init(ControlLoopCallback callback);
 
@@ -61,7 +55,7 @@ void timer_init(ControlLoopCallback callback);
  *
  * Enables the timer interrupt to begin calling the callback.
  *
- * TODO: Enable the timer (TIMx->CR1 |= CEN) and NVIC interrupt.
+ * Calls HardwareTimer::resume() to start the TIM4 clock and enable interrupts.
  */
 void timer_start(void);
 
@@ -70,7 +64,7 @@ void timer_start(void);
  *
  * Disables the timer interrupt. Useful during calibration or menu mode.
  *
- * TODO: Disable the timer and NVIC interrupt.
+ * Calls HardwareTimer::pause() to stop the TIM4 clock.
  */
 void timer_stop(void);
 
@@ -81,14 +75,14 @@ void timer_stop(void);
  *
  * @return true if a tick has occurred since last call
  *
- * TODO: Implement using a volatile flag set in the ISR.
+ * Uses a volatile bool flag set in the TIM4 ISR.
  */
 bool timer_tick_pending(void);
 
 /**
  * @brief Clear the tick pending flag.
  *
- * TODO: Reset the volatile tick flag.
+ * Resets the volatile tick flag to false.
  */
 void timer_tick_clear(void);
 
@@ -97,8 +91,7 @@ void timer_tick_clear(void);
  *
  * @return Microseconds since boot
  *
- * TODO: Use micros() from Arduino or implement via DWT cycle counter
- *       for sub-microsecond precision.
+ * Uses Arduino STM32 core micros() which leverages the DWT cycle counter.
  */
 uint32_t timer_micros(void);
 

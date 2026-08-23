@@ -10,28 +10,29 @@
 #ifndef BUTTON_H
 #define BUTTON_H
 
-#include <stdbool.h>
 #include "../config/pin_config.h"
+#include <stdbool.h>
+
 
 /**
  * @brief Button identifier enum.
  */
 typedef enum {
-    BUTTON_START = 0,   /**< Start/run button */
-    BUTTON_MODE  = 1    /**< Mode select button */
+  BUTTON_START = 0, /**< Start/run button */
+  BUTTON_MODE = 1   /**< Mode select button */
 } ButtonID;
 
 /**
  * @brief Initialize button GPIO pins with internal pull-ups.
  *
- * TODO: Configure button pins as INPUT_PULLUP.
+ * Configures PIN_BUTTON_START and PIN_BUTTON_MODE as INPUT_PULLUP.
  */
 void button_init(void);
 
 /**
  * @brief Update button debounce state. Call this at regular intervals (~10ms).
  *
- * TODO: Implement software debouncing (sample, compare, update state).
+ * Implements 20ms software debouncing with edge detection.
  */
 void button_update(void);
 
@@ -58,7 +59,7 @@ bool button_just_pressed(ButtonID btn);
  *
  * @param btn Button identifier
  *
- * TODO: Implement blocking wait with debounce.
+ * Polls button_update() in a tight loop with 10ms delay until press+release.
  */
 void button_wait_press(ButtonID btn);
 

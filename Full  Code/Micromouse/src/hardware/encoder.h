@@ -49,21 +49,15 @@ typedef enum {
  * Configures TIM2 and TIM3 in Encoder Mode 3 (counts on both edges of
  * both channels) using direct register access.
  *
- * TODO: Implement register-level setup for TIM2 (32-bit, PA0/PA1):
- *       - Enable GPIOA and TIM2 clocks
- *       - Set PA0, PA1 to Alternate Function (AF1 for TIM2)
- *       - Configure Encoder Mode 3 (SMS=011)
- *       - Set input capture with filter
- *       - Set ARR to 0xFFFFFFFF (32-bit full range)
- *       - Start timer
+ * Implementation uses register-level access for both timers:
  *
- * TODO: Implement register-level setup for TIM3 (16-bit, PA6/PA7):
- *       - Enable GPIOA and TIM3 clocks
- *       - Set PA6, PA7 to Alternate Function (AF2 for TIM3)
- *       - Configure Encoder Mode 3
- *       - Set input capture with filter
- *       - Set ARR to 0xFFFF (16-bit full range)
- *       - Start timer
+ * TIM2 (32-bit, PA0/PA1, AF1):
+ *   GPIOA+TIM2 clocks, AF1, Encoder Mode 3 (SMS=011),
+ *   IC filter, ARR=0xFFFFFFFF, CEN.
+ *
+ * TIM3 (16-bit, PA6/PA7, AF2):
+ *   GPIOA+TIM3 clocks, AF2, Encoder Mode 3 (SMS=011),
+ *   IC filter, ARR=0xFFFF, CEN.
  */
 void encoder_init(void);
 
@@ -76,8 +70,8 @@ void encoder_init(void);
  * @param enc Encoder identifier
  * @return    Raw encoder count (signed, handles wrap-around)
  *
- * TODO: Implement TIM2->CNT read (32-bit, direct cast).
- * TODO: Implement TIM3->CNT read (16-bit, cast through int16_t for sign).
+ * TIM2: direct (int32_t) cast of CNT.
+ * TIM3: cast CNT through (int16_t) for sign extension, then to int32_t.
  */
 int32_t encoder_get_count(EncoderID enc);
 
@@ -90,8 +84,7 @@ int32_t encoder_get_count(EncoderID enc);
  * @param enc Encoder identifier
  * @return    Count change since last call (positive = forward)
  *
- * TODO: Implement delta calculation with proper overflow handling.
- * TODO: For TIM3 (16-bit), use int16_t arithmetic for correct wrap-around.
+ * Uses int16_t subtraction for TIM3 to handle 16-bit wrap-around correctly.
  */
 int32_t encoder_get_delta(EncoderID enc);
 
@@ -100,14 +93,14 @@ int32_t encoder_get_delta(EncoderID enc);
  *
  * @param enc Encoder identifier
  *
- * TODO: Set TIMx->CNT = 0 and reset internal tracking variables.
+ * Sets TIMx->CNT = 0 and resets internal tracking variables.
  */
 void encoder_reset(EncoderID enc);
 
 /**
  * @brief Reset both encoders to zero.
  *
- * TODO: Reset TIM2->CNT and TIM3->CNT and all tracking state.
+ * Resets TIM2->CNT and TIM3->CNT to 0 and clears all tracking state.
  */
 void encoder_reset_all(void);
 
@@ -117,7 +110,7 @@ void encoder_reset_all(void);
  * @param counts Raw encoder count value
  * @return       Distance in mm
  *
- * TODO: Implement as: counts * MM_PER_COUNT
+ * Computes: counts * MM_PER_COUNT
  */
 float encoder_counts_to_mm(int32_t counts);
 
@@ -127,7 +120,7 @@ float encoder_counts_to_mm(int32_t counts);
  * @param counts_per_sec Encoder count rate
  * @return               Speed in mm/s
  *
- * TODO: Implement as: counts_per_sec * MM_PER_COUNT
+ * Computes: counts_per_sec * MM_PER_COUNT
  */
 float encoder_counts_to_speed(float counts_per_sec);
 
@@ -137,7 +130,7 @@ float encoder_counts_to_speed(float counts_per_sec);
  * @param counts_per_sec Encoder count rate
  * @return               Motor shaft RPM
  *
- * TODO: Implement as: (counts_per_sec * 60.0f) / ENCODER_CPR
+ * Computes: (counts_per_sec * 60.0f) / ENCODER_CPR
  */
 float encoder_counts_to_rpm(float counts_per_sec);
 
