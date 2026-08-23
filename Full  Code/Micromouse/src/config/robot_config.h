@@ -43,17 +43,17 @@
  *  @{
  */
 
-#define WHEEL_DIAMETER_MM       34.0f   /**< Wheel outer diameter (mm)      */
+#define WHEEL_DIAMETER_MM       43.0f   /**< Wheel outer diameter (mm)      */
 
 /**
  * Wheel circumference (mm).
- * C = π × D = π × 34.0 ≈ 106.81 mm
+ * C = π × D = π × 43.0 ≈ 135.09 mm
  */
 #define WHEEL_CIRCUMFERENCE_MM  (3.14159265358979f * WHEEL_DIAMETER_MM)
 
 /**
  * Distance per encoder count (mm/count).
- * = Circumference / CPR ≈ 106.81 / 1820 ≈ 0.0587 mm/count
+ * = Circumference / CPR ≈ 135.09 / 1820 ≈ 0.0742 mm/count
  */
 #define MM_PER_COUNT            (WHEEL_CIRCUMFERENCE_MM / ENCODER_CPR)
 
@@ -73,7 +73,7 @@
  *
  * TODO: Measure actual wheel base on your robot and update this value.
  */
-#define WHEEL_BASE_MM           75.0f   /**< TODO: Measure and update       */
+#define WHEEL_BASE_MM           93.0f   /**< Measured wheel base       */
 
 /**
  * Distance from wheel axle to front sensor mounting point (mm).

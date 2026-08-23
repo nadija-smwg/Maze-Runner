@@ -15,11 +15,8 @@ void odometry_init(void);
 
 /**
  * @brief Update the odometry pose based on encoder deltas.
- *
- * @param left_delta_mm Left wheel travel distance
- * @param right_delta_mm Right wheel travel distance
  */
-void odometry_update(float left_delta_mm, float right_delta_mm);
+void odometry_update(void);
 
 /**
  * @brief Get the current odometry pose.

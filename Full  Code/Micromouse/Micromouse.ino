@@ -53,7 +53,8 @@
 // Phase testing mode flags (set to 1 for active test mode)
 #define PHASE_1_TEST_MODE 0
 #define PHASE_2_TEST_MODE 0
-#define PHASE_3_TEST_MODE 1
+#define PHASE_3_TEST_MODE 0
+#define PHASE_4_TEST_MODE 1
 
 #if PHASE_1_TEST_MODE == 1
 volatile uint32_t phase1_timer_ticks = 0;
@@ -68,6 +69,13 @@ void phase2_timer_callback(void) { phase2_timer_ticks++; }
 #if PHASE_3_TEST_MODE == 1
 volatile uint32_t phase3_timer_ticks = 0;
 void phase3_timer_callback(void) { phase3_timer_ticks++; }
+#endif
+
+#if PHASE_4_TEST_MODE == 1
+volatile uint32_t phase4_timer_ticks = 0;
+void phase4_timer_callback(void) { 
+    phase4_timer_ticks++; 
+}
 #endif
 
 void setup() {
@@ -179,6 +187,34 @@ void setup() {
   LOG_INFO("Phase 3 Ready!");
   LOG_INFO(" - BTN_START: Re-calibrate Gyro");
   LOG_INFO(" - BTN_MODE: Toggle Debug LED");
+  return;
+#endif
+
+#if PHASE_4_TEST_MODE == 1
+  LOG_INFO("=== PHASE 4 SENSOR FUSION TEST MODE ===");
+  button_init();
+  led_init();
+  battery_init();
+  encoder_init();
+
+  Wire.setSCL(PIN_I2C_SCL);
+  Wire.setSDA(PIN_I2C_SDA);
+  Wire.begin();
+  Wire.setClock(400000);
+  if (oled_init()) {
+      oled_clear();
+      oled_print(0, 0, "Phase 4 Booting");
+      oled_update();
+  }
+
+  sensor_manager_init();
+  calibrate_all();
+  fusion_init();
+
+  timer_init(phase4_timer_callback);
+  timer_start();
+
+  LOG_INFO("Phase 4 Ready!");
   return;
 #endif
 
@@ -458,6 +494,66 @@ void loop() {
       Serial.println(raw.gyro_z);
   }
 
+  delay(5);
+  return;
+#endif
+
+#if PHASE_4_TEST_MODE == 1
+  button_update();
+  led_update();
+  
+  static uint32_t last_sensor_tick = millis();
+  if (millis() - last_sensor_tick >= 50) { // 20Hz ToF updates
+      last_sensor_tick = millis();
+      sensor_manager_update(); 
+  }
+
+  static uint32_t last_fusion_tick = millis();
+  uint32_t now = millis();
+  float dt = (now - last_fusion_tick) / 1000.0f;
+  
+  // Guard against 0 dt if loop is extremely fast
+  if (dt > 0.0f) {
+      fusion_update(dt);
+      last_fusion_tick = now;
+  }
+
+  static uint32_t last_print = 0;
+  if ((now - last_print) >= 100) {
+      last_print = now;
+      Pose p = position_estimator_get_pose();
+      
+      char buf[32];
+      oled_clear();
+      oled_print(0, 0, "- Phase 4 -");
+      
+      // Also add button functionality to reset the pose
+      if (button_is_pressed(BUTTON_MODE)) {
+          fusion_reset_heading(0.0f);
+          Pose zero = {0.0f, 0.0f, 0.0f};
+          odometry_set_pose(zero);
+      }
+      
+      sprintf(buf, "X: %d mm", (int)p.x_mm);
+      oled_print(0, 15, buf);
+      
+      sprintf(buf, "Y: %d mm", (int)p.y_mm);
+      oled_print(0, 25, buf);
+      
+      float deg = p.theta_rad * (180.0f / 3.14159265f);
+      sprintf(buf, "H: %d deg", (int)deg);
+      oled_print(0, 40, buf);
+      
+      oled_update();
+      
+      Serial.print("[Phase4] X: ");
+      Serial.print(p.x_mm, 1);
+      Serial.print(" mm | Y: ");
+      Serial.print(p.y_mm, 1);
+      Serial.print(" mm | H: ");
+      Serial.print(deg, 1);
+      Serial.println(" deg");
+  }
   delay(5);
   return;
 #endif
