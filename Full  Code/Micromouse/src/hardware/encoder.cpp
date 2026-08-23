@@ -120,30 +120,31 @@ void encoder_init(void) {
 
 int32_t encoder_get_count(EncoderID enc) {
     if (enc == ENCODER_LEFT) {
-        // TIM2 is a 32-bit timer, direct cast is safe and accurate
-        return (int32_t)TIM2->CNT;
-    } else {
-        // TIM3 is a 16-bit timer: cast to int16_t first for sign extension,
-        // then upgrade to int32_t.
-        // Hardware correction: right motor is physically reversed, so negate count.
+        // Left is now TIM3 (16-bit) due to swapped wiring
+        // Negated because it counts backwards when moving forward
         return -((int32_t)(int16_t)TIM3->CNT);
+    } else {
+        // Right is now TIM2 (32-bit), physically reversed
+        // Negated again (so positive) to count upwards when moving forward
+        return (int32_t)TIM2->CNT;
     }
 }
 
 int32_t encoder_get_delta(EncoderID enc) {
     if (enc == ENCODER_LEFT) {
-        int32_t current = (int32_t)TIM2->CNT;
-        int32_t delta = current - _last_left_count;
-        _last_left_count = current;
-        return delta;
-    } else {
-        // For 16-bit TIM3, perform subtraction in 16-bit signed math so overflows/underflows
-        // wrap around correctly, then cast to 32-bit signed integer.
-        // Hardware correction: right motor is physically reversed, so negate delta.
+        // Left is now TIM3 (16-bit)
         int16_t current = (int16_t)TIM3->CNT;
-        int16_t delta = current - (int16_t)_last_right_count;
-        _last_right_count = current;
+        int16_t delta = current - (int16_t)_last_left_count;
+        _last_left_count = current;
+        // Negated because it counts backwards when moving forward
         return -((int32_t)delta);
+    } else {
+        // Right is now TIM2 (32-bit), physically reversed
+        int32_t current = (int32_t)TIM2->CNT;
+        int32_t delta = current - _last_right_count;
+        _last_right_count = current;
+        // Negated again (so positive) to count upwards when moving forward
+        return delta;
     }
 }
 
@@ -153,10 +154,10 @@ int32_t encoder_get_delta(EncoderID enc) {
 
 void encoder_reset(EncoderID enc) {
     if (enc == ENCODER_LEFT) {
-        TIM2->CNT = 0;
+        TIM3->CNT = 0;
         _last_left_count = 0;
     } else {
-        TIM3->CNT = 0;
+        TIM2->CNT = 0;
         _last_right_count = 0;
     }
 }

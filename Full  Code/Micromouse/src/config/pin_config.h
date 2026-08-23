@@ -21,15 +21,15 @@
  *  @{
  */
 
-/* Left Motor (Motor A) */
-#define PIN_MOTOR_LEFT_PWM      PA8     /**< TIM1_CH1 — Left motor PWM      */
-#define PIN_MOTOR_LEFT_IN1      PB13    /**< AIN1 — Left motor direction 1 (Swapped) */
-#define PIN_MOTOR_LEFT_IN2      PB12    /**< AIN2 — Left motor direction 2 (Swapped) */
+/* Left Motor (Motor B - Swapped to fix physical wiring) */
+#define PIN_MOTOR_LEFT_PWM      PA9     /**< TIM1_CH2 — Left motor PWM      */
+#define PIN_MOTOR_LEFT_IN1      PB15    /**< BIN1 — Left motor direction 1  */
+#define PIN_MOTOR_LEFT_IN2      PA10    /**< BIN2 — Left motor direction 2  */
 
-/* Right Motor (Motor B) */
-#define PIN_MOTOR_RIGHT_PWM     PA9     /**< TIM1_CH2 — Right motor PWM     */
-#define PIN_MOTOR_RIGHT_IN1     PB15    /**< BIN1 — Right motor direction 1 */
-#define PIN_MOTOR_RIGHT_IN2     PA10    /**< BIN2 — Right motor direction 2 */
+/* Right Motor (Motor A - Swapped to fix physical wiring) */
+#define PIN_MOTOR_RIGHT_PWM     PA8     /**< TIM1_CH1 — Right motor PWM     */
+#define PIN_MOTOR_RIGHT_IN1     PB13    /**< AIN1 — Right motor direction 1 */
+#define PIN_MOTOR_RIGHT_IN2     PB12    /**< AIN2 — Right motor direction 2 */
 
 /* Standby */
 #define PIN_MOTOR_STBY          PB14    /**< STBY — Motor driver enable     */
