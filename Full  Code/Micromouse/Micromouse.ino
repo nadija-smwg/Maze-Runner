@@ -49,8 +49,8 @@
 #include "src/utils/serial_debug.h"
 
 // Phase testing mode flags (set to 1 for active test mode)
-#define PHASE_1_TEST_MODE 1
-#define PHASE_2_TEST_MODE 0
+#define PHASE_1_TEST_MODE 0
+#define PHASE_2_TEST_MODE 1
 
 #if PHASE_1_TEST_MODE == 1
 volatile uint32_t phase1_timer_ticks = 0;
@@ -73,6 +73,18 @@ void setup() {
   button_init();
   led_init();
   battery_init();
+
+  Wire.setSCL(PIN_I2C_SCL);
+  Wire.setSDA(PIN_I2C_SDA);
+  Wire.begin();
+  Wire.setClock(400000);
+  if (oled_init()) {
+      oled_clear();
+      oled_print(0, 0, "Phase 1 Test Mode");
+      oled_update();
+  } else {
+      LOG_ERROR("OLED Init Failed");
+  }
 
   uint16_t v_mv = battery_get_voltage_mv();
   uint8_t v_pct = battery_get_percentage();
@@ -101,6 +113,18 @@ void setup() {
   button_init();
   led_init();
   battery_init();
+
+  Wire.setSCL(PIN_I2C_SCL);
+  Wire.setSDA(PIN_I2C_SDA);
+  Wire.begin();
+  Wire.setClock(400000);
+  if (oled_init()) {
+      oled_clear();
+      oled_print(0, 0, "Phase 2 Test Mode");
+      oled_update();
+  } else {
+      LOG_ERROR("OLED Init Failed");
+  }
 
   // Reset encoders to zero
   encoder_reset_all();
@@ -205,6 +229,16 @@ void loop() {
   static uint32_t last_print_ticks = 0;
   if ((phase1_timer_ticks - last_print_ticks) >= 1000) {
     last_print_ticks = phase1_timer_ticks;
+    
+    char buf[32];
+    oled_clear();
+    oled_print(0, 0, "Phase 1 Test");
+    sprintf(buf, "Ticks: %lu", phase1_timer_ticks);
+    oled_print(0, 16, buf);
+    sprintf(buf, "Bat: %u mV", battery_get_voltage_mv());
+    oled_print(0, 32, buf);
+    oled_update();
+
     Serial.print("[Heartbeat 1Hz] Timer Ticks: ");
     Serial.print(phase1_timer_ticks);
     Serial.print(" | Battery: ");
@@ -229,20 +263,20 @@ void loop() {
       LOG_INFO("[State 0] Motors STOPPED.");
       break;
     case 1:
-      motor_forward(500);
-      LOG_INFO("[State 1] Motors FORWARD (PWM 500).");
+      motor_forward(1500);
+      LOG_INFO("[State 1] Motors FORWARD (PWM 1500).");
       break;
     case 2:
-      motor_reverse(500);
-      LOG_INFO("[State 2] Motors REVERSE (PWM 500).");
+      motor_reverse(1500);
+      LOG_INFO("[State 2] Motors REVERSE (PWM 1500).");
       break;
     case 3:
-      motor_turn_left(500);
-      LOG_INFO("[State 3] Motors TURN LEFT (PWM 500).");
+      motor_turn_left(1500);
+      LOG_INFO("[State 3] Motors TURN LEFT (PWM 1500).");
       break;
     case 4:
-      motor_turn_right(500);
-      LOG_INFO("[State 4] Motors TURN RIGHT (PWM 500).");
+      motor_turn_right(1500);
+      LOG_INFO("[State 4] Motors TURN RIGHT (PWM 1500).");
       break;
     case 5:
       motor_stop();
@@ -261,20 +295,42 @@ void loop() {
   static uint32_t last_enc_print = 0;
   if ((phase2_timer_ticks - last_enc_print) >= 500) {
     last_enc_print = phase2_timer_ticks;
+    
+    // 1. Get absolute positions
     int32_t l_cnt = encoder_get_count(ENCODER_LEFT);
     int32_t r_cnt = encoder_get_count(ENCODER_RIGHT);
     float l_mm = encoder_counts_to_mm(l_cnt);
     float r_mm = encoder_counts_to_mm(r_cnt);
 
-    Serial.print("[Phase 2 2Hz] L_Enc: ");
-    Serial.print(l_cnt);
-    Serial.print(" (");
+    // 2. Get deltas to calculate speed
+    // This block runs every 500ms (0.5s), so multiply delta by 2 for counts_per_sec
+    int32_t l_delta = encoder_get_delta(ENCODER_LEFT);
+    int32_t r_delta = encoder_get_delta(ENCODER_RIGHT);
+    
+    float l_speed = encoder_counts_to_speed(l_delta * 2.0f);
+    float r_speed = encoder_counts_to_speed(r_delta * 2.0f);
+
+    // Update OLED
+    char buf[32];
+    oled_clear();
+    oled_print(0, 0, "Phase 2 Test");
+    sprintf(buf, "L: %.1f mm/s", l_speed);
+    oled_print(0, 16, buf);
+    sprintf(buf, "R: %.1f mm/s", r_speed);
+    oled_print(0, 32, buf);
+    sprintf(buf, "DL:%.0f DR:%.0f", l_mm, r_mm); // Distances
+    oled_print(0, 48, buf);
+    oled_update();
+
+    Serial.print("[Phase 2 2Hz] L: ");
     Serial.print(l_mm, 1);
-    Serial.print(" mm) | R_Enc: ");
-    Serial.print(r_cnt);
-    Serial.print(" (");
+    Serial.print("mm, ");
+    Serial.print(l_speed, 1);
+    Serial.print("mm/s | R: ");
     Serial.print(r_mm, 1);
-    Serial.println(" mm)");
+    Serial.print("mm, ");
+    Serial.print(r_speed, 1);
+    Serial.println("mm/s");
   }
 
   delay(5);
