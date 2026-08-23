@@ -313,13 +313,20 @@ void loop() {
     // Update OLED
     char buf[32];
     oled_clear();
-    oled_print(0, 0, "Phase 2 Test");
-    sprintf(buf, "L: %.1f mm/s", l_speed);
-    oled_print(0, 16, buf);
-    sprintf(buf, "R: %.1f mm/s", r_speed);
-    oled_print(0, 32, buf);
-    sprintf(buf, "DL:%.0f DR:%.0f", l_mm, r_mm); // Distances
-    oled_print(0, 48, buf);
+    oled_print(0, 0, "- Phase 2 Test -");
+    
+    sprintf(buf, "Spd L: %.1f mm/s", l_speed);
+    oled_print(0, 15, buf);
+    
+    sprintf(buf, "Spd R: %.1f mm/s", r_speed);
+    oled_print(0, 25, buf);
+    
+    sprintf(buf, "Cnt L:%ld R:%ld", l_cnt, r_cnt);
+    oled_print(0, 40, buf);
+    
+    sprintf(buf, "Dst L:%.0f R:%.0f", l_mm, r_mm);
+    oled_print(0, 50, buf);
+    
     oled_update();
 
     Serial.print("[Phase 2 2Hz] L: ");

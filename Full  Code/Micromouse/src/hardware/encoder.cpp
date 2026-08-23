@@ -124,8 +124,9 @@ int32_t encoder_get_count(EncoderID enc) {
         return (int32_t)TIM2->CNT;
     } else {
         // TIM3 is a 16-bit timer: cast to int16_t first for sign extension,
-        // then upgrade to int32_t so it matches our signed 32-bit API
-        return (int32_t)(int16_t)TIM3->CNT;
+        // then upgrade to int32_t.
+        // Hardware correction: right motor is physically reversed, so negate count.
+        return -((int32_t)(int16_t)TIM3->CNT);
     }
 }
 
@@ -137,11 +138,12 @@ int32_t encoder_get_delta(EncoderID enc) {
         return delta;
     } else {
         // For 16-bit TIM3, perform subtraction in 16-bit signed math so overflows/underflows
-        // wrap around correctly, then cast to 32-bit signed integer
+        // wrap around correctly, then cast to 32-bit signed integer.
+        // Hardware correction: right motor is physically reversed, so negate delta.
         int16_t current = (int16_t)TIM3->CNT;
         int16_t delta = current - (int16_t)_last_right_count;
         _last_right_count = current;
-        return (int32_t)delta;
+        return -((int32_t)delta);
     }
 }
 
