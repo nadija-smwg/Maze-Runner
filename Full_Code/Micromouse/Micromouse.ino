@@ -37,6 +37,8 @@
 
 // Control
 #include "src/control/motion_controller.h"
+#include "src/control/velocity_controller.h"
+#include "src/control/heading_controller.h"
 
 // Robot
 #include "src/robot/mission_manager.h"
@@ -55,8 +57,8 @@
 #define PHASE_1_TEST_MODE 0
 #define PHASE_2_TEST_MODE 0
 #define PHASE_3_TEST_MODE 0
-#define PHASE_4_TEST_MODE 1
-#define PHASE_5_TEST_MODE 0
+#define PHASE_4_TEST_MODE 0
+#define PHASE_5_TEST_MODE 1
 
 #if PHASE_1_TEST_MODE == 1
 volatile uint32_t phase1_timer_ticks = 0;
@@ -241,8 +243,14 @@ void setup() {
   sensor_manager_init();
   calibrate_all();
   fusion_init();
+  
+  // Initialize PID controllers
+  velocity_controller_init();
+  heading_controller_init();
 
   LOG_INFO("Phase 5 Ready!");
+  LOG_INFO("Press START to drive straight.");
+  LOG_INFO("Press MODE to turn 90 deg.");
   return;
 #endif
 
@@ -594,52 +602,65 @@ void loop() {
 #endif
 
 #if PHASE_5_TEST_MODE == 1
-  // === Phase 5: Hand-Turn Gyro Test ===
-  // No motors! Just display the gyro heading.
-  // Turn the robot by hand and verify it reads 90 degrees.
-  // Press BUTTON_START to reset heading to 0.
-
   button_update();
   led_update();
 
-  // Sensor fusion update
   static uint32_t last_sensor_tick = millis();
-  if (millis() - last_sensor_tick >= 50) {
+  if (millis() - last_sensor_tick >= 10) {
     last_sensor_tick = millis();
-    // DISABLE ToF Sensors for Gyro Test!
-    // The ToF sensors take ~90ms to read over I2C, which blocks the loop.
-    // This causes dt to jump massively and triggers the dt cap, destroying the
-    // math! sensor_manager_update();
+    sensor_manager_update(); // Safe to run now!
   }
 
-  // Sensor fusion update (Throttled to 100Hz exactly like 1.MPU6050.ino!)
-  // Running this unthrottled at 3000Hz destroys floating point precision and
-  // ruins the math of the 0.85 Low Pass Filter.
   static uint32_t last_fusion_tick = millis();
   if (millis() - last_fusion_tick >= 10) {
     uint32_t now = millis();
     float dt = (now - last_fusion_tick) / 1000.0f;
     last_fusion_tick = now;
-
-    // Sanity guard
-    if (dt <= 0.0f || dt > 0.05f) {
-      dt = 0.01f;
-    }
-
+    if (dt <= 0.0f || dt > 0.05f) { dt = 0.01f; }
     fusion_update(dt);
   }
 
-  // Reset heading on button press
+  static int p5_state = 0; // 0=Idle, 1=Drive, 2=Turn
+  static float target_v = 0.0f;
+  static float target_h = 0.0f;
+
   if (button_just_pressed(BUTTON_START)) {
-    fusion_reset_heading(0.0f);
-    Pose zero = {0.0f, 0.0f, 0.0f};
-    odometry_set_pose(zero);
-    encoder_reset_all();
+    if (p5_state == 0) {
+      p5_state = 1; // Drive straight
+      target_v = 150.0f; // 150 mm/s
+      target_h = fusion_get_heading(); // Lock to current heading
+      LOG_INFO("Driving Straight!");
+    } else {
+      p5_state = 0; // Stop
+    }
   }
 
-  // Get current pose
-  Pose p = position_estimator_get_pose();
-  float deg = p.theta_rad * (180.0f / 3.14159265f);
+  if (button_just_pressed(BUTTON_MODE)) {
+    if (p5_state == 0) {
+      p5_state = 2; // Turn
+      target_v = 0.0f;
+      target_h = fusion_get_heading() + 90.0f; // Target +90
+      LOG_INFO("Turning 90!");
+    } else {
+      p5_state = 0;
+    }
+  }
+
+  // 1kHz Motion Control Loop
+  static uint32_t last_ctrl_tick = micros();
+  if (micros() - last_ctrl_tick >= 1000) {
+    last_ctrl_tick = micros();
+    
+    // Run controllers
+
+    if (p5_state == 0) {
+      motor_stop();
+    } else {
+      float current_h = fusion_get_heading();
+      float omega = heading_controller_update(target_h, current_h, 0.001f);
+      velocity_controller_update(target_v, omega);
+    }
+  }
 
   // OLED Display (10Hz)
   static uint32_t last_print = 0;
@@ -647,28 +668,19 @@ void loop() {
     last_print = millis();
     char buf[32];
     oled_clear();
-    oled_print(0, 0, "- Gyro Test -");
-    oled_print(0, 10, "Turn by hand!");
+    oled_print(0, 0, "Phase 5: PID");
+    
+    if(p5_state == 0) oled_print(0, 15, "State: IDLE");
+    if(p5_state == 1) oled_print(0, 15, "State: DRIVE");
+    if(p5_state == 2) oled_print(0, 15, "State: TURN");
 
-    sprintf(buf, "Heading: %d deg", (int)deg);
-    oled_print(0, 28, buf);
-
-    // Show raw gyro rate too
-    IMUScaledData imu;
-    mpu6050_read_scaled(&imu);
-    String gz_str = String(imu.gyro_z_dps, 1);
-    sprintf(buf, "Rate: %s d/s", gz_str.c_str());
-    oled_print(0, 42, buf);
-
-    oled_print(0, 55, "BTN=Reset to 0");
-
+    sprintf(buf, "Tgt H: %.1f", target_h);
+    oled_print(0, 30, buf);
+    
+    sprintf(buf, "Cur H: %.1f", fusion_get_heading());
+    oled_print(0, 45, buf);
+    
     oled_update();
-
-    // Serial logging
-    Serial.print("[P5] H:");
-    Serial.print(deg, 1);
-    Serial.print(" GzRate:");
-    Serial.println(imu.gyro_z_dps, 2);
   }
   return;
 #endif
