@@ -4,7 +4,7 @@
 
 ---
 
-## 1. Algorithmic Back-End Porting (`src/` → `Full Code/`)
+## 1. Algorithmic Back-End Porting (`src/` → `Full_Code/`)
 *   **Purpose:** Simply include the raw, hardware-agnostic C code into the firmware build system.
 *   **Execution Steps:**
     1.  Copy `flood_fill.c`, `dijkstra_weighted.c`, `path_smoother.c`, and `solver.c` into the firmware source tree.

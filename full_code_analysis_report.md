@@ -1,7 +1,7 @@
-# 🔬 Full Code — Complete Function-by-Function Analysis Report
+# 🔬 Full_Code — Complete Function-by-Function Analysis Report
 
 > **Project:** Maze-Runner Micromouse  
-> **Scope:** Every file in `Full Code/Micromouse/src/` — 67 files across 10 modules  
+> **Scope:** Every file in `Full_Code/Micromouse/src/` — 67 files across 10 modules  
 > **Date:** 2026-08-24
 
 ---
@@ -87,7 +87,7 @@ Micromouse/
 
 ---
 
-## [config.h](file:///c:/Users/KM%20Computers/OneDrive/Desktop/Projects/Maze-Runner/Full%20%20Code/Micromouse/src/config/config.h) — Algorithm Tuning Constants
+## [config.h](./Full_Code/Micromouse/src/config/config.h) — Algorithm Tuning Constants
 
 **Status:** ✅ Complete — All values defined
 
@@ -114,7 +114,7 @@ Micromouse/
 
 ---
 
-## [robot_config.h](file:///c:/Users/KM%20Computers/OneDrive/Desktop/Projects/Maze-Runner/Full%20%20Code/Micromouse/src/config/robot_config.h) — Physical Robot Constants
+## [robot_config.h](./Full_Code/Micromouse/src/config/robot_config.h) — Physical Robot Constants
 
 **Status:** ⚠️ WHEEL_BASE_MM needs recalibration
 
@@ -135,7 +135,7 @@ Micromouse/
 
 ---
 
-## [pin_config.h](file:///c:/Users/KM%20Computers/OneDrive/Desktop/Projects/Maze-Runner/Full%20%20Code/Micromouse/src/config/pin_config.h) — Pin Assignments
+## [pin_config.h](./Full_Code/Micromouse/src/config/pin_config.h) — Pin Assignments
 
 **Status:** ✅ Complete — All pins mapped
 
@@ -159,7 +159,7 @@ Every hardware pin is defined here. Key mappings:
 
 ---
 
-## [motor.cpp](file:///c:/Users/KM%20Computers/OneDrive/Desktop/Projects/Maze-Runner/Full%20%20Code/Micromouse/src/hardware/motor.cpp) — TB6612FNG Motor Driver
+## [motor.cpp](./Full_Code/Micromouse/src/hardware/motor.cpp) — TB6612FNG Motor Driver
 
 **Status:** ✅ Complete and Working
 
@@ -178,7 +178,7 @@ Every hardware pin is defined here. Key mappings:
 
 ---
 
-## [encoder.cpp](file:///c:/Users/KM%20Computers/OneDrive/Desktop/Projects/Maze-Runner/Full%20%20Code/Micromouse/src/hardware/encoder.cpp) — Quadrature Encoders
+## [encoder.cpp](./Full_Code/Micromouse/src/hardware/encoder.cpp) — Quadrature Encoders
 
 **Status:** ✅ Complete and Working
 
@@ -205,7 +205,7 @@ The negation is applied inside `encoder_get_count()` to correct this.
 
 ---
 
-## [pwm.cpp](file:///c:/Users/KM%20Computers/OneDrive/Desktop/Projects/Maze-Runner/Full%20%20Code/Micromouse/src/hardware/pwm.cpp) — PWM Generation
+## [pwm.cpp](./Full_Code/Micromouse/src/hardware/pwm.cpp) — PWM Generation
 
 **Status:** ✅ Complete and Working
 
@@ -217,7 +217,7 @@ The negation is applied inside `encoder_get_count()` to correct this.
 
 ---
 
-## [timer.cpp](file:///c:/Users/KM%20Computers/OneDrive/Desktop/Projects/Maze-Runner/Full%20%20Code/Micromouse/src/hardware/timer.cpp) — 1kHz Hardware Timer
+## [timer.cpp](./Full_Code/Micromouse/src/hardware/timer.cpp) — 1kHz Hardware Timer
 
 **Status:** ✅ Complete and Working
 
@@ -234,10 +234,10 @@ The negation is applied inside `encoder_get_count()` to correct this.
 
 | File | Functions | Status | Purpose |
 |------|-----------|--------|---------|
-| [gpio.cpp](file:///c:/Users/KM%20Computers/OneDrive/Desktop/Projects/Maze-Runner/Full%20%20Code/Micromouse/src/hardware/gpio.cpp) | `gpio_init()` | ✅ | Configures motor direction pins |
-| [button.cpp](file:///c:/Users/KM%20Computers/OneDrive/Desktop/Projects/Maze-Runner/Full%20%20Code/Micromouse/src/hardware/button.cpp) | `button_init()`, `button_update()`, `button_pressed()` | ✅ | 20ms debounce, edge detection |
-| [led.cpp](file:///c:/Users/KM%20Computers/OneDrive/Desktop/Projects/Maze-Runner/Full%20%20Code/Micromouse/src/hardware/led.cpp) | `led_init()`, `led_set()`, `led_blink_start()`, `led_update()` | ✅ | Non-blocking blink patterns |
-| [battery.cpp](file:///c:/Users/KM%20Computers/OneDrive/Desktop/Projects/Maze-Runner/Full%20%20Code/Micromouse/src/hardware/battery.cpp) | `battery_init()`, `battery_read_mv()`, `battery_is_low()` | ✅ | ADC voltage reading with divider |
+| [gpio.cpp](./Full_Code/Micromouse/src/hardware/gpio.cpp) | `gpio_init()` | ✅ | Configures motor direction pins |
+| [button.cpp](./Full_Code/Micromouse/src/hardware/button.cpp) | `button_init()`, `button_update()`, `button_pressed()` | ✅ | 20ms debounce, edge detection |
+| [led.cpp](./Full_Code/Micromouse/src/hardware/led.cpp) | `led_init()`, `led_set()`, `led_blink_start()`, `led_update()` | ✅ | Non-blocking blink patterns |
+| [battery.cpp](./Full_Code/Micromouse/src/hardware/battery.cpp) | `battery_init()`, `battery_read_mv()`, `battery_is_low()` | ✅ | ADC voltage reading with divider |
 
 ---
 
@@ -245,7 +245,7 @@ The negation is applied inside `encoder_get_count()` to correct this.
 
 ---
 
-## [mpu6050.cpp](file:///c:/Users/KM%20Computers/OneDrive/Desktop/Projects/Maze-Runner/Full%20%20Code/Micromouse/src/sensors/mpu6050.cpp) — IMU Driver
+## [mpu6050.cpp](./Full_Code/Micromouse/src/sensors/mpu6050.cpp) — IMU Driver
 
 **Status:** ✅ Complete and Working
 
@@ -271,7 +271,7 @@ This filter MUST be called at a consistent rate. At 100Hz it works correctly. At
 
 ---
 
-## [vl53l0x.cpp](file:///c:/Users/KM%20Computers/OneDrive/Desktop/Projects/Maze-Runner/Full%20%20Code/Micromouse/src/sensors/vl53l0x.cpp) — ToF Laser Sensor Driver
+## [vl53l0x.cpp](./Full_Code/Micromouse/src/sensors/vl53l0x.cpp) — ToF Laser Sensor Driver
 
 **Status:** ✅ Complete and Working
 
@@ -287,7 +287,7 @@ This filter MUST be called at a consistent rate. At 100Hz it works correctly. At
 
 ---
 
-## [distance_manager.cpp](file:///c:/Users/KM%20Computers/OneDrive/Desktop/Projects/Maze-Runner/Full%20%20Code/Micromouse/src/sensors/distance_manager.cpp) — Wall Detection
+## [distance_manager.cpp](./Full_Code/Micromouse/src/sensors/distance_manager.cpp) — Wall Detection
 
 **Status:** ✅ Complete and Working
 
@@ -306,7 +306,7 @@ This filter MUST be called at a consistent rate. At 100Hz it works correctly. At
 
 ---
 
-## [sensor_fusion.cpp](file:///c:/Users/KM%20Computers/OneDrive/Desktop/Projects/Maze-Runner/Full%20%20Code/Micromouse/src/sensors/sensor_fusion.cpp) — Central Fusion Pipeline
+## [sensor_fusion.cpp](./Full_Code/Micromouse/src/sensors/sensor_fusion.cpp) — Central Fusion Pipeline
 
 **Status:** ❌ BROKEN — Passes 0.0 for encoder dtheta
 
@@ -333,7 +333,7 @@ heading_estimator_update(imu.gyro_z_dps, enc_dtheta_deg, dt);
 
 ---
 
-## [calibration.cpp](file:///c:/Users/KM%20Computers/OneDrive/Desktop/Projects/Maze-Runner/Full%20%20Code/Micromouse/src/sensors/calibration.cpp) — Gyro Calibration Wrapper
+## [calibration.cpp](./Full_Code/Micromouse/src/sensors/calibration.cpp) — Gyro Calibration Wrapper
 
 **Status:** ✅ Complete
 
@@ -347,7 +347,7 @@ heading_estimator_update(imu.gyro_z_dps, enc_dtheta_deg, dt);
 
 ---
 
-## [odometry.cpp](file:///c:/Users/KM%20Computers/OneDrive/Desktop/Projects/Maze-Runner/Full%20%20Code/Micromouse/src/localization/odometry.cpp) — Encoder Dead Reckoning
+## [odometry.cpp](./Full_Code/Micromouse/src/localization/odometry.cpp) — Encoder Dead Reckoning
 
 **Status:** ✅ Complete and Working (for X/Y distance)
 
@@ -372,7 +372,7 @@ d_theta = (right_mm - left_mm) / WHEEL_BASE_MM
 
 ---
 
-## [heading_estimator.cpp](file:///c:/Users/KM%20Computers/OneDrive/Desktop/Projects/Maze-Runner/Full%20%20Code/Micromouse/src/localization/heading_estimator.cpp) — Complementary Filter
+## [heading_estimator.cpp](./Full_Code/Micromouse/src/localization/heading_estimator.cpp) — Complementary Filter
 
 **Status:** ❌ BROKEN — alpha=1.0
 
@@ -413,7 +413,7 @@ This prevents small noise from being integrated into heading. 1.5°/s is a good 
 
 ---
 
-## [position_estimator.cpp](file:///c:/Users/KM%20Computers/OneDrive/Desktop/Projects/Maze-Runner/Full%20%20Code/Micromouse/src/localization/position_estimator.cpp) — Global Position
+## [position_estimator.cpp](./Full_Code/Micromouse/src/localization/position_estimator.cpp) — Global Position
 
 **Status:** ⚠️ Partial — Wall corrections disabled
 
@@ -428,7 +428,7 @@ This prevents small noise from being integrated into heading. 1.5°/s is a good 
 
 ---
 
-## [pose.cpp](file:///c:/Users/KM%20Computers/OneDrive/Desktop/Projects/Maze-Runner/Full%20%20Code/Micromouse/src/localization/pose.cpp) — Angle Normalization
+## [pose.cpp](./Full_Code/Micromouse/src/localization/pose.cpp) — Angle Normalization
 
 **Status:** ✅ Complete
 
@@ -439,7 +439,7 @@ This prevents small noise from being integrated into heading. 1.5°/s is a good 
 
 ---
 
-## [coordinate_transform.cpp](file:///c:/Users/KM%20Computers/OneDrive/Desktop/Projects/Maze-Runner/Full%20%20Code/Micromouse/src/localization/coordinate_transform.cpp) — mm ↔ Cell Conversion
+## [coordinate_transform.cpp](./Full_Code/Micromouse/src/localization/coordinate_transform.cpp) — mm ↔ Cell Conversion
 
 **Status:** ✅ Complete
 
@@ -458,7 +458,7 @@ This prevents small noise from being integrated into heading. 1.5°/s is a good 
 
 ---
 
-## [pid.cpp](file:///c:/Users/KM%20Computers/OneDrive/Desktop/Projects/Maze-Runner/Full%20%20Code/Micromouse/src/control/pid.cpp) — Generic PID Controller
+## [pid.cpp](./Full_Code/Micromouse/src/control/pid.cpp) — Generic PID Controller
 
 **Status:** ✅ Complete and Working
 
@@ -476,7 +476,7 @@ When setpoint changes suddenly (step change), derivative-on-error produces a hug
 
 ---
 
-## [speed_controller.cpp](file:///c:/Users/KM%20Computers/OneDrive/Desktop/Projects/Maze-Runner/Full%20%20Code/Micromouse/src/control/speed_controller.cpp) — Per-Wheel Speed PID
+## [speed_controller.cpp](./Full_Code/Micromouse/src/control/speed_controller.cpp) — Per-Wheel Speed PID
 
 **Status:** ❌ TODO — Empty stubs
 
@@ -517,7 +517,7 @@ void speed_controller_update(...) {
 
 ---
 
-## [heading_controller.cpp](file:///c:/Users/KM%20Computers/OneDrive/Desktop/Projects/Maze-Runner/Full%20%20Code/Micromouse/src/control/heading_controller.cpp) — Heading PID
+## [heading_controller.cpp](./Full_Code/Micromouse/src/control/heading_controller.cpp) — Heading PID
 
 **Status:** ❌ TODO — Empty stubs
 
@@ -550,7 +550,7 @@ float heading_controller_update(float target, float current, float dt) {
 
 ---
 
-## [velocity_controller.cpp](file:///c:/Users/KM%20Computers/OneDrive/Desktop/Projects/Maze-Runner/Full%20%20Code/Micromouse/src/control/velocity_controller.cpp) — Differential Drive Mixer
+## [velocity_controller.cpp](./Full_Code/Micromouse/src/control/velocity_controller.cpp) — Differential Drive Mixer
 
 **Status:** ❌ TODO — Empty stubs
 
@@ -573,7 +573,7 @@ This is the "unicycle model" → differential drive conversion. Also implemented
 
 ---
 
-## [cell_controller.cpp](file:///c:/Users/KM%20Computers/OneDrive/Desktop/Projects/Maze-Runner/Full%20%20Code/Micromouse/src/control/cell_controller.cpp) — Distance Tracking
+## [cell_controller.cpp](./Full_Code/Micromouse/src/control/cell_controller.cpp) — Distance Tracking
 
 **Status:** ❌ TODO — Empty stubs
 
@@ -613,7 +613,7 @@ float target_v = profile_get_speed(&profile, distance_so_far);
 
 ---
 
-## [turn_controller.cpp](file:///c:/Users/KM%20Computers/OneDrive/Desktop/Projects/Maze-Runner/Full%20%20Code/Micromouse/src/control/turn_controller.cpp) — Turning
+## [turn_controller.cpp](./Full_Code/Micromouse/src/control/turn_controller.cpp) — Turning
 
 **Status:** ❌ TODO — Empty stubs
 
@@ -638,7 +638,7 @@ Rolling turn: Both wheels forward at different speeds (arc path)
 
 ---
 
-## [wall_follower.cpp](file:///c:/Users/KM%20Computers/OneDrive/Desktop/Projects/Maze-Runner/Full%20%20Code/Micromouse/src/control/wall_follower.cpp) — Centering PD
+## [wall_follower.cpp](./Full_Code/Micromouse/src/control/wall_follower.cpp) — Centering PD
 
 **Status:** ❌ TODO — Empty stubs
 
@@ -657,7 +657,7 @@ Output: angular correction (added to heading controller output)
 
 ---
 
-## [motion_controller.cpp](file:///c:/Users/KM%20Computers/OneDrive/Desktop/Projects/Maze-Runner/Full%20%20Code/Micromouse/src/control/motion_controller.cpp) — Master 1kHz Loop
+## [motion_controller.cpp](./Full_Code/Micromouse/src/control/motion_controller.cpp) — Master 1kHz Loop
 
 **Status:** ❌ TODO — Empty stubs
 
@@ -690,7 +690,7 @@ This is THE most important file. It orchestrates everything:
 
 ---
 
-## [motion_profile.c](file:///c:/Users/KM%20Computers/OneDrive/Desktop/Projects/Maze-Runner/Full%20%20Code/Micromouse/src/motion/motion_profile.c) — Profile Generator
+## [motion_profile.c](./Full_Code/Micromouse/src/motion/motion_profile.c) — Profile Generator
 
 **Status:** ✅ Complete (pure math, untested on hardware)
 
@@ -711,7 +711,7 @@ This is THE most important file. It orchestrates everything:
 
 ---
 
-## [maze.h](file:///c:/Users/KM%20Computers/OneDrive/Desktop/Projects/Maze-Runner/Full%20%20Code/Micromouse/src/maze/maze.h) — Maze Data Structures
+## [maze.h](./Full_Code/Micromouse/src/maze/maze.h) — Maze Data Structures
 
 **Status:** ✅ Complete
 
@@ -734,7 +734,7 @@ This is THE most important file. It orchestrates everything:
 
 ---
 
-## [flood_fill.c](file:///c:/Users/KM%20Computers/OneDrive/Desktop/Projects/Maze-Runner/Full%20%20Code/Micromouse/src/maze/flood_fill.c) — Search Run Algorithm (Tier 1)
+## [flood_fill.c](./Full_Code/Micromouse/src/maze/flood_fill.c) — Search Run Algorithm (Tier 1)
 
 **Status:** ✅ Complete
 
@@ -755,7 +755,7 @@ At each cell:
 
 ---
 
-## [dijkstra_weighted.c](file:///c:/Users/KM%20Computers/OneDrive/Desktop/Projects/Maze-Runner/Full%20%20Code/Micromouse/src/maze/dijkstra_weighted.c) — Fast Run Path Optimizer (Tier 2)
+## [dijkstra_weighted.c](./Full_Code/Micromouse/src/maze/dijkstra_weighted.c) — Fast Run Path Optimizer (Tier 2)
 
 **Status:** ✅ Complete
 
@@ -769,7 +769,7 @@ At each cell:
 
 ---
 
-## [path_smoother.c](file:///c:/Users/KM%20Computers/OneDrive/Desktop/Projects/Maze-Runner/Full%20%20Code/Micromouse/src/maze/path_smoother.c) — Path Post-Processor (Tier 3)
+## [path_smoother.c](./Full_Code/Micromouse/src/maze/path_smoother.c) — Path Post-Processor (Tier 3)
 
 **Status:** ✅ Complete
 
@@ -791,7 +791,7 @@ Commands:
 
 ---
 
-## [solver.c](file:///c:/Users/KM%20Computers/OneDrive/Desktop/Projects/Maze-Runner/Full%20%20Code/Micromouse/src/maze/solver.c) — Top-Level Solver Orchestrator
+## [solver.c](./Full_Code/Micromouse/src/maze/solver.c) — Top-Level Solver Orchestrator
 
 **Status:** ✅ Complete
 
@@ -811,7 +811,7 @@ Commands:
 
 ---
 
-## [robot_state_machine.cpp](file:///c:/Users/KM%20Computers/OneDrive/Desktop/Projects/Maze-Runner/Full%20%20Code/Micromouse/src/robot/robot_state_machine.cpp) — Top-Level FSM
+## [robot_state_machine.cpp](./Full_Code/Micromouse/src/robot/robot_state_machine.cpp) — Top-Level FSM
 
 **Status:** ❌ TODO — Only skeleton with empty switch cases
 
@@ -829,17 +829,17 @@ Commands:
 
 | File | Functions | Purpose |
 |------|-----------|---------|
-| [search_mode.cpp](file:///c:/Users/KM%20Computers/OneDrive/Desktop/Projects/Maze-Runner/Full%20%20Code/Micromouse/src/robot/search_mode.cpp) | `search_mode_init()`, `search_mode_update()` | Search run loop: read walls → flood fill → decide → move |
-| [fast_run_mode.cpp](file:///c:/Users/KM%20Computers/OneDrive/Desktop/Projects/Maze-Runner/Full%20%20Code/Micromouse/src/robot/fast_run_mode.cpp) | `fast_run_mode_init()`, `fast_run_mode_update()` | Fast run loop: get next command → execute → repeat |
-| [command_executor.cpp](file:///c:/Users/KM%20Computers/OneDrive/Desktop/Projects/Maze-Runner/Full%20%20Code/Micromouse/src/robot/command_executor.cpp) | `executor_load_commands()`, `executor_step()`, `executor_is_done()` | Execute array of MotionCommands sequentially |
-| [competition_state.cpp](file:///c:/Users/KM%20Computers/OneDrive/Desktop/Projects/Maze-Runner/Full%20%20Code/Micromouse/src/robot/competition_state.cpp) | `competition_record_run()`, `competition_get_best_time()` | Track run count and best time |
-| [mission_manager.cpp](file:///c:/Users/KM%20Computers/OneDrive/Desktop/Projects/Maze-Runner/Full%20%20Code/Micromouse/src/robot/mission_manager.cpp) | `mission_manager_update()` | Overall strategy: search → return → fast run |
+| [search_mode.cpp](./Full_Code/Micromouse/src/robot/search_mode.cpp) | `search_mode_init()`, `search_mode_update()` | Search run loop: read walls → flood fill → decide → move |
+| [fast_run_mode.cpp](./Full_Code/Micromouse/src/robot/fast_run_mode.cpp) | `fast_run_mode_init()`, `fast_run_mode_update()` | Fast run loop: get next command → execute → repeat |
+| [command_executor.cpp](./Full_Code/Micromouse/src/robot/command_executor.cpp) | `executor_load_commands()`, `executor_step()`, `executor_is_done()` | Execute array of MotionCommands sequentially |
+| [competition_state.cpp](./Full_Code/Micromouse/src/robot/competition_state.cpp) | `competition_record_run()`, `competition_get_best_time()` | Track run count and best time |
+| [mission_manager.cpp](./Full_Code/Micromouse/src/robot/mission_manager.cpp) | `mission_manager_update()` | Overall strategy: search → return → fast run |
 
 ---
 
 # MODULE 9: `display/` — OLED Interface
 
-## [oled_driver.cpp](file:///c:/Users/KM%20Computers/OneDrive/Desktop/Projects/Maze-Runner/Full%20%20Code/Micromouse/src/display/oled_driver.cpp) — SSD1306 Driver
+## [oled_driver.cpp](./Full_Code/Micromouse/src/display/oled_driver.cpp) — SSD1306 Driver
 
 **Status:** ✅ Complete
 
@@ -859,10 +859,10 @@ Commands:
 
 | File | Functions | Status | Purpose |
 |------|-----------|--------|---------|
-| [math_utils.cpp](file:///c:/Users/KM%20Computers/OneDrive/Desktop/Projects/Maze-Runner/Full%20%20Code/Micromouse/src/utils/math_utils.cpp) | `math_constrain()`, `math_map()` | ✅ | Clamp float to range, linear interpolation |
-| [filters.cpp](file:///c:/Users/KM%20Computers/OneDrive/Desktop/Projects/Maze-Runner/Full%20%20Code/Micromouse/src/utils/filters.cpp) | `LowPassFilter` class: `update()`, `get()`, `reset()` | ✅ | EMA filter: `value = α × new + (1-α) × old` |
-| [logger.h](file:///c:/Users/KM%20Computers/OneDrive/Desktop/Projects/Maze-Runner/Full%20%20Code/Micromouse/src/utils/logger.h) | `LOG_DEBUG()`, `LOG_INFO()`, `LOG_WARN()`, `LOG_ERROR()` | ✅ | Compile-time filtered serial logging macros |
-| [ring_buffer.h](file:///c:/Users/KM%20Computers/OneDrive/Desktop/Projects/Maze-Runner/Full%20%20Code/Micromouse/src/utils/ring_buffer.h) | `RingBuffer` template class | ✅ | Fixed-size circular buffer for data buffering |
+| [math_utils.cpp](./Full_Code/Micromouse/src/utils/math_utils.cpp) | `math_constrain()`, `math_map()` | ✅ | Clamp float to range, linear interpolation |
+| [filters.cpp](./Full_Code/Micromouse/src/utils/filters.cpp) | `LowPassFilter` class: `update()`, `get()`, `reset()` | ✅ | EMA filter: `value = α × new + (1-α) × old` |
+| [logger.h](./Full_Code/Micromouse/src/utils/logger.h) | `LOG_DEBUG()`, `LOG_INFO()`, `LOG_WARN()`, `LOG_ERROR()` | ✅ | Compile-time filtered serial logging macros |
+| [ring_buffer.h](./Full_Code/Micromouse/src/utils/ring_buffer.h) | `RingBuffer` template class | ✅ | Fixed-size circular buffer for data buffering |
 
 ---
 

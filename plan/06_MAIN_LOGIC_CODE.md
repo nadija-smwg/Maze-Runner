@@ -1,4 +1,4 @@
-# 06 — Main Logic, Maze Solving & Full Code
+# 06 — Main Logic, Maze Solving & Full_Code
 ## Flood Fill Algorithm + PID Control + Complete Integration
 
 ---

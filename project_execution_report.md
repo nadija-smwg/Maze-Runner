@@ -38,26 +38,26 @@ After examining every source file in the project, here is the actual implementat
 
 | Module | Files | Status | Implementation |
 |--------|-------|--------|----------------|
-| **Hardware — Motor** | [motor.cpp](Full%20%20Code/Micromouse/src/hardware/motor.cpp), [encoder.cpp](Full%20%20Code/Micromouse/src/hardware/encoder.cpp), [pwm.cpp](Full%20%20Code/Micromouse/src/hardware/pwm.cpp) | ✅ IMPLEMENTED | Tested in Phase 1 & 2 test modes |
-| **Hardware — GPIO/LED/Button** | [gpio.cpp](Full%20%20Code/Micromouse/src/hardware/gpio.cpp), [led.cpp](Full%20%20Code/Micromouse/src/hardware/led.cpp), [button.cpp](Full%20%20Code/Micromouse/src/hardware/button.cpp) | ✅ IMPLEMENTED | Tested in Phase 1 test mode |
-| **Hardware — Battery** | [battery.cpp](Full%20%20Code/Micromouse/src/hardware/battery.cpp) | ✅ IMPLEMENTED | ADC voltage reading working |
-| **Hardware — Timer** | [timer.cpp](Full%20%20Code/Micromouse/src/hardware/timer.cpp) | ✅ IMPLEMENTED | 1kHz interrupt callback working |
-| **Sensor — MPU6050** | [mpu6050.cpp](Full%20%20Code/Micromouse/src/sensors/mpu6050.cpp) | ⚠️ SKELETON | All functions have `TODO` — raw I2C code not written |
-| **Sensor — VL53L0X** | [vl53l0x.cpp](Full%20%20Code/Micromouse/src/sensors/vl53l0x.cpp) | ⚠️ SKELETON | XSHUT init sequence and read are `TODO` |
-| **Sensor — Distance Mgr** | [distance_manager.cpp](Full%20%20Code/Micromouse/src/sensors/distance_manager.cpp) | ⚠️ SKELETON | Wall detection, centering error all `TODO` |
-| **Sensor — Fusion** | [sensor_fusion.cpp](Full%20%20Code/Micromouse/src/sensors/sensor_fusion.cpp) | ⚠️ SKELETON | Complementary filter not written |
-| **Sensor — Calibration** | [calibration.cpp](Full%20%20Code/Micromouse/src/sensors/calibration.cpp) | ⚠️ SKELETON | Empty |
-| **Control — PID** | [pid.cpp](Full%20%20Code/Micromouse/src/control/pid.cpp) | ✅ IMPLEMENTED | Full PID with anti-windup + derivative-on-measurement |
-| **Control — Speed Ctrl** | [speed_controller.cpp](Full%20%20Code/Micromouse/src/control/speed_controller.cpp) | ⚠️ SKELETON | PID integration `TODO` |
-| **Control — Heading Ctrl** | [heading_controller.cpp](Full%20%20Code/Micromouse/src/control/heading_controller.cpp) | ⚠️ SKELETON | PID integration `TODO` |
-| **Control — Wall Follower** | [wall_follower.cpp](Full%20%20Code/Micromouse/src/control/wall_follower.cpp) | ⚠️ SKELETON | PID integration `TODO` |
-| **Control — Cell Ctrl** | [cell_controller.cpp](Full%20%20Code/Micromouse/src/control/cell_controller.cpp) | ⚠️ SKELETON | Distance tracking `TODO` |
-| **Control — Turn Ctrl** | [turn_controller.cpp](Full%20%20Code/Micromouse/src/control/turn_controller.cpp) | ⚠️ SKELETON | Turn execution `TODO` |
-| **Control — Motion Ctrl** | [motion_controller.cpp](Full%20%20Code/Micromouse/src/control/motion_controller.cpp) | ⚠️ SKELETON | Orchestrator `TODO` |
-| **Localization — Odometry** | [odometry.cpp](Full%20%20Code/Micromouse/src/localization/odometry.cpp) | ⚠️ SKELETON | Math documented but commented out |
-| **Robot — FSM** | [robot_state_machine.cpp](Full%20%20Code/Micromouse/src/robot/robot_state_machine.cpp) | ⚠️ SKELETON | Empty switch cases |
-| **Robot — Search/Fast Run** | [search_mode.cpp](Full%20%20Code/Micromouse/src/robot/search_mode.cpp), [fast_run_mode.cpp](Full%20%20Code/Micromouse/src/robot/fast_run_mode.cpp) | ⚠️ SKELETON | Not connected to solver |
-| **Display — OLED** | [oled_driver.cpp](Full%20%20Code/Micromouse/src/display/oled_driver.cpp) | ⚠️ SKELETON | I2C driver not written |
+| **Hardware — Motor** | [motor.cpp](Full_Code/Micromouse/src/hardware/motor.cpp), [encoder.cpp](Full_Code/Micromouse/src/hardware/encoder.cpp), [pwm.cpp](Full_Code/Micromouse/src/hardware/pwm.cpp) | ✅ IMPLEMENTED | Tested in Phase 1 & 2 test modes |
+| **Hardware — GPIO/LED/Button** | [gpio.cpp](Full_Code/Micromouse/src/hardware/gpio.cpp), [led.cpp](Full_Code/Micromouse/src/hardware/led.cpp), [button.cpp](Full_Code/Micromouse/src/hardware/button.cpp) | ✅ IMPLEMENTED | Tested in Phase 1 test mode |
+| **Hardware — Battery** | [battery.cpp](Full_Code/Micromouse/src/hardware/battery.cpp) | ✅ IMPLEMENTED | ADC voltage reading working |
+| **Hardware — Timer** | [timer.cpp](Full_Code/Micromouse/src/hardware/timer.cpp) | ✅ IMPLEMENTED | 1kHz interrupt callback working |
+| **Sensor — MPU6050** | [mpu6050.cpp](Full_Code/Micromouse/src/sensors/mpu6050.cpp) | ⚠️ SKELETON | All functions have `TODO` — raw I2C code not written |
+| **Sensor — VL53L0X** | [vl53l0x.cpp](Full_Code/Micromouse/src/sensors/vl53l0x.cpp) | ⚠️ SKELETON | XSHUT init sequence and read are `TODO` |
+| **Sensor — Distance Mgr** | [distance_manager.cpp](Full_Code/Micromouse/src/sensors/distance_manager.cpp) | ⚠️ SKELETON | Wall detection, centering error all `TODO` |
+| **Sensor — Fusion** | [sensor_fusion.cpp](Full_Code/Micromouse/src/sensors/sensor_fusion.cpp) | ⚠️ SKELETON | Complementary filter not written |
+| **Sensor — Calibration** | [calibration.cpp](Full_Code/Micromouse/src/sensors/calibration.cpp) | ⚠️ SKELETON | Empty |
+| **Control — PID** | [pid.cpp](Full_Code/Micromouse/src/control/pid.cpp) | ✅ IMPLEMENTED | Full PID with anti-windup + derivative-on-measurement |
+| **Control — Speed Ctrl** | [speed_controller.cpp](Full_Code/Micromouse/src/control/speed_controller.cpp) | ⚠️ SKELETON | PID integration `TODO` |
+| **Control — Heading Ctrl** | [heading_controller.cpp](Full_Code/Micromouse/src/control/heading_controller.cpp) | ⚠️ SKELETON | PID integration `TODO` |
+| **Control — Wall Follower** | [wall_follower.cpp](Full_Code/Micromouse/src/control/wall_follower.cpp) | ⚠️ SKELETON | PID integration `TODO` |
+| **Control — Cell Ctrl** | [cell_controller.cpp](Full_Code/Micromouse/src/control/cell_controller.cpp) | ⚠️ SKELETON | Distance tracking `TODO` |
+| **Control — Turn Ctrl** | [turn_controller.cpp](Full_Code/Micromouse/src/control/turn_controller.cpp) | ⚠️ SKELETON | Turn execution `TODO` |
+| **Control — Motion Ctrl** | [motion_controller.cpp](Full_Code/Micromouse/src/control/motion_controller.cpp) | ⚠️ SKELETON | Orchestrator `TODO` |
+| **Localization — Odometry** | [odometry.cpp](Full_Code/Micromouse/src/localization/odometry.cpp) | ⚠️ SKELETON | Math documented but commented out |
+| **Robot — FSM** | [robot_state_machine.cpp](Full_Code/Micromouse/src/robot/robot_state_machine.cpp) | ⚠️ SKELETON | Empty switch cases |
+| **Robot — Search/Fast Run** | [search_mode.cpp](Full_Code/Micromouse/src/robot/search_mode.cpp), [fast_run_mode.cpp](Full_Code/Micromouse/src/robot/fast_run_mode.cpp) | ⚠️ SKELETON | Not connected to solver |
+| **Display — OLED** | [oled_driver.cpp](Full_Code/Micromouse/src/display/oled_driver.cpp) | ⚠️ SKELETON | I2C driver not written |
 | **Algorithm — Flood Fill** | [flood_fill.c](src/flood_fill.c) | ✅ COMPLETE | BFS with straight-preference working |
 | **Algorithm — Dijkstra** | [dijkstra_weighted.c](src/dijkstra_weighted.c) | ✅ COMPLETE | Turn-penalized shortest path working |
 | **Algorithm — Solver** | [solver.c](src/solver.c) | ✅ COMPLETE | Full search + fast-run orchestrator |
@@ -65,7 +65,7 @@ After examining every source file in the project, here is the actual implementat
 | **Algorithm — Motion Profile** | [motion_profile.c](src/motion_profile.c) | ✅ COMPLETE | S-curve and arc profiles working |
 
 > [!CAUTION]
-> **CRITICAL FINDING:** Out of ~35 implementation files in the firmware, only **~8 are actually implemented**. The remaining **~27 files are skeletons with `TODO` comments**. The algorithms work in desktop simulation (`src/`) but are **not integrated** into the STM32 firmware (`Full Code/`). This is a massive gap with only 48 hours remaining.
+> **CRITICAL FINDING:** Out of ~35 implementation files in the firmware, only **~8 are actually implemented**. The remaining **~27 files are skeletons with `TODO` comments**. The algorithms work in desktop simulation (`src/`) but are **not integrated** into the STM32 firmware (`Full_Code/`). This is a massive gap with only 48 hours remaining.
 
 ### SWOT Analysis
 
@@ -154,7 +154,7 @@ After examining every source file in the project, here is the actual implementat
 | Member | Assigned Role | Justification |
 |--------|--------------|---------------|
 | **M1 (You)** | **Firmware Lead + Integration Architect** | Only person who can write STM32-level code, debug I2C, and integrate sensors. Must be protected from non-firmware tasks. Every minute you spend on wiring is a minute not writing firmware. |
-| **M2 (CSE)** | **Algorithm Integration Engineer + PID Tuning Partner** | Wrote the algorithms. Must port `src/*.c` into `Full Code/` firmware. Can also write the skeleton implementations for speed_controller, heading_controller, wall_follower using the existing PID class — these are pure C++ logic, not hardware-dependent. |
+| **M2 (CSE)** | **Algorithm Integration Engineer + PID Tuning Partner** | Wrote the algorithms. Must port `src/*.c` into `Full_Code/` firmware. Can also write the skeleton implementations for speed_controller, heading_controller, wall_follower using the existing PID class — these are pure C++ logic, not hardware-dependent. |
 | **M3 (ENTC)** | **Hardware Integration Lead (wiring)** | Best soldering skills after you. Takes over ALL remaining hardware: motor driver→STM32, ToF power/XSHUT, OLED, LEDs, buttons. You supervise pin assignments, M3 executes. |
 | **M4 (ENTC)** | **Hardware Assistant + Test Operator** | Assists M3 with wiring, cable management. After hardware done, becomes the "test pilot" — physically operates the robot during testing while you watch Serial output and tune. |
 | **M5 (Mech)** | **Mechanical Finisher + Hardware Support** | Finishes any chassis modifications, cable routing, sensor mounting. After that, supports M3/M4 on wiring. Also documents physical measurements (wheel base, sensor offsets) that firmware needs. |
@@ -163,7 +163,7 @@ After examining every source file in the project, here is the actual implementat
 
 > [!WARNING]
 > **Before splitting into teams, you MUST spend 30 minutes briefing M3 and M5 on:**
-> - The [pin_config.h](Full%20%20Code/Micromouse/src/config/pin_config.h) mapping (which wire goes where)
+> - The [pin_config.h](Full_Code/Micromouse/src/config/pin_config.h) mapping (which wire goes where)
 > - Power rail layout (what gets 3.3V vs 5V)
 > - I2C bus topology (MPU6050, OLED, 5× VL53L0X all on PB8/PB9)
 > - XSHUT pin assignments for each ToF sensor
@@ -171,9 +171,9 @@ After examining every source file in the project, here is the actual implementat
 >
 > **And brief M2 on:**
 > - How the firmware architecture connects to their algorithms
-> - The existing PID class API in [pid.cpp](Full%20%20Code/Micromouse/src/control/pid.cpp)
+> - The existing PID class API in [pid.cpp](Full_Code/Micromouse/src/control/pid.cpp)
 > - What `motion_controller_update()` needs to do (the pipeline in the TODO comment)
-> - How `solver.c` will be called from [robot_state_machine.cpp](Full%20%20Code/Micromouse/src/robot/robot_state_machine.cpp)
+> - How `solver.c` will be called from [robot_state_machine.cpp](Full_Code/Micromouse/src/robot/robot_state_machine.cpp)
 
 ---
 
@@ -382,13 +382,13 @@ Your idea: 2 on hardware, 3 on software.
 
 | # | Task | Owner | Duration | Priority | Dependencies | Risk | Verification |
 |---|------|-------|----------|----------|-------------|------|--------------|
-| 4.1 | Copy `solver.c`, `flood_fill.c`, `dijkstra_weighted.c`, `path_smoother.c`, `motion_profile.c` into `Full Code/Micromouse/src/maze/` | M2 | 30 min | P0 | None | LOW | Files compile in Arduino IDE |
+| 4.1 | Copy `solver.c`, `flood_fill.c`, `dijkstra_weighted.c`, `path_smoother.c`, `motion_profile.c` into `Full_Code/Micromouse/src/maze/` | M2 | 30 min | P0 | None | LOW | Files compile in Arduino IDE |
 | 4.2 | Copy `solver.h`, `flood_fill.h`, `dijkstra_weighted.h`, `path_smoother.h`, `motion_profile.h`, `maze.h`, `config.h` into firmware | M2 | 20 min | P0 | 4.1 | LOW | No compile errors |
 | 4.3 | Resolve C vs C++ linkage — wrap headers with `extern "C" {}` | M2 | 30 min | P0 | 4.2 | MED | Clean compile |
 | 4.4 | Implement `search_mode.cpp` — calls solver_record_walls + solver_search_step | M2 | 1.5 hr | P0 | 4.3 | MED | Compiles, logic matches solver API |
 | 4.5 | Implement `fast_run_mode.cpp` — calls solver_get_next_command + motion_execute_command | M2 | 1 hr | P1 | 4.4 | MED | Compiles, logic matches API |
 | 4.6 | Implement `robot_state_machine.cpp` — full FSM transitions | M1+M2 | 1.5 hr | P0 | 4.4, 3.7 | HIGH | State transitions work via button press |
-| 4.7 | Update `Micromouse.ino` `setup()` and `loop()` to remove test modes and enable full code | M1 | 30 min | P0 | 4.6 | LOW | Clean boot into STATE_IDLE |
+| 4.7 | Update `Micromouse.ino` `setup()` and `loop()` to remove test modes and enable Full_Code | M1 | 30 min | P0 | 4.6 | LOW | Clean boot into STATE_IDLE |
 
 ### Phase 5: Integration & Tuning (Hours 10-48)
 
@@ -547,7 +547,7 @@ If time runs out, here's what to **skip** to still have a working robot:
 - [ ] Battery disconnected during all wiring
 - [ ] Multimeter available and working
 - [ ] Soldering iron temperature set correctly (350°C for lead, 380°C for lead-free)
-- [ ] [pin_config.h](Full%20%20Code/Micromouse/src/config/pin_config.h) printed out and on the workbench
+- [ ] [pin_config.h](Full_Code/Micromouse/src/config/pin_config.h) printed out and on the workbench
 
 ### Motor Driver (TB6612FNG → STM32)
 
@@ -1092,7 +1092,7 @@ MVR PLAN:
 
 ### STM32 Best Practices for This Sprint
 
-1. **Use `PHASE_2_TEST_MODE` as your stepping stone.** It's already in [Micromouse.ino](Full%20%20Code/Micromouse/Micromouse.ino). Add a `PHASE_3_TEST_MODE` for sensor testing before attempting full integration.
+1. **Use `PHASE_2_TEST_MODE` as your stepping stone.** It's already in [Micromouse.ino](Full_Code/Micromouse/Micromouse.ino). Add a `PHASE_3_TEST_MODE` for sensor testing before attempting full integration.
 
 2. **I2C Bus Management — Critical for 7 devices:**
    ```cpp
@@ -1144,7 +1144,7 @@ MVR PLAN:
 ### Firmware Debugging Strategy
 
 1. **Serial.print() is your best friend.** Add debug output to EVERY new function during development. Remove later.
-2. **Use `LOG_INFO` macro** already in your [logger.h](Full%20%20Code/Micromouse/src/utils/logger.h).
+2. **Use `LOG_INFO` macro** already in your [logger.h](Full_Code/Micromouse/src/utils/logger.h).
 3. **Create a PHASE_3_TEST_MODE** for sensor-only testing before full integration.
 4. **Print encoder counts and gyro at 10Hz** during speed/heading tuning.
 5. **Plot Serial data** using Serial Plotter in Arduino IDE for PID tuning visualization.
@@ -1235,7 +1235,7 @@ WALL FOLLOWER:
 ## APPENDIX A: Quick Reference — File Ownership Map
 
 ```
-Full Code/Micromouse/
+Full_Code/Micromouse/
 ├── Micromouse.ino                    ← M1 ONLY
 ├── src/
 │   ├── config/

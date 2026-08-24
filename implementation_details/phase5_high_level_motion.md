@@ -141,7 +141,7 @@ The testing code uses an ACCUMULATIVE PID pattern:
   pwm += pid_output
   pwm = constrain(pwm, 0, PWM_MAX)
 
-This must be adapted for the Full Code PID class which already handles
+This must be adapted for the Full_Code PID class which already handles
 integral accumulation internally.
 
 Speed Measurement:

@@ -2,7 +2,7 @@
 
 > **Objective:** Complete the remaining Phase 4 (Sensor Fusion) and Phase 5 (Motion Control) using a bottom-up, test-driven strategy. Each sub-step produces a flashable, testable sketch that validates ONE behavior before moving on.
 >
-> **Key Insight from Testing:** X-distance from encoders is accurate but **angle/heading is incorrect** in the Full Code. The root cause has been identified and is documented below.
+> **Key Insight from Testing:** X-distance from encoders is accurate but **angle/heading is incorrect** in the Full_Code. The root cause has been identified and is documented below.
 
 ---
 
@@ -82,7 +82,7 @@ Instead of trying to implement everything at once, we will build and validate **
 ### Stage D: Combine Into Cell-By-Cell Navigation
 ### Stage E: Wall Following & Maze Solving
 
-Each stage produces a **self-contained test sketch** in the Full Code's Phase test system.
+Each stage produces a **self-contained test sketch** in the Full_Code's Phase test system.
 
 ---
 

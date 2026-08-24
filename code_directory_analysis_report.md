@@ -1,6 +1,6 @@
 # Micromouse Code Directory Analysis Report
 
-This report analyzes the entire `Maze-Runner/Full Code/Micromouse` codebase, detailing the purpose of each directory and the use cases of all source files within them. The code follows a clean, modular architecture, splitting responsibilities across different specialized modules inside the `src/` directory.
+This report analyzes the entire `Maze-Runner/Full_Code/Micromouse` codebase, detailing the purpose of each directory and the use cases of all source files within them. The code follows a clean, modular architecture, splitting responsibilities across different specialized modules inside the `src/` directory.
 
 ## 📁 Root Directory
 Contains the core project file and high-level project folders.
