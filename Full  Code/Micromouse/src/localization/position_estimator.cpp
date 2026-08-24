@@ -37,12 +37,11 @@ void position_estimator_update(float dt) {
     // 4. Wall Corrections (Only if driving perfectly straight)
     // To simplify for now, we only correct when facing North (Heading ~ 0)
     // Positive Y is Left. Left ToF measures distance to the wall on the left.
+    /* TEMPORARILY DISABLED FOR PHASE 5 FLOOR TESTING 
+     * If you are not in a maze, random objects will trigger this and artificially shift Y!
     if (fabs(fused_heading_deg) < 3.0f) {
         if (distance_has_wall_left()) {
             float expected_y = cell_to_mm(mm_to_cell(_best_pose.y_mm)) + 90.0f; 
-            // The wall is 90mm from cell center. Actual robot center is expected_y - sensor_reading.
-            // Wait, we need to account for robot width / sensor offset. 
-            // Let's assume distance_get_mm returns distance from robot center to wall.
             float actual_y = expected_y - distance_get_mm(TOF_LEFT);
             _best_pose.y_mm = (0.95f * _best_pose.y_mm) + (0.05f * actual_y);
         }
@@ -52,6 +51,7 @@ void position_estimator_update(float dt) {
             _best_pose.y_mm = (0.95f * _best_pose.y_mm) + (0.05f * actual_y);
         }
     }
+    */
     
     // 5. Push corrected position and fused heading back to Odometry to prevent cumulative drift
     odometry_set_pose(_best_pose);

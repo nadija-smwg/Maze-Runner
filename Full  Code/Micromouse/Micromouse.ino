@@ -604,8 +604,8 @@ void loop() {
     static Phase5State p5_state = P5_IDLE;
 
     // Motor speeds (intentionally low for safe testing)
-    #define P5_DRIVE_PWM  1200   // ~29% of max 4199
-    #define P5_TURN_PWM   1000   // ~24% of max 4199
+    #define P5_DRIVE_PWM  900   // Reduced for easier checking
+    #define P5_TURN_PWM   800   // Reduced for easier checking
 
     button_update();
     led_update();
