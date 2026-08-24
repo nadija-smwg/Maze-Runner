@@ -25,10 +25,11 @@
 
 // Sensors
 #include "src/sensors/calibration.h"
-#include "src/sensors/sensor_fusion.h"
-#include "src/sensors/sensor_manager.h"
 #include "src/sensors/distance_manager.h"
 #include "src/sensors/mpu6050.h"
+#include "src/sensors/sensor_fusion.h"
+#include "src/sensors/sensor_manager.h"
+
 
 // Localization
 #include "src/localization/odometry.h"
@@ -54,8 +55,8 @@
 #define PHASE_1_TEST_MODE 0
 #define PHASE_2_TEST_MODE 0
 #define PHASE_3_TEST_MODE 0
-#define PHASE_4_TEST_MODE 0
-#define PHASE_5_TEST_MODE 1
+#define PHASE_4_TEST_MODE 1
+#define PHASE_5_TEST_MODE 0
 
 #if PHASE_1_TEST_MODE == 1
 volatile uint32_t phase1_timer_ticks = 0;
@@ -74,9 +75,7 @@ void phase3_timer_callback(void) { phase3_timer_ticks++; }
 
 #if PHASE_4_TEST_MODE == 1
 volatile uint32_t phase4_timer_ticks = 0;
-void phase4_timer_callback(void) { 
-    phase4_timer_ticks++; 
-}
+void phase4_timer_callback(void) { phase4_timer_ticks++; }
 #endif
 
 void setup() {
@@ -96,11 +95,11 @@ void setup() {
   Wire.begin();
   Wire.setClock(400000);
   if (oled_init()) {
-      oled_clear();
-      oled_print(0, 0, "Phase 1 Test Mode");
-      oled_update();
+    oled_clear();
+    oled_print(0, 0, "Phase 1 Test Mode");
+    oled_update();
   } else {
-      LOG_ERROR("OLED Init Failed");
+    LOG_ERROR("OLED Init Failed");
   }
 
   uint16_t v_mv = battery_get_voltage_mv();
@@ -136,11 +135,11 @@ void setup() {
   Wire.begin();
   Wire.setClock(400000);
   if (oled_init()) {
-      oled_clear();
-      oled_print(0, 0, "Phase 2 Test Mode");
-      oled_update();
+    oled_clear();
+    oled_print(0, 0, "Phase 2 Test Mode");
+    oled_update();
   } else {
-      LOG_ERROR("OLED Init Failed");
+    LOG_ERROR("OLED Init Failed");
   }
 
   // Reset encoders to zero
@@ -168,11 +167,11 @@ void setup() {
   Wire.begin();
   Wire.setClock(400000);
   if (oled_init()) {
-      oled_clear();
-      oled_print(0, 0, "Phase 3 Booting");
-      oled_update();
+    oled_clear();
+    oled_print(0, 0, "Phase 3 Booting");
+    oled_update();
   } else {
-      LOG_ERROR("OLED Init Failed");
+    LOG_ERROR("OLED Init Failed");
   }
 
   // Initialize Sensors
@@ -203,9 +202,9 @@ void setup() {
   Wire.begin();
   Wire.setClock(400000);
   if (oled_init()) {
-      oled_clear();
-      oled_print(0, 0, "Phase 4 Booting");
-      oled_update();
+    oled_clear();
+    oled_print(0, 0, "Phase 4 Booting");
+    oled_update();
   }
 
   sensor_manager_init();
@@ -234,9 +233,9 @@ void setup() {
   Wire.begin();
   Wire.setClock(400000);
   if (oled_init()) {
-      oled_clear();
-      oled_print(0, 0, "Phase 5 Booting");
-      oled_update();
+    oled_clear();
+    oled_print(0, 0, "Phase 5 Booting");
+    oled_update();
   }
 
   sensor_manager_init();
@@ -246,7 +245,6 @@ void setup() {
   LOG_INFO("Phase 5 Ready!");
   return;
 #endif
-
 
   // 1. Hardware Initialization (Motors, Pins, Encoders, Battery, etc.)
   gpio_init_motor_pins();
@@ -337,7 +335,7 @@ void loop() {
   static uint32_t last_print_ticks = 0;
   if ((phase1_timer_ticks - last_print_ticks) >= 1000) {
     last_print_ticks = phase1_timer_ticks;
-    
+
     char buf[32];
     oled_clear();
     oled_print(0, 0, "Phase 1 Test");
@@ -403,7 +401,7 @@ void loop() {
   static uint32_t last_enc_print = 0;
   if ((phase2_timer_ticks - last_enc_print) >= 500) {
     last_enc_print = phase2_timer_ticks;
-    
+
     // 1. Get absolute positions
     int32_t l_cnt = encoder_get_count(ENCODER_LEFT);
     int32_t r_cnt = encoder_get_count(ENCODER_RIGHT);
@@ -411,10 +409,11 @@ void loop() {
     float r_mm = encoder_counts_to_mm(r_cnt);
 
     // 2. Get deltas to calculate speed
-    // This block runs every 500ms (0.5s), so multiply delta by 2 for counts_per_sec
+    // This block runs every 500ms (0.5s), so multiply delta by 2 for
+    // counts_per_sec
     int32_t l_delta = encoder_get_delta(ENCODER_LEFT);
     int32_t r_delta = encoder_get_delta(ENCODER_RIGHT);
-    
+
     float l_speed = encoder_counts_to_speed(l_delta * 2.0f);
     float r_speed = encoder_counts_to_speed(r_delta * 2.0f);
 
@@ -422,19 +421,19 @@ void loop() {
     char buf[32];
     oled_clear();
     oled_print(0, 0, "- Phase 2 Test -");
-    
+
     sprintf(buf, "Spd L: %.1f mm/s", l_speed);
     oled_print(0, 15, buf);
-    
+
     sprintf(buf, "Spd R: %.1f mm/s", r_speed);
     oled_print(0, 25, buf);
-    
+
     sprintf(buf, "Cnt L:%ld R:%ld", l_cnt, r_cnt);
     oled_print(0, 40, buf);
-    
+
     sprintf(buf, "Dst L:%.0f R:%.0f", l_mm, r_mm);
     oled_print(0, 50, buf);
-    
+
     oled_update();
 
     Serial.print("[Phase 2 2Hz] L: ");
@@ -457,70 +456,70 @@ void loop() {
   led_update();
 
   if (button_just_pressed(BUTTON_START)) {
-      LOG_INFO("Re-calibrating Gyro...");
-      calibrate_all();
+    LOG_INFO("Re-calibrating Gyro...");
+    calibrate_all();
   }
-  
+
   if (button_just_pressed(BUTTON_MODE)) {
-      led_toggle(LED_DEBUG);
+    led_toggle(LED_DEBUG);
   }
 
   static uint32_t last_sensor_print = 0;
   // Update sensors every 100ms (10Hz)
   if ((phase3_timer_ticks - last_sensor_print) >= 100) {
-      last_sensor_print = phase3_timer_ticks;
-      
-      sensor_manager_update();
-      
-      IMUScaledData imu;
-      mpu6050_read_scaled(&imu);
-      
-      uint16_t dist_f = distance_get_mm(TOF_FRONT);
-      uint16_t dist_fl = distance_get_mm(TOF_FRONT_LEFT);
-      uint16_t dist_fr = distance_get_mm(TOF_FRONT_RIGHT);
-      uint16_t dist_l = distance_get_mm(TOF_LEFT);
-      uint16_t dist_r = distance_get_mm(TOF_RIGHT);
-      
-      char buf[32];
-      oled_clear();
-      oled_print(0, 0, "- Phase 3 Test -");
-      
-      sprintf(buf, "F:%u FL:%u FR:%u", dist_f, dist_fl, dist_fr);
-      oled_print(0, 15, buf);
-      
-      sprintf(buf, "L:%u R:%u", dist_l, dist_r);
-      oled_print(0, 25, buf);
-      
-      String gyroStr = String(imu.gyro_z_dps, 1);
-      sprintf(buf, "GyroZ: %s deg/s", gyroStr.c_str());
-      oled_print(0, 40, buf);
-      
-      sprintf(buf, "Bat: %u mV", battery_get_voltage_mv());
-      oled_print(0, 50, buf);
-      
-      oled_update();
-      
-      Serial.print("[Phase3] F:");
-      Serial.print(dist_f);
-      Serial.print(" FL:");
-      Serial.print(dist_fl);
-      Serial.print(" FR:");
-      Serial.print(dist_fr);
-      Serial.print(" L:");
-      Serial.print(dist_l);
-      Serial.print(" R:");
-      Serial.print(dist_r);
-      Serial.print(" | Gz:");
-      Serial.print(imu.gyro_z_dps, 1);
-      Serial.print(" | Bat:");
-      Serial.print(battery_get_voltage_mv());
-      Serial.print(" | BiasZ:");
-      Serial.print(mpu6050_get_gyro_bias_z(), 1);
-      
-      IMURawData raw;
-      mpu6050_read_raw(&raw);
-      Serial.print(" | RawZ:");
-      Serial.println(raw.gyro_z);
+    last_sensor_print = phase3_timer_ticks;
+
+    sensor_manager_update();
+
+    IMUScaledData imu;
+    mpu6050_read_scaled(&imu);
+
+    uint16_t dist_f = distance_get_mm(TOF_FRONT);
+    uint16_t dist_fl = distance_get_mm(TOF_FRONT_LEFT);
+    uint16_t dist_fr = distance_get_mm(TOF_FRONT_RIGHT);
+    uint16_t dist_l = distance_get_mm(TOF_LEFT);
+    uint16_t dist_r = distance_get_mm(TOF_RIGHT);
+
+    char buf[32];
+    oled_clear();
+    oled_print(0, 0, "- Phase 3 Test -");
+
+    sprintf(buf, "F:%u FL:%u FR:%u", dist_f, dist_fl, dist_fr);
+    oled_print(0, 15, buf);
+
+    sprintf(buf, "L:%u R:%u", dist_l, dist_r);
+    oled_print(0, 25, buf);
+
+    String gyroStr = String(imu.gyro_z_dps, 1);
+    sprintf(buf, "GyroZ: %s deg/s", gyroStr.c_str());
+    oled_print(0, 40, buf);
+
+    sprintf(buf, "Bat: %u mV", battery_get_voltage_mv());
+    oled_print(0, 50, buf);
+
+    oled_update();
+
+    Serial.print("[Phase3] F:");
+    Serial.print(dist_f);
+    Serial.print(" FL:");
+    Serial.print(dist_fl);
+    Serial.print(" FR:");
+    Serial.print(dist_fr);
+    Serial.print(" L:");
+    Serial.print(dist_l);
+    Serial.print(" R:");
+    Serial.print(dist_r);
+    Serial.print(" | Gz:");
+    Serial.print(imu.gyro_z_dps, 1);
+    Serial.print(" | Bat:");
+    Serial.print(battery_get_voltage_mv());
+    Serial.print(" | BiasZ:");
+    Serial.print(mpu6050_get_gyro_bias_z(), 1);
+
+    IMURawData raw;
+    mpu6050_read_raw(&raw);
+    Serial.print(" | RawZ:");
+    Serial.println(raw.gyro_z);
   }
 
   delay(5);
@@ -530,141 +529,148 @@ void loop() {
 #if PHASE_4_TEST_MODE == 1
   button_update();
   led_update();
-  
+
   static uint32_t last_sensor_tick = millis();
-  if (millis() - last_sensor_tick >= 50) { // 20Hz ToF updates
-      last_sensor_tick = millis();
-      sensor_manager_update(); 
+  if (millis() - last_sensor_tick >= 10) { 
+    last_sensor_tick = millis();
+    // Thanks to Round-Robin polling, this only takes ~30ms now!
+    // It is totally safe to run alongside the gyro.
+    sensor_manager_update();
   }
 
+  // Sensor fusion update (Throttled to 100Hz)
   static uint32_t last_fusion_tick = millis();
-  uint32_t now = millis();
-  float dt = (now - last_fusion_tick) / 1000.0f;
-  
-  // Guard against 0 dt if loop is extremely fast
-  if (dt > 0.0f) {
-      fusion_update(dt);
-      last_fusion_tick = now;
+  if (millis() - last_fusion_tick >= 10) {
+    uint32_t now = millis();
+    float dt = (now - last_fusion_tick) / 1000.0f;
+    last_fusion_tick = now;
+
+    // Guard against bad dt
+    if (dt <= 0.0f || dt > 0.05f) {
+      dt = 0.01f;
+    }
+
+    fusion_update(dt);
   }
 
   static uint32_t last_print = 0;
-  if ((now - last_print) >= 100) {
-      last_print = now;
-      Pose p = position_estimator_get_pose();
-      
-      char buf[32];
-      oled_clear();
-      oled_print(0, 0, "- Phase 4 -");
-      
-      // Also add button functionality to reset the pose
-      if (button_is_pressed(BUTTON_MODE)) {
-          fusion_reset_heading(0.0f);
-          Pose zero = {0.0f, 0.0f, 0.0f};
-          odometry_set_pose(zero);
-      }
-      
-      sprintf(buf, "X: %d mm", (int)p.x_mm);
-      oled_print(0, 15, buf);
-      
-      sprintf(buf, "Y: %d mm", (int)p.y_mm);
-      oled_print(0, 25, buf);
-      
-      float deg = p.theta_rad * (180.0f / 3.14159265f);
-      sprintf(buf, "H: %d deg", (int)deg);
-      oled_print(0, 40, buf);
-      
-      oled_update();
-      
-      Serial.print("[Phase4] X: ");
-      Serial.print(p.x_mm, 1);
-      Serial.print(" mm | Y: ");
-      Serial.print(p.y_mm, 1);
-      Serial.print(" mm | H: ");
-      Serial.print(deg, 1);
-      Serial.println(" deg");
+  if (millis() - last_print >= 100) {
+    last_print = millis();
+    Pose p = position_estimator_get_pose();
+
+    char buf[32];
+    oled_clear();
+    oled_print(0, 0, "- Phase 4 -");
+
+    // Also add button functionality to reset the pose
+    if (button_is_pressed(BUTTON_MODE)) {
+      fusion_reset_heading(0.0f);
+      Pose zero = {0.0f, 0.0f, 0.0f};
+      odometry_set_pose(zero);
+    }
+
+    sprintf(buf, "X: %d mm", (int)p.x_mm);
+    oled_print(0, 15, buf);
+
+    sprintf(buf, "Y: %d mm", (int)p.y_mm);
+    oled_print(0, 25, buf);
+
+    float deg = p.theta_rad * (180.0f / 3.14159265f);
+    sprintf(buf, "H: %d deg", (int)deg);
+    oled_print(0, 40, buf);
+
+    oled_update();
+
+    Serial.print("[Phase4] X: ");
+    Serial.print(p.x_mm, 1);
+    Serial.print(" mm | Y: ");
+    Serial.print(p.y_mm, 1);
+    Serial.print(" mm | H: ");
+    Serial.print(deg, 1);
+    Serial.println(" deg");
   }
   delay(5);
   return;
 #endif
 
 #if PHASE_5_TEST_MODE == 1
-    // === Phase 5: Hand-Turn Gyro Test ===
-    // No motors! Just display the gyro heading.
-    // Turn the robot by hand and verify it reads 90 degrees.
-    // Press BUTTON_START to reset heading to 0.
-    
-    button_update();
-    led_update();
+  // === Phase 5: Hand-Turn Gyro Test ===
+  // No motors! Just display the gyro heading.
+  // Turn the robot by hand and verify it reads 90 degrees.
+  // Press BUTTON_START to reset heading to 0.
 
-    // Sensor fusion update
-    static uint32_t last_sensor_tick = millis();
-    if (millis() - last_sensor_tick >= 50) {
-        last_sensor_tick = millis();
-        // DISABLE ToF Sensors for Gyro Test!
-        // The ToF sensors take ~90ms to read over I2C, which blocks the loop.
-        // This causes dt to jump massively and triggers the dt cap, destroying the math!
-        // sensor_manager_update(); 
+  button_update();
+  led_update();
+
+  // Sensor fusion update
+  static uint32_t last_sensor_tick = millis();
+  if (millis() - last_sensor_tick >= 50) {
+    last_sensor_tick = millis();
+    // DISABLE ToF Sensors for Gyro Test!
+    // The ToF sensors take ~90ms to read over I2C, which blocks the loop.
+    // This causes dt to jump massively and triggers the dt cap, destroying the
+    // math! sensor_manager_update();
+  }
+
+  // Sensor fusion update (Throttled to 100Hz exactly like 1.MPU6050.ino!)
+  // Running this unthrottled at 3000Hz destroys floating point precision and
+  // ruins the math of the 0.85 Low Pass Filter.
+  static uint32_t last_fusion_tick = millis();
+  if (millis() - last_fusion_tick >= 10) {
+    uint32_t now = millis();
+    float dt = (now - last_fusion_tick) / 1000.0f;
+    last_fusion_tick = now;
+
+    // Sanity guard
+    if (dt <= 0.0f || dt > 0.05f) {
+      dt = 0.01f;
     }
 
-    // Sensor fusion update (Throttled to 100Hz exactly like 1.MPU6050.ino!)
-    // Running this unthrottled at 3000Hz destroys floating point precision and 
-    // ruins the math of the 0.85 Low Pass Filter.
-    static uint32_t last_fusion_tick = millis();
-    if (millis() - last_fusion_tick >= 10) {
-        uint32_t now = millis();
-        float dt = (now - last_fusion_tick) / 1000.0f;
-        last_fusion_tick = now;
-        
-        // Sanity guard
-        if (dt <= 0.0f || dt > 0.05f) {
-            dt = 0.01f;
-        }
-        
-        fusion_update(dt);
-    }
+    fusion_update(dt);
+  }
 
-    // Reset heading on button press
-    if (button_just_pressed(BUTTON_START)) {
-        fusion_reset_heading(0.0f);
-        Pose zero = {0.0f, 0.0f, 0.0f};
-        odometry_set_pose(zero);
-        encoder_reset_all();
-    }
+  // Reset heading on button press
+  if (button_just_pressed(BUTTON_START)) {
+    fusion_reset_heading(0.0f);
+    Pose zero = {0.0f, 0.0f, 0.0f};
+    odometry_set_pose(zero);
+    encoder_reset_all();
+  }
 
-    // Get current pose
-    Pose p = position_estimator_get_pose();
-    float deg = p.theta_rad * (180.0f / 3.14159265f);
+  // Get current pose
+  Pose p = position_estimator_get_pose();
+  float deg = p.theta_rad * (180.0f / 3.14159265f);
 
-    // OLED Display (10Hz)
-    static uint32_t last_print = 0;
-    if (millis() - last_print >= 100) {
-        last_print = millis();
-        char buf[32];
-        oled_clear();
-        oled_print(0, 0, "- Gyro Test -");
-        oled_print(0, 10, "Turn by hand!");
+  // OLED Display (10Hz)
+  static uint32_t last_print = 0;
+  if (millis() - last_print >= 100) {
+    last_print = millis();
+    char buf[32];
+    oled_clear();
+    oled_print(0, 0, "- Gyro Test -");
+    oled_print(0, 10, "Turn by hand!");
 
-        sprintf(buf, "Heading: %d deg", (int)deg);
-        oled_print(0, 28, buf);
+    sprintf(buf, "Heading: %d deg", (int)deg);
+    oled_print(0, 28, buf);
 
-        // Show raw gyro rate too
-        IMUScaledData imu;
-        mpu6050_read_scaled(&imu);
-        String gz_str = String(imu.gyro_z_dps, 1);
-        sprintf(buf, "Rate: %s d/s", gz_str.c_str());
-        oled_print(0, 42, buf);
+    // Show raw gyro rate too
+    IMUScaledData imu;
+    mpu6050_read_scaled(&imu);
+    String gz_str = String(imu.gyro_z_dps, 1);
+    sprintf(buf, "Rate: %s d/s", gz_str.c_str());
+    oled_print(0, 42, buf);
 
-        oled_print(0, 55, "BTN=Reset to 0");
+    oled_print(0, 55, "BTN=Reset to 0");
 
-        oled_update();
+    oled_update();
 
-        // Serial logging
-        Serial.print("[P5] H:");
-        Serial.print(deg, 1);
-        Serial.print(" GzRate:");
-        Serial.println(imu.gyro_z_dps, 2);
-    }
-    return;
+    // Serial logging
+    Serial.print("[P5] H:");
+    Serial.print(deg, 1);
+    Serial.print(" GzRate:");
+    Serial.println(imu.gyro_z_dps, 2);
+  }
+  return;
 #endif
 
   // Watchdog feed (from plan)

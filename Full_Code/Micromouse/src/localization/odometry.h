@@ -24,6 +24,11 @@ void odometry_update(void);
 Pose odometry_get_pose(void);
 
 /**
+ * @brief Get the last calculated change in heading (d_theta) from encoders.
+ */
+float odometry_get_dtheta(void);
+
+/**
  * @brief Force the current pose to a known value.
  */
 void odometry_set_pose(Pose new_pose);

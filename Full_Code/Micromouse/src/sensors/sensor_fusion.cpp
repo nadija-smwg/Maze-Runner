@@ -26,11 +26,9 @@ void fusion_update(float dt) {
     IMUScaledData imu;
     mpu6050_read_scaled(&imu);
     
-    // 3. We need encoder delta theta for heading estimator.
-    // However, odometry_update already processed it.
-    // The complementary filter will pull absolute heading from odometry_get_pose()!
-    // So we just pass 0.0f for dtheta to heading_estimator since it reads odometry_get_pose internally.
-    heading_estimator_update(imu.gyro_z_dps, 0.0f, dt);
+    // 3. Complementary Filter: Pass gyro rate and encoder delta theta
+    // The filter will fuse the high-frequency gyro data with the low-frequency encoder data.
+    heading_estimator_update(imu.gyro_z_dps, odometry_get_dtheta(), dt);
     
     // 4. Wall corrections
     position_estimator_update(dt);

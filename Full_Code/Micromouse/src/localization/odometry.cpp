@@ -13,6 +13,7 @@
 static Pose _current_pose = {0, 0, 0};
 static long _prev_left = 0;
 static long _prev_right = 0;
+static float _current_dtheta = 0.0f;
 
 void odometry_init(void) {
     _current_pose = {0.0f, 0.0f, 0.0f};
@@ -35,10 +36,10 @@ void odometry_update(void) {
     float d_center = (left_delta_mm + right_delta_mm) / 2.0f;
 
     // 3. How much did the robot rotate? 
-    float d_theta = (right_delta_mm - left_delta_mm) / WHEEL_BASE_MM;
+    _current_dtheta = (right_delta_mm - left_delta_mm) / WHEEL_BASE_MM;
 
     // 4. Update Heading (Internal Odometry tracking)
-    _current_pose.theta_rad = pose_normalize_angle_rad(_current_pose.theta_rad + d_theta);
+    _current_pose.theta_rad = pose_normalize_angle_rad(_current_pose.theta_rad + _current_dtheta);
 
     // 4. Update X/Y Position (using basic trigonometry)
     _current_pose.x_mm += d_center * cos(_current_pose.theta_rad);
@@ -51,4 +52,8 @@ Pose odometry_get_pose(void) {
 
 void odometry_set_pose(Pose new_pose) {
     _current_pose = new_pose;
+}
+
+float odometry_get_dtheta(void) {
+    return _current_dtheta;
 }

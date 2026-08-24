@@ -46,8 +46,8 @@ bool mpu6050_init(void) {
     write_register(0x6B, 0x00);
     delay(10); // Wait for sensor to stabilize
 
-    // 3. Sample Rate = 1000Hz (SMPLRT_DIV = 7)
-    write_register(0x19, 0x07);
+    // 3. Sample Rate = 1000Hz (SMPLRT_DIV = 0)
+    write_register(0x19, 0x00);
 
     // 4. DLPF = 44Hz (CONFIG = 3)
     write_register(0x1A, 0x03);
@@ -87,15 +87,15 @@ void mpu6050_read_raw(IMURawData *data) {
         }
     }
 
-    data->accel_x = (buffer[0] << 8) | buffer[1];
-    data->accel_y = (buffer[2] << 8) | buffer[3];
-    data->accel_z = (buffer[4] << 8) | buffer[5];
+    data->accel_x = (int16_t)((buffer[0] << 8) | buffer[1]);
+    data->accel_y = (int16_t)((buffer[2] << 8) | buffer[3]);
+    data->accel_z = (int16_t)((buffer[4] << 8) | buffer[5]);
     
-    data->temp    = (buffer[6] << 8) | buffer[7];
+    data->temp    = (int16_t)((buffer[6] << 8) | buffer[7]);
     
-    data->gyro_x  = (buffer[8] << 8) | buffer[9];
-    data->gyro_y  = (buffer[10] << 8) | buffer[11];
-    data->gyro_z  = (buffer[12] << 8) | buffer[13];
+    data->gyro_x  = (int16_t)((buffer[8] << 8) | buffer[9]);
+    data->gyro_y  = (int16_t)((buffer[10] << 8) | buffer[11]);
+    data->gyro_z  = (int16_t)((buffer[12] << 8) | buffer[13]);
 }
 
 void mpu6050_read_scaled(IMUScaledData *data) {
@@ -115,10 +115,15 @@ void mpu6050_read_scaled(IMUScaledData *data) {
     data->gyro_x_dps = (float)(raw.gyro_x - _gyro_bias_x) / 65.5f;
     data->gyro_y_dps = (float)(raw.gyro_y - _gyro_bias_y) / 65.5f;
     
-    // The VL53L0X lasers pull current on the 3.3V line, creating a constant 
-    // hardware noise shift on the MPU6050 gyro. We apply an empirical +2.1 deg/s 
-    // correction here to cancel it out so the robot tracks perfectly straight.
-    float raw_gz = (float)(raw.gyro_z - _gyro_bias_z) / 65.5f;
+    // CUSTOM HARDWARE CALIBRATION:
+    // 1. The VL53L0X lasers pull current on the 3.3V line, creating a constant 
+    //    hardware noise shift on the MPU6050 gyro. We apply an empirical +2.1 deg/s 
+    //    correction here to cancel it out so the robot tracks perfectly straight.
+    float base_gz = ((float)(raw.gyro_z - _gyro_bias_z) / 65.5f) + 2.1f;
+    
+    // 2. A 90-degree physical turn was reading as ~172.5 degrees.
+    //    We apply a multiplier of (90.0 / 172.5) = 0.5217 to scale the turns perfectly!
+    float raw_gz = base_gz * 0.5217f;
     
     // EMA Low-Pass Filter (matches test code alpha=0.85)
     // Smooths out electrical noise spikes from ToF sensors and motors

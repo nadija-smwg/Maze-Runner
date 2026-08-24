@@ -20,6 +20,7 @@ static HardwareTimer *MyTim = nullptr;
  *  ISR
  * ═══════════════════════════════════════════════════════════════════════════ */
 
+
 static void _timer_isr(void) {
     // 1. Mark that a 1ms control loop tick has occurred
     _tick_pending = true;

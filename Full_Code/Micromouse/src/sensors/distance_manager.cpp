@@ -37,11 +37,14 @@ void distance_manager_init(void) {
 }
 
 void distance_manager_update(void) {
-    for (int i = 0; i < TOF_COUNT; i++) {
+    // CONTINUOUS POLLING:
+    // With the Pololu library in continuous mode, reading all 5 sensors 
+    // takes very little time. We can read them all in one pass.
+    for (uint8_t i = 0; i < TOF_COUNT; i++) {
         uint16_t raw_mm = vl53l0x_read_distance_mm(&_sensors[i]);
         
         // Simple Exponential Moving Average (EMA) filter to reduce noise
-        if (raw_mm != 8190) {
+        if (raw_mm != 8190 && raw_mm < 8000) {
             if (_distances_mm[i] == 8190) {
                 _distances_mm[i] = raw_mm; // Initialize on first valid read
             } else {
