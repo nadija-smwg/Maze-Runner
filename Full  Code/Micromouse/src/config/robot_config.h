@@ -23,7 +23,7 @@
  *  @{
  */
 
-#define GEAR_RATIO              188.5f  /**< Calibrated ratio (290/100 * 65)*/
+#define GEAR_RATIO              18.85f  /**< Calibrated for 100cm actual = 100cm OLED */
 #define ENCODER_PPR             7.0f    /**< Pulses per revolution (raw)    */
 #define ENCODER_QUADRATURE      4.0f    /**< Quadrature multiplier (×4)     */
 

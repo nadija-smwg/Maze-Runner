@@ -68,7 +68,7 @@ void mpu6050_read_raw(IMURawData *data) {
 
     Wire.beginTransmission(MPU6050_I2C_ADDR);
     Wire.write(0x3B); // Starting register: ACCEL_XOUT_H
-    Wire.endTransmission(); // Use standard Stop condition instead of Repeated Start for robustness
+    Wire.endTransmission(false); // MUST use Repeated Start to prevent register tearing!
     
     Wire.requestFrom((uint8_t)MPU6050_I2C_ADDR, (uint8_t)14);
 
@@ -118,7 +118,13 @@ void mpu6050_read_scaled(IMUScaledData *data) {
     // The VL53L0X lasers pull current on the 3.3V line, creating a constant 
     // hardware noise shift on the MPU6050 gyro. We apply an empirical +2.1 deg/s 
     // correction here to cancel it out so the robot tracks perfectly straight.
-    data->gyro_z_dps = ((float)(raw.gyro_z - _gyro_bias_z) / 65.5f) + 2.1f;
+    float raw_gz = (float)(raw.gyro_z - _gyro_bias_z) / 65.5f;
+    
+    // EMA Low-Pass Filter (matches test code alpha=0.85)
+    // Smooths out electrical noise spikes from ToF sensors and motors
+    static float gz_filtered = 0.0f;
+    gz_filtered = 0.85f * gz_filtered + 0.15f * raw_gz;
+    data->gyro_z_dps = gz_filtered;
 }
 
 void mpu6050_calibrate_gyro(uint16_t samples) {

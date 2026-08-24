@@ -30,10 +30,9 @@ void heading_estimator_update(float gyro_z_dps, float encoder_dtheta_rad, float 
     float encoder_heading_deg = odometry_get_pose().theta_rad * (180.0f / 3.14159265f);
 
     // 3. Complementary Filter
-    // Calculate time-invariant alpha based on loop dt
-    // tau is the time constant (e.g. 0.5 seconds for encoders to correct gyro drift)
-    float tau = 0.5f; 
-    float alpha = tau / (tau + dt);
+    // Temporarily set alpha to 1.0f (100% Gyro, 0% Encoders) for Phase 5 Testing.
+    // This allows us to trust the pure gyro angle so we can calibrate the wheels against it!
+    float alpha = 1.0f; // tau / (tau + dt);
 
     _fused_heading_deg = alpha * (_fused_heading_deg + gyro_dtheta_deg) + (1.0f - alpha) * encoder_heading_deg;
     

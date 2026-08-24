@@ -588,47 +588,43 @@ void loop() {
 #endif
 
 #if PHASE_5_TEST_MODE == 1
-    // === Phase 5 Test State Machine ===
-    enum Phase5State {
-        P5_IDLE,
-        P5_FWD_180,
-        P5_WAIT_1,     // Wait for BTN_START after forward
-        P5_REV_0,
-        P5_WAIT_2,     // Wait for BTN_START after reverse
-        P5_TURN_L90,
-        P5_WAIT_3,     // Wait for BTN_START after turn left
-        P5_TURN_R0,
-        P5_DONE
-    };
-
-    static Phase5State p5_state = P5_IDLE;
-
-    // Motor speeds (intentionally low for safe testing)
-    #define P5_DRIVE_PWM  900   // Reduced for easier checking
-    #define P5_TURN_PWM   800   // Reduced for easier checking
-
+    // === Phase 5: Hand-Turn Gyro Test ===
+    // No motors! Just display the gyro heading.
+    // Turn the robot by hand and verify it reads 90 degrees.
+    // Press BUTTON_START to reset heading to 0.
+    
     button_update();
     led_update();
 
-    // Sensor fusion update (same as Phase 4)
+    // Sensor fusion update
     static uint32_t last_sensor_tick = millis();
     if (millis() - last_sensor_tick >= 50) {
         last_sensor_tick = millis();
-        sensor_manager_update();
+        // DISABLE ToF Sensors for Gyro Test!
+        // The ToF sensors take ~90ms to read over I2C, which blocks the loop.
+        // This causes dt to jump massively and triggers the dt cap, destroying the math!
+        // sensor_manager_update(); 
     }
 
+    // Sensor fusion update (Throttled to 100Hz exactly like 1.MPU6050.ino!)
+    // Running this unthrottled at 3000Hz destroys floating point precision and 
+    // ruins the math of the 0.85 Low Pass Filter.
     static uint32_t last_fusion_tick = millis();
-    uint32_t now = millis();
-    float dt = (now - last_fusion_tick) / 1000.0f;
-    if (dt > 0.0f) {
-        fusion_update(dt);
+    if (millis() - last_fusion_tick >= 10) {
+        uint32_t now = millis();
+        float dt = (now - last_fusion_tick) / 1000.0f;
         last_fusion_tick = now;
+        
+        // Sanity guard
+        if (dt <= 0.0f || dt > 0.05f) {
+            dt = 0.01f;
+        }
+        
+        fusion_update(dt);
     }
 
-    // Emergency stop & reset on BUTTON_MODE
-    if (button_just_pressed(BUTTON_MODE)) {
-        motor_stop();
-        p5_state = P5_IDLE;
+    // Reset heading on button press
+    if (button_just_pressed(BUTTON_START)) {
         fusion_reset_heading(0.0f);
         Pose zero = {0.0f, 0.0f, 0.0f};
         odometry_set_pose(zero);
@@ -639,120 +635,35 @@ void loop() {
     Pose p = position_estimator_get_pose();
     float deg = p.theta_rad * (180.0f / 3.14159265f);
 
-    // State machine
-    switch (p5_state) {
-    case P5_IDLE:
-        motor_stop();
-        if (button_just_pressed(BUTTON_START)) {
-            // Reset pose before starting
-            fusion_reset_heading(0.0f);
-            Pose zero = {0.0f, 0.0f, 0.0f};
-            odometry_set_pose(zero);
-            encoder_reset_all();
-            p5_state = P5_FWD_180;
-        }
-        break;
-
-    case P5_FWD_180:
-        motor_forward(P5_DRIVE_PWM);
-        if (p.x_mm >= 180.0f) {
-            motor_stop();
-            p5_state = P5_WAIT_1;
-        }
-        break;
-
-    case P5_WAIT_1:
-        motor_stop();
-        if (button_just_pressed(BUTTON_START)) {
-            p5_state = P5_REV_0;
-        }
-        break;
-
-    case P5_REV_0:
-        motor_reverse(P5_DRIVE_PWM);
-        if (p.x_mm <= 0.0f) {
-            motor_stop();
-            p5_state = P5_WAIT_2;
-        }
-        break;
-
-    case P5_WAIT_2:
-        motor_stop();
-        if (button_just_pressed(BUTTON_START)) {
-            p5_state = P5_TURN_L90;
-        }
-        break;
-
-    case P5_TURN_L90:
-        motor_turn_left(P5_TURN_PWM);
-        if (deg >= 90.0f) {
-            motor_stop();
-            p5_state = P5_WAIT_3;
-        }
-        break;
-
-    case P5_WAIT_3:
-        motor_stop();
-        if (button_just_pressed(BUTTON_START)) {
-            p5_state = P5_TURN_R0;
-        }
-        break;
-
-    case P5_TURN_R0:
-        motor_turn_right(P5_TURN_PWM);
-        if (deg <= 0.0f) {
-            motor_stop();
-            p5_state = P5_DONE;
-        }
-        break;
-
-    case P5_DONE:
-        motor_stop();
-        if (button_just_pressed(BUTTON_START)) {
-            p5_state = P5_IDLE;
-        }
-        break;
-    }
-
     // OLED Display (10Hz)
     static uint32_t last_print = 0;
-    if (now - last_print >= 100) {
-        last_print = now;
+    if (millis() - last_print >= 100) {
+        last_print = millis();
         char buf[32];
         oled_clear();
-        oled_print(0, 0, "- Phase 5 -");
+        oled_print(0, 0, "- Gyro Test -");
+        oled_print(0, 10, "Turn by hand!");
 
-        switch (p5_state) {
-        case P5_IDLE:    oled_print(0, 15, "Ready! Press START"); break;
-        case P5_FWD_180: sprintf(buf, "FWD -> X:%d/180", (int)p.x_mm); oled_print(0, 15, buf); break;
-        case P5_WAIT_1:  sprintf(buf, "ok FWD X:%d START", (int)p.x_mm); oled_print(0, 15, buf); break;
-        case P5_REV_0:   sprintf(buf, "REV -> X:%d/0", (int)p.x_mm);   oled_print(0, 15, buf); break;
-        case P5_WAIT_2:  sprintf(buf, "ok REV X:%d START", (int)p.x_mm); oled_print(0, 15, buf); break;
-        case P5_TURN_L90:sprintf(buf, "TRN_L -> H:%d/90", (int)deg);   oled_print(0, 15, buf); break;
-        case P5_WAIT_3:  sprintf(buf, "ok TRN H:%d START", (int)deg);   oled_print(0, 15, buf); break;
-        case P5_TURN_R0: sprintf(buf, "TRN_R -> H:%d/0", (int)deg);    oled_print(0, 15, buf); break;
-        case P5_DONE:    oled_print(0, 15, "DONE! Press START"); break;
-        }
+        sprintf(buf, "Heading: %d deg", (int)deg);
+        oled_print(0, 28, buf);
 
-        sprintf(buf, "X:%d Y:%d", (int)p.x_mm, (int)p.y_mm);
-        oled_print(0, 35, buf);
-        sprintf(buf, "H:%d deg", (int)deg);
-        oled_print(0, 50, buf);
+        // Show raw gyro rate too
+        IMUScaledData imu;
+        mpu6050_read_scaled(&imu);
+        String gz_str = String(imu.gyro_z_dps, 1);
+        sprintf(buf, "Rate: %s d/s", gz_str.c_str());
+        oled_print(0, 42, buf);
+
+        oled_print(0, 55, "BTN=Reset to 0");
 
         oled_update();
 
         // Serial logging
-        Serial.print("[P5] State:");
-        Serial.print(p5_state);
-        Serial.print(" X:");
-        Serial.print(p.x_mm, 1);
-        Serial.print(" Y:");
-        Serial.print(p.y_mm, 1);
-        Serial.print(" H:");
-        Serial.println(deg, 1);
+        Serial.print("[P5] H:");
+        Serial.print(deg, 1);
+        Serial.print(" GzRate:");
+        Serial.println(imu.gyro_z_dps, 2);
     }
-
-    delay(2);
     return;
 #endif
 
