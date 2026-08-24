@@ -30,8 +30,12 @@ void heading_estimator_update(float gyro_z_dps, float encoder_dtheta_rad, float 
     float encoder_heading_deg = odometry_get_pose().theta_rad * (180.0f / 3.14159265f);
 
     // 3. Complementary Filter
-    // Trust gyro 98%, pull toward encoder 2%
-    _fused_heading_deg = 0.98f * (_fused_heading_deg + gyro_dtheta_deg) + 0.02f * encoder_heading_deg;
+    // Calculate time-invariant alpha based on loop dt
+    // tau is the time constant (e.g. 0.5 seconds for encoders to correct gyro drift)
+    float tau = 0.5f; 
+    float alpha = tau / (tau + dt);
+
+    _fused_heading_deg = alpha * (_fused_heading_deg + gyro_dtheta_deg) + (1.0f - alpha) * encoder_heading_deg;
     
     // Normalize to [-180, 180]
     _fused_heading_deg = pose_normalize_angle_deg(_fused_heading_deg);

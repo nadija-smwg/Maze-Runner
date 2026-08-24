@@ -54,7 +54,8 @@
 #define PHASE_1_TEST_MODE 0
 #define PHASE_2_TEST_MODE 0
 #define PHASE_3_TEST_MODE 0
-#define PHASE_4_TEST_MODE 1
+#define PHASE_4_TEST_MODE 0
+#define PHASE_5_TEST_MODE 1
 
 #if PHASE_1_TEST_MODE == 1
 volatile uint32_t phase1_timer_ticks = 0;
@@ -215,6 +216,34 @@ void setup() {
   timer_start();
 
   LOG_INFO("Phase 4 Ready!");
+  return;
+#endif
+
+#if PHASE_5_TEST_MODE == 1
+  LOG_INFO("=== PHASE 5 MOTION TEST MODE ===");
+  gpio_init_motor_pins();
+  pwm_init();
+  encoder_init();
+  motor_init();
+  button_init();
+  led_init();
+  battery_init();
+
+  Wire.setSCL(PIN_I2C_SCL);
+  Wire.setSDA(PIN_I2C_SDA);
+  Wire.begin();
+  Wire.setClock(400000);
+  if (oled_init()) {
+      oled_clear();
+      oled_print(0, 0, "Phase 5 Booting");
+      oled_update();
+  }
+
+  sensor_manager_init();
+  calibrate_all();
+  fusion_init();
+
+  LOG_INFO("Phase 5 Ready!");
   return;
 #endif
 
@@ -556,6 +585,175 @@ void loop() {
   }
   delay(5);
   return;
+#endif
+
+#if PHASE_5_TEST_MODE == 1
+    // === Phase 5 Test State Machine ===
+    enum Phase5State {
+        P5_IDLE,
+        P5_FWD_180,
+        P5_WAIT_1,     // Wait for BTN_START after forward
+        P5_REV_0,
+        P5_WAIT_2,     // Wait for BTN_START after reverse
+        P5_TURN_L90,
+        P5_WAIT_3,     // Wait for BTN_START after turn left
+        P5_TURN_R0,
+        P5_DONE
+    };
+
+    static Phase5State p5_state = P5_IDLE;
+
+    // Motor speeds (intentionally low for safe testing)
+    #define P5_DRIVE_PWM  1200   // ~29% of max 4199
+    #define P5_TURN_PWM   1000   // ~24% of max 4199
+
+    button_update();
+    led_update();
+
+    // Sensor fusion update (same as Phase 4)
+    static uint32_t last_sensor_tick = millis();
+    if (millis() - last_sensor_tick >= 50) {
+        last_sensor_tick = millis();
+        sensor_manager_update();
+    }
+
+    static uint32_t last_fusion_tick = millis();
+    uint32_t now = millis();
+    float dt = (now - last_fusion_tick) / 1000.0f;
+    if (dt > 0.0f) {
+        fusion_update(dt);
+        last_fusion_tick = now;
+    }
+
+    // Emergency stop & reset on BUTTON_MODE
+    if (button_just_pressed(BUTTON_MODE)) {
+        motor_stop();
+        p5_state = P5_IDLE;
+        fusion_reset_heading(0.0f);
+        Pose zero = {0.0f, 0.0f, 0.0f};
+        odometry_set_pose(zero);
+        encoder_reset_all();
+    }
+
+    // Get current pose
+    Pose p = position_estimator_get_pose();
+    float deg = p.theta_rad * (180.0f / 3.14159265f);
+
+    // State machine
+    switch (p5_state) {
+    case P5_IDLE:
+        motor_stop();
+        if (button_just_pressed(BUTTON_START)) {
+            // Reset pose before starting
+            fusion_reset_heading(0.0f);
+            Pose zero = {0.0f, 0.0f, 0.0f};
+            odometry_set_pose(zero);
+            encoder_reset_all();
+            p5_state = P5_FWD_180;
+        }
+        break;
+
+    case P5_FWD_180:
+        motor_forward(P5_DRIVE_PWM);
+        if (p.x_mm >= 180.0f) {
+            motor_stop();
+            p5_state = P5_WAIT_1;
+        }
+        break;
+
+    case P5_WAIT_1:
+        motor_stop();
+        if (button_just_pressed(BUTTON_START)) {
+            p5_state = P5_REV_0;
+        }
+        break;
+
+    case P5_REV_0:
+        motor_reverse(P5_DRIVE_PWM);
+        if (p.x_mm <= 0.0f) {
+            motor_stop();
+            p5_state = P5_WAIT_2;
+        }
+        break;
+
+    case P5_WAIT_2:
+        motor_stop();
+        if (button_just_pressed(BUTTON_START)) {
+            p5_state = P5_TURN_L90;
+        }
+        break;
+
+    case P5_TURN_L90:
+        motor_turn_left(P5_TURN_PWM);
+        if (deg >= 90.0f) {
+            motor_stop();
+            p5_state = P5_WAIT_3;
+        }
+        break;
+
+    case P5_WAIT_3:
+        motor_stop();
+        if (button_just_pressed(BUTTON_START)) {
+            p5_state = P5_TURN_R0;
+        }
+        break;
+
+    case P5_TURN_R0:
+        motor_turn_right(P5_TURN_PWM);
+        if (deg <= 0.0f) {
+            motor_stop();
+            p5_state = P5_DONE;
+        }
+        break;
+
+    case P5_DONE:
+        motor_stop();
+        if (button_just_pressed(BUTTON_START)) {
+            p5_state = P5_IDLE;
+        }
+        break;
+    }
+
+    // OLED Display (10Hz)
+    static uint32_t last_print = 0;
+    if (now - last_print >= 100) {
+        last_print = now;
+        char buf[32];
+        oled_clear();
+        oled_print(0, 0, "- Phase 5 -");
+
+        switch (p5_state) {
+        case P5_IDLE:    oled_print(0, 15, "Ready! Press START"); break;
+        case P5_FWD_180: sprintf(buf, "FWD -> X:%d/180", (int)p.x_mm); oled_print(0, 15, buf); break;
+        case P5_WAIT_1:  sprintf(buf, "ok FWD X:%d START", (int)p.x_mm); oled_print(0, 15, buf); break;
+        case P5_REV_0:   sprintf(buf, "REV -> X:%d/0", (int)p.x_mm);   oled_print(0, 15, buf); break;
+        case P5_WAIT_2:  sprintf(buf, "ok REV X:%d START", (int)p.x_mm); oled_print(0, 15, buf); break;
+        case P5_TURN_L90:sprintf(buf, "TRN_L -> H:%d/90", (int)deg);   oled_print(0, 15, buf); break;
+        case P5_WAIT_3:  sprintf(buf, "ok TRN H:%d START", (int)deg);   oled_print(0, 15, buf); break;
+        case P5_TURN_R0: sprintf(buf, "TRN_R -> H:%d/0", (int)deg);    oled_print(0, 15, buf); break;
+        case P5_DONE:    oled_print(0, 15, "DONE! Press START"); break;
+        }
+
+        sprintf(buf, "X:%d Y:%d", (int)p.x_mm, (int)p.y_mm);
+        oled_print(0, 35, buf);
+        sprintf(buf, "H:%d deg", (int)deg);
+        oled_print(0, 50, buf);
+
+        oled_update();
+
+        // Serial logging
+        Serial.print("[P5] State:");
+        Serial.print(p5_state);
+        Serial.print(" X:");
+        Serial.print(p.x_mm, 1);
+        Serial.print(" Y:");
+        Serial.print(p.y_mm, 1);
+        Serial.print(" H:");
+        Serial.println(deg, 1);
+    }
+
+    delay(2);
+    return;
 #endif
 
   // Watchdog feed (from plan)

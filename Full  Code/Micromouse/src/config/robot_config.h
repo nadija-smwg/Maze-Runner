@@ -23,7 +23,7 @@
  *  @{
  */
 
-#define GEAR_RATIO              65.0f   /**< Gearbox ratio (output:input)   */
+#define GEAR_RATIO              188.5f  /**< Calibrated ratio (290/100 * 65)*/
 #define ENCODER_PPR             7.0f    /**< Pulses per revolution (raw)    */
 #define ENCODER_QUADRATURE      4.0f    /**< Quadrature multiplier (×4)     */
 
@@ -73,7 +73,7 @@
  *
  * TODO: Measure actual wheel base on your robot and update this value.
  */
-#define WHEEL_BASE_MM           93.0f   /**< Measured wheel base       */
+#define WHEEL_BASE_MM           127.1f  /**< Calibrated from 123 deg display for 90 deg actual */
 
 /**
  * Distance from wheel axle to front sensor mounting point (mm).
