@@ -81,8 +81,8 @@ float distance_get_centering_error(void) {
     bool wall_r = distance_has_wall_right();
 
     // Standard maze cell is 180mm. 
-    // Assuming robot width is ~80mm, target distance to wall is ~50mm.
-    const float TARGET_WALL_DIST_MM = 50.0f;
+    // Assuming robot width is ~120mm, target distance to wall is ~30mm.
+    const float TARGET_WALL_DIST_MM = 30.0f;
 
     if (wall_l && wall_r) {
         // Both walls: Error is simply the difference
@@ -94,11 +94,11 @@ float distance_get_centering_error(void) {
         return (float)_distances_mm[TOF_RIGHT] - (float)_distances_mm[TOF_LEFT];
     } else if (wall_l) {
         // Only left wall present. 
-        // Target is 50mm. If L=40, we are too far left. error = 50 - 40 = +10.
+        // Target is 30mm. If L=20, we are too far left. error = 30 - 20 = +10.
         return TARGET_WALL_DIST_MM - (float)_distances_mm[TOF_LEFT];
     } else if (wall_r) {
         // Only right wall present.
-        // Target is 50mm. If R=40, we are too far right. error = 40 - 50 = -10.
+        // Target is 30mm. If R=20, we are too far right. error = 20 - 30 = -10.
         return (float)_distances_mm[TOF_RIGHT] - TARGET_WALL_DIST_MM;
     }
 
