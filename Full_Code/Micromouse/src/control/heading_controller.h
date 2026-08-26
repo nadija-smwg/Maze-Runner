@@ -26,8 +26,7 @@ void heading_controller_init(void);
  * TODO: Compute PID output based on heading error.
  */
 float heading_controller_update(float target_heading_deg,
-                                float current_heading_deg,
-                                float dt);
+                                float current_heading_deg, float dt);
 
 /**
  * @brief Reset the heading controller state.
