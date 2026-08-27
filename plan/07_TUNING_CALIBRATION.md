@@ -375,6 +375,42 @@ void characterizeSensorNoise(VL53L0X& sensor, const char* name) {
 // characterizeSensorNoise(sensorRight, "Right");
 ```
 
+```
+
+---
+
+## Step 9: PD Wall-Follower Calibration
+
+Once basic straight-line motion works, wall-following must be calibrated to stop the robot from oscillating (wobbling) in the corridors.
+
+### Proportional (P) - The Steering
+1. Set `Kd = 0`.
+2. Start with `Kp = 1` and place the robot in a straight corridor.
+3. Keep increasing `Kp` until the robot drives through but **visibly oscillates** rapidly from side to side without crashing.
+4. Drop that `Kp` value by about 20%.
+
+### Derivative (D) - The Damper
+1. Now start increasing `Kd` (Derivative values are usually 5x-20x higher than P).
+2. The wobbling should disappear as the robot snaps to the center smoothly.
+3. If `Kd` is too high, the robot will vibrate aggressively due to sensor noise. If this happens, ensure your **EMA Sensor Filter** is working.
+
+---
+
+## Step 10: EMA Sensor Filtering & Hysteresis
+
+Raw ToF data is noisy. You must filter it before feeding it into the PD wall-follower.
+
+1. **Exponential Moving Average (EMA)**: Average the last few readings to smooth out noise.
+   ```cpp
+   filtered_dist = (alpha * current_reading) + ((1 - alpha) * filtered_dist);
+   // alpha = 0.3 is a good starting point for ToF sensors.
+   ```
+2. **Hysteresis**: Prevent the robot from flickering when detecting walls.
+   ```cpp
+   if (filtered_dist < 140) has_wall = true;
+   if (filtered_dist > 160) has_wall = false;
+   ```
+
 ---
 
 ## Golden Reference Values

@@ -227,7 +227,7 @@ The entire algorithm suite uses **zero dynamic memory allocation** — all struc
 | 2 | **Sensor & Actuator Interfacing** — Motors, encoders, VL53L0X, MPU6050 | ✅ Complete |
 | 3 | **Kinematics & Control** — Dead reckoning, PID, sensor fusion | 🔧 In Progress |
 | 4 | **Maze-Solving Algorithms** — Flood fill, Dijkstra, path smoother | ✅ Complete |
-| 5 | **Competition Optimization** — State machine, speed tuning, robustness | 🔲 Pending |
+| 5 | **Competition Optimization** — Wall follower, motion profiling, sensor filtering | 🔧 In Progress |
 
 ### Software Modules
 
@@ -240,7 +240,8 @@ The entire algorithm suite uses **zero dynamic memory allocation** — all struc
 | Motion Profile | `motion_profile.c/.h` | ✅ Done | S-curve, arc turns, wheel speed diff |
 | Solver Orchestrator | `solver.c/.h` | ✅ Done | Ties all tiers together |
 | Desktop Test Harness | `main.c` | ✅ Done | Full algorithm demo on simulated maze |
-| PID Controller | — | 🔧 WIP | Needed for motor control integration |
+| Wall Follower (Phase 5) | `Micromouse.ino` | 🔧 WIP | Trapezoidal profiling, EMA filtering, Hysteresis |
+| PID Controller | — | 🔲 Pending | Velocity PID & PD wall-centering planned |
 | STM32 Main Firmware | — | 🔲 Pending | Final firmware integrating all modules |
 
 ### Hardware Testing
