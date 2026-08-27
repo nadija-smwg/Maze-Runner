@@ -52,6 +52,7 @@
 // Utils
 #include "src/utils/logger.h"
 #include "src/utils/serial_debug.h"
+#include "src/utils/debug_buffer.h"
 
 // Phase testing mode flags (set to 1 for active test mode)
 #define PHASE_1_TEST_MODE 0
@@ -247,6 +248,9 @@ void setup() {
   // Initialize PID controllers
   velocity_controller_init();
   heading_controller_init();
+
+  // Initialize debug buffer for offline logging
+  debug_buffer_init();
 
   LOG_INFO("Phase 5 Ready!");
   LOG_INFO("Press START to drive straight.");
@@ -605,10 +609,13 @@ void loop() {
   button_update();
   led_update();
 
+  // ═══════════════════════════════════════════════════════════════════════
+  //  Sensor & Fusion Updates (100Hz = every 10ms)
+  // ═══════════════════════════════════════════════════════════════════════
   static uint32_t last_sensor_tick = millis();
   if (millis() - last_sensor_tick >= 10) {
     last_sensor_tick = millis();
-    sensor_manager_update(); // Safe to run now!
+    sensor_manager_update(); // Round-robin ToF polling (~30ms total cycle)
   }
 
   static uint32_t last_fusion_tick = millis();
@@ -622,92 +629,374 @@ void loop() {
     fusion_update(dt);
   }
 
-  static int p5_state = 0; // 0=Idle, 1=Drive
+  // ═══════════════════════════════════════════════════════════════════════
+  //  Phase 5 State Machine
+  // ═══════════════════════════════════════════════════════════════════════
+  // States: 0=IDLE, 1=DRIVE, 2=FF_CALIBRATE (feedforward measurement)
+  static int p5_state = 0;
   static float target_v = 0.0f;
   static float target_h = 0.0f;
-  static float live_kp = 1.0f;
+  static float live_kp = 0.05f;    // Start at the default SPEED_KP
+  static int ff_step = 0;          // Feedforward calibration step (0-3)
+  static const int ff_pwm_values[] = {500, 1000, 1500, 2000};
+  static uint32_t ff_start_time = 0;
+  static uint32_t mode_press_time = 0;   // For long-press detection
+  static bool mode_held = false;
 
+  // ───────────────────────────────────────────────────────────────────────
+  //  BUTTON_START: Toggle IDLE ↔ DRIVE
+  // ───────────────────────────────────────────────────────────────────────
   if (button_just_pressed(BUTTON_START)) {
     if (p5_state == 0) {
-      p5_state = 1;                    // Drive straight
-      target_v = 300.0f;               // 300 mm/s
-      target_h = fusion_get_heading(); // Lock to current heading
-      Serial.println("\n[DECISION] START pressed. State -> DRIVE (300 mm/s)");
-    } else {
-      p5_state = 0; // Stop
-      Serial.println("\n[DECISION] START pressed. State -> IDLE (Motors Stopped)");
-    }
-  }
+      // *** IDLE → DRIVE ***
+      p5_state = 1;
+      target_v = 150.0f;               // Start at 150mm/s (safer for tuning)
+      target_h = fusion_get_heading(); // Lock heading at current angle
 
-  if (button_just_pressed(BUTTON_MODE)) {
-    if (p5_state == 0) {
-      // Idle mode: Use BUTTON_MODE to tune SPEED_KP
-      live_kp += 0.2f;
-      if (live_kp > 3.0f)
-        live_kp = 0.0f;
-      // Force KD to 0.0f to prevent derivative chatter, but add a little KI (0.05f) 
-      // so it can overcome the motor deadband!
-      speed_controller_set_gains(live_kp, 0.05f, 0.0f);
-      Serial.print("\n[DECISION] MODE pressed. KP: ");
-      Serial.print(live_kp);
-      Serial.println(" | KI: 0.05");
-    } else {
+      // CRITICAL: Reset the velocity controller to prevent startup spike!
+      // This clears the _first_call flag, resets encoder deltas, and
+      // resets PID integral so there's no accumulated windup from idle time.
+      velocity_controller_init();
+
+      // Clear the debug buffer for a fresh recording
+      debug_buffer_clear();
+
+      Serial.println();
+      Serial.println("════════════════════════════════════════");
+      Serial.println("[START] State -> DRIVE (150 mm/s)");
+      Serial.println("════════════════════════════════════════");
+    } else if (p5_state == 2) {
+      // FF_CALIBRATE → IDLE (abort calibration)
       p5_state = 0;
-      Serial.println("\n[DECISION] MODE pressed while driving. State -> IDLE (Motors Stopped)");
+      motor_stop();
+      Serial.println("[START] Calibration aborted -> IDLE");
+    } else {
+      // *** DRIVE → IDLE ***
+      p5_state = 0;
+      motor_stop();
+      Serial.println();
+      Serial.println("════════════════════════════════════════");
+      Serial.print("[STOP] State -> IDLE | Buffer: ");
+      Serial.print(debug_buffer_get_count());
+      Serial.println(" entries saved");
+      Serial.println("  Long-press MODE to dump buffer to Serial");
+      Serial.println("════════════════════════════════════════");
     }
   }
 
-  // 1kHz Motion Control Loop
+  // ───────────────────────────────────────────────────────────────────────
+  //  BUTTON_MODE: Context-dependent actions
+  //    IDLE + short press: Cycle speed KP
+  //    IDLE + long press (>1s): Dump debug buffer to Serial
+  //    IDLE + double press: Enter FF calibration mode
+  //    DRIVE: Emergency stop
+  // ───────────────────────────────────────────────────────────────────────
+  if (button_just_pressed(BUTTON_MODE)) {
+    mode_press_time = millis();
+    mode_held = false;
+  }
+
+  // Detect long press (>1 second hold)
+  if (button_is_pressed(BUTTON_MODE) && !mode_held) {
+    if (millis() - mode_press_time > 1000) {
+      mode_held = true;
+      if (p5_state == 0) {
+        // IDLE + Long press = DUMP BUFFER
+        Serial.println();
+        Serial.println("[MODE LONG] Dumping debug buffer...");
+        debug_buffer_dump_serial();
+        // Show on OLED
+        oled_clear();
+        oled_print(0, 0, "BUFFER DUMPED!");
+        char buf2[32];
+        sprintf(buf2, "%u entries", debug_buffer_get_count());
+        oled_print(0, 20, buf2);
+        oled_print(0, 40, "Check Serial");
+        oled_update();
+        delay(1500); // Brief pause so user can see
+      }
+    }
+  }
+
+  // Short press handler (fires on release, only if not a long press)
+  if (!button_is_pressed(BUTTON_MODE) && mode_press_time > 0 && !mode_held) {
+    uint32_t hold_duration = millis() - mode_press_time;
+    if (hold_duration < 1000 && hold_duration > 50) {
+      // Short press detected
+      if (p5_state == 0) {
+        // IDLE: Cycle speed KP for tuning
+        live_kp += 0.05f;
+        if (live_kp > 0.5f)
+          live_kp = 0.0f;
+        speed_controller_set_gains(live_kp, 0.02f, 0.0f);
+        Serial.print("[MODE] Speed KP -> ");
+        Serial.println(live_kp, 2);
+      } else if (p5_state == 1) {
+        // DRIVE: Emergency stop
+        p5_state = 0;
+        motor_stop();
+        Serial.println("[MODE] Emergency stop -> IDLE");
+      }
+    }
+    mode_press_time = 0;
+  }
+  if (!button_is_pressed(BUTTON_MODE)) {
+    mode_press_time = 0;
+    mode_held = false;
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════
+  //  1kHz Motion Control Loop (runs every 1ms)
+  // ═══════════════════════════════════════════════════════════════════════
   static uint32_t last_ctrl_tick = micros();
   if (micros() - last_ctrl_tick >= 1000) {
     last_ctrl_tick = micros();
 
-    // Run controllers
     if (p5_state == 0) {
       motor_stop();
-    } else {
-      // Force zero rotation (open-loop heading) to isolate velocity PID
+    } else if (p5_state == 1) {
+      // DRIVE mode:
+      // Heading controller is currently DISABLED (omega=0) to isolate
+      // the speed PID. Once speed PID is tuned and smooth, re-enable by
+      // uncommenting the heading_controller_update line below.
       float omega = 0.0f;
+      // float omega = heading_controller_update(target_h, fusion_get_heading(), 0.001f);
       velocity_controller_update(target_v, omega);
+    }
+    // FF_CALIBRATE mode (state 2) is handled below separately
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════
+  //  Feedforward Calibration Mode (state 2)
+  //  Sets motors to fixed PWM and measures actual speed for KV calculation
+  // ═══════════════════════════════════════════════════════════════════════
+  if (p5_state == 2) {
+    static uint32_t ff_ctrl_tick = micros();
+    if (micros() - ff_ctrl_tick >= 1000) {
+      ff_ctrl_tick = micros();
+      // Drive at fixed PWM (bypassing PID entirely)
+      int pwm = ff_pwm_values[ff_step];
+      motor_set_both(pwm, pwm);
+    }
+
+    // After 3 seconds at each step, print results and move to next
+    if (millis() - ff_start_time >= 3000) {
+      float avg_speed = velocity_controller_get_speed();
+      float l_speed = velocity_controller_get_left_speed();
+      float r_speed = velocity_controller_get_right_speed();
+      int pwm = ff_pwm_values[ff_step];
+
+      Serial.print("[FF_CAL] PWM=");
+      Serial.print(pwm);
+      Serial.print(" | Avg=");
+      Serial.print(avg_speed, 1);
+      Serial.print(" mm/s | L=");
+      Serial.print(l_speed, 1);
+      Serial.print(" R=");
+      Serial.print(r_speed, 1);
+      if (avg_speed > 5.0f) {
+        Serial.print(" | KV_avg=");
+        Serial.print(pwm / avg_speed, 2);
+      }
+      if (l_speed > 5.0f) {
+        Serial.print(" | KV_L=");
+        Serial.print(pwm / l_speed, 2);
+      }
+      if (r_speed > 5.0f) {
+        Serial.print(" | KV_R=");
+        Serial.print(pwm / r_speed, 2);
+      }
+      Serial.println();
+
+      ff_step++;
+      if (ff_step >= 4) {
+        // Done with all steps
+        motor_stop();
+        p5_state = 0;
+        ff_step = 0;
+        Serial.println("[FF_CAL] Complete! Update FEEDFORWARD_KV_LEFT and KV_RIGHT in speed_controller.cpp");
+      } else {
+        ff_start_time = millis();
+      }
     }
   }
 
-  // OLED Display and Serial Plotter (10Hz)
+  // ═══════════════════════════════════════════════════════════════════════
+  //  Debug Buffer Sampling (100Hz while driving)
+  // ═══════════════════════════════════════════════════════════════════════
+  static uint32_t last_sample_tick = 0;
+  if (p5_state == 1 && millis() - last_sample_tick >= 10) {
+    last_sample_tick = millis();
+
+    DebugEntry entry;
+    entry.timestamp_ms = (uint16_t)(millis() & 0xFFFF);  // Wraps at 65535
+    entry.target_v = (int16_t)target_v;
+    entry.current_v = (int16_t)velocity_controller_get_speed();
+    entry.left_speed = (int16_t)velocity_controller_get_left_speed();
+    entry.right_speed = (int16_t)velocity_controller_get_right_speed();
+    entry.left_pwm = speed_controller_get_left_pwm();
+    entry.right_pwm = speed_controller_get_right_pwm();
+    entry.heading_x10 = (int16_t)(fusion_get_heading() * 10.0f);
+    entry.battery_mv = battery_get_voltage_mv();
+
+    debug_buffer_sample(&entry);
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════
+  //  OLED Display (10Hz = every 100ms)
+  // ═══════════════════════════════════════════════════════════════════════
   static uint32_t last_print = 0;
   if (millis() - last_print >= 100) {
     last_print = millis();
+
+    // Get all debug values
+    float cur_speed = velocity_controller_get_speed();
+    float l_speed = velocity_controller_get_left_speed();
+    float r_speed = velocity_controller_get_right_speed();
+    int16_t l_pwm = speed_controller_get_left_pwm();
+    int16_t r_pwm = speed_controller_get_right_pwm();
+    float heading = fusion_get_heading();
+    uint16_t bat_mv = battery_get_voltage_mv();
+
     char buf[32];
     oled_clear();
-    oled_print(0, 0, "Phase 5: Spd Tune");
 
-    if (p5_state == 0)
-      oled_print(0, 15, "State: IDLE");
-    if (p5_state == 1)
-      oled_print(0, 15, "State: DRIVE");
+    if (p5_state == 0) {
+      // ── IDLE Display ──
+      // Line 1: Title + Battery
+      sprintf(buf, "P5 IDLE  %u.%uV", bat_mv / 1000, (bat_mv % 1000) / 100);
+      oled_print(0, 0, buf);
 
-    int kp_int = (int)live_kp;
-    int kp_dec = (int)(live_kp * 10.0f) % 10;
-    sprintf(buf, "SpdKP:%d.%d", kp_int, kp_dec);
-    oled_print(0, 30, buf);
+      // Line 2: Speed KP
+      int kp_int = (int)(live_kp * 100);
+      sprintf(buf, "SpdKP: 0.%02d", kp_int);
+      oled_print(0, 13, buf);
 
-    int spd_int = (int)velocity_controller_get_speed();
-    sprintf(buf, "Spd: %d", spd_int);
-    oled_print(0, 45, buf);
+      // Line 3: Encoder counts
+      sprintf(buf, "EncL:%ld R:%ld", encoder_get_count(ENCODER_LEFT), encoder_get_count(ENCODER_RIGHT));
+      oled_print(0, 26, buf);
+
+      // Line 4: Heading
+      int h_int = (int)heading;
+      int h_dec = (int)(heading * 10) % 10;
+      if (h_dec < 0) h_dec = -h_dec;
+      sprintf(buf, "Hdg: %d.%d deg", h_int, h_dec);
+      oled_print(0, 39, buf);
+
+      // Line 5: Buffer status
+      sprintf(buf, "Log:%u/%u", debug_buffer_get_count(), DEBUG_BUFFER_SIZE);
+      oled_print(0, 52, buf);
+
+    } else if (p5_state == 1) {
+      // ── DRIVE Display ──
+      // Line 1: Title + Battery
+      sprintf(buf, "P5 DRIVE %u.%uV", bat_mv / 1000, (bat_mv % 1000) / 100);
+      oled_print(0, 0, buf);
+
+      // Line 2: Target vs Current speed
+      sprintf(buf, "T:%d C:%d mm/s", (int)target_v, (int)cur_speed);
+      oled_print(0, 13, buf);
+
+      // Line 3: Per-motor speed
+      sprintf(buf, "L:%d R:%d mm/s", (int)l_speed, (int)r_speed);
+      oled_print(0, 26, buf);
+
+      // Line 4: Per-motor PWM
+      sprintf(buf, "PWM L:%d R:%d", l_pwm, r_pwm);
+      oled_print(0, 39, buf);
+
+      // Line 5: Heading + buffer
+      int h_int = (int)heading;
+      sprintf(buf, "H:%d Log:%u", h_int, debug_buffer_get_count());
+      oled_print(0, 52, buf);
+
+    } else if (p5_state == 2) {
+      // ── FF CALIBRATION Display ──
+      oled_print(0, 0, "FF CALIBRATION");
+      sprintf(buf, "Step: %d/4", ff_step + 1);
+      oled_print(0, 15, buf);
+      sprintf(buf, "PWM: %d", ff_pwm_values[ff_step]);
+      oled_print(0, 30, buf);
+      sprintf(buf, "Spd: %d mm/s", (int)cur_speed);
+      oled_print(0, 45, buf);
+    }
 
     oled_update();
 
-    // Serial Monitor Output (Text Format for Debugging)
-    // We don't use Plotter format here because large encoder counts ruin the graph scale
-    Serial.print("Target_v: ");
-    Serial.print(target_v);
-    Serial.print(" | Cur_v: ");
-    Serial.print(velocity_controller_get_speed());
-    Serial.print(" | EncL: ");
-    Serial.print(encoder_get_count(ENCODER_LEFT));
-    Serial.print(" | EncR: ");
-    Serial.print(encoder_get_count(ENCODER_RIGHT));
-    Serial.print(" | KP: ");
-    Serial.println(live_kp);
+    // ═════════════════════════════════════════════════════════════════════
+    //  Serial Monitor Output (10Hz — human-readable debug format)
+    // ═════════════════════════════════════════════════════════════════════
+    // Toggle CSV mode with #define SERIAL_CSV_MODE below.
+    // CSV mode: paste into Serial Plotter or spreadsheet for graphs.
+    // Text mode: human-readable debug output.
+
+#define SERIAL_CSV_MODE 0  // Set to 1 for CSV output (Serial Plotter friendly)
+
+#if SERIAL_CSV_MODE == 1
+    // CSV header (printed once)
+    static bool csv_header_printed = false;
+    if (!csv_header_printed) {
+      Serial.println("Target,Current,L_Speed,R_Speed,L_PWM,R_PWM,Heading,Battery");
+      csv_header_printed = true;
+    }
+    Serial.print((int)target_v);
+    Serial.print(',');
+    Serial.print((int)cur_speed);
+    Serial.print(',');
+    Serial.print((int)l_speed);
+    Serial.print(',');
+    Serial.print((int)r_speed);
+    Serial.print(',');
+    Serial.print(l_pwm);
+    Serial.print(',');
+    Serial.print(r_pwm);
+    Serial.print(',');
+    Serial.print(heading, 1);
+    Serial.print(',');
+    Serial.println(bat_mv);
+#else
+    // Human-readable format
+    if (p5_state == 1) {
+      Serial.print("[P5 DRIVE t=");
+      Serial.print(millis());
+      Serial.print("ms] Tgt:");
+      Serial.print((int)target_v);
+      Serial.print(" Cur:");
+      Serial.print((int)cur_speed);
+      Serial.print(" | L_spd:");
+      Serial.print((int)l_speed);
+      Serial.print(" R_spd:");
+      Serial.print((int)r_speed);
+      Serial.print(" | L_pwm:");
+      Serial.print(l_pwm);
+      Serial.print(" R_pwm:");
+      Serial.print(r_pwm);
+      Serial.print(" | Hdg:");
+      Serial.print(heading, 1);
+      Serial.print(" | Bat:");
+      Serial.print(bat_mv);
+      Serial.print("mV | Log:");
+      Serial.println(debug_buffer_get_count());
+    } else if (p5_state == 0) {
+      // In IDLE, print less frequently (already visible on OLED)
+      static uint32_t idle_print_count = 0;
+      if (idle_print_count % 10 == 0) { // Every 1 second in IDLE
+        Serial.print("[P5 IDLE] EncL:");
+        Serial.print(encoder_get_count(ENCODER_LEFT));
+        Serial.print(" EncR:");
+        Serial.print(encoder_get_count(ENCODER_RIGHT));
+        Serial.print(" Hdg:");
+        Serial.print(heading, 1);
+        Serial.print(" Bat:");
+        Serial.print(bat_mv);
+        Serial.print("mV | KP:");
+        Serial.print(live_kp, 2);
+        Serial.print(" | Log:");
+        Serial.println(debug_buffer_get_count());
+      }
+      idle_print_count++;
+    }
+#endif
   }
   return;
 #endif

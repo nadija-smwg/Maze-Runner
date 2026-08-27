@@ -27,4 +27,15 @@ void velocity_controller_update(float linear_velocity_mm_s,
  */
 float velocity_controller_get_speed(void);
 
+/**
+ * @brief Get the current filtered left wheel speed (mm/s).
+ */
+float velocity_controller_get_left_speed(void);
+
+/**
+ * @brief Get the current filtered right wheel speed (mm/s).
+ */
+float velocity_controller_get_right_speed(void);
+
 #endif /* VELOCITY_CONTROLLER_H */
+
