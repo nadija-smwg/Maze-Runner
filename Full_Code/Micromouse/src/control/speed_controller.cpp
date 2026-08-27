@@ -9,15 +9,14 @@
 #include "../hardware/motor.h"
 #include "pid.h"
 
-
 // PID constants for wheel speed (needs tuning)
-#define SPEED_KP 2.0f
-#define SPEED_KI 1.0f
+#define SPEED_KP 0.05f
+#define SPEED_KI 0.02f
 #define SPEED_KD 0.0f
 
 // Feedforward constant: roughly PWM_MAX / max_speed_mm_s.
-// Assuming ~800mm/s max speed at 4200 PWM -> 4200/800 = 5.25
-#define FEEDFORWARD_KV 5.0f
+// Calibrated value based on test data for ~150-300 mm/s operating range.
+#define FEEDFORWARD_KV 4.5f
 
 static PID _left_pid(SPEED_KP, SPEED_KI, SPEED_KD, -PWM_MAX, PWM_MAX);
 static PID _right_pid(SPEED_KP, SPEED_KI, SPEED_KD, -PWM_MAX, PWM_MAX);
@@ -63,4 +62,9 @@ void speed_controller_update(float target_left_speed_mm_s,
 void speed_controller_reset(void) {
   _left_pid.reset();
   _right_pid.reset();
+}
+
+void speed_controller_set_gains(float kp, float ki, float kd) {
+    _left_pid.set_gains(kp, ki, kd);
+    _right_pid.set_gains(kp, ki, kd);
 }

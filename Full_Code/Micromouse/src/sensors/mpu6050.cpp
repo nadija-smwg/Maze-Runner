@@ -49,8 +49,8 @@ bool mpu6050_init(void) {
     // 3. Sample Rate = 1000Hz (SMPLRT_DIV = 0)
     write_register(0x19, 0x00);
 
-    // 4. DLPF = 44Hz (CONFIG = 3)
-    write_register(0x1A, 0x03);
+    // 4. DLPF = 10Hz (CONFIG = 5) - Kills motor vibration noise!
+    write_register(0x1A, 0x05);
 
     // 5. Gyro config = ±500 deg/s (GYRO_CONFIG = 8)
     write_register(0x1B, 0x08);

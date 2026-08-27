@@ -37,4 +37,9 @@ void speed_controller_update(float target_left_speed_mm_s,
  */
 void speed_controller_reset(void);
 
+/**
+ * @brief Dynamically set speed PID gains.
+ */
+void speed_controller_set_gains(float kp, float ki, float kd);
+
 #endif /* SPEED_CONTROLLER_H */

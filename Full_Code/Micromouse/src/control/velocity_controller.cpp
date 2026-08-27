@@ -12,6 +12,7 @@
 
 static LowPassFilter left_speed_filter(0.05f);
 static LowPassFilter right_speed_filter(0.05f);
+static float _current_avg_speed = 0.0f;
 
 void velocity_controller_init(void) {
     speed_controller_init();
@@ -37,8 +38,14 @@ void velocity_controller_update(float linear_velocity_mm_s,
     float current_left_speed = left_speed_filter.update(raw_left);
     float current_right_speed = right_speed_filter.update(raw_right);
     
+    _current_avg_speed = (current_left_speed + current_right_speed) / 2.0f;
+    
     // 3. Pass to speed controller
     speed_controller_update(target_left_speed, target_right_speed, 
                             current_left_speed, current_right_speed, 
                             CONTROL_LOOP_DT_S);
+}
+
+float velocity_controller_get_speed(void) {
+    return _current_avg_speed;
 }

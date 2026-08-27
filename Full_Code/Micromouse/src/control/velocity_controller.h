@@ -22,4 +22,9 @@ void velocity_controller_init(void);
 void velocity_controller_update(float linear_velocity_mm_s,
                                 float angular_velocity_rad_s);
 
+/**
+ * @brief Get the current filtered average speed.
+ */
+float velocity_controller_get_speed(void);
+
 #endif /* VELOCITY_CONTROLLER_H */

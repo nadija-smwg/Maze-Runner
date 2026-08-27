@@ -39,6 +39,7 @@
 #include "src/control/motion_controller.h"
 #include "src/control/velocity_controller.h"
 #include "src/control/heading_controller.h"
+#include "src/control/speed_controller.h"
 
 // Robot
 #include "src/robot/mission_manager.h"
@@ -620,7 +621,7 @@ void loop() {
     fusion_update(dt);
   }
 
-  static int p5_state = 0; // 0=Idle, 1=Drive, 2=Turn
+  static int p5_state = 0; // 0=Idle, 1=Drive
   static float target_v = 0.0f;
   static float target_h = 0.0f;
   static float live_kp = 1.0f;
@@ -638,10 +639,11 @@ void loop() {
 
   if (button_just_pressed(BUTTON_MODE)) {
     if (p5_state == 0) {
-      // Idle mode: Use BUTTON_MODE to tune KP
+      // Idle mode: Use BUTTON_MODE to tune SPEED_KP
       live_kp += 0.2f;
       if (live_kp > 3.0f) live_kp = 0.0f;
-      heading_controller_set_gains(live_kp, 0.0f, 0.0f);
+      // Force KI and KD to 0.0f to isolate KP tuning and prevent derivative chatter!
+      speed_controller_set_gains(live_kp, 0.0f, 0.0f);
     } else {
       p5_state = 0;
     }
@@ -653,7 +655,6 @@ void loop() {
     last_ctrl_tick = micros();
     
     // Run controllers
-
     if (p5_state == 0) {
       motor_stop();
     } else {
@@ -663,27 +664,35 @@ void loop() {
     }
   }
 
-  // OLED Display (10Hz)
+  // OLED Display and Serial Plotter (10Hz)
   static uint32_t last_print = 0;
   if (millis() - last_print >= 100) {
     last_print = millis();
     char buf[32];
     oled_clear();
-    oled_print(0, 0, "Phase 5: Tune Mode");
+    oled_print(0, 0, "Phase 5: Spd Tune");
     
     if(p5_state == 0) oled_print(0, 15, "State: IDLE");
     if(p5_state == 1) oled_print(0, 15, "State: DRIVE");
     
     int kp_int = (int)live_kp;
     int kp_dec = (int)(live_kp * 10.0f) % 10;
-    sprintf(buf, "KP: %d.%d", kp_int, kp_dec);
+    sprintf(buf, "SpdKP:%d.%d", kp_int, kp_dec);
     oled_print(0, 30, buf);
     
-    int h_int = (int)fusion_get_heading();
-    sprintf(buf, "H: %d", h_int);
+    int spd_int = (int)velocity_controller_get_speed();
+    sprintf(buf, "Spd: %d", spd_int);
     oled_print(0, 45, buf);
     
     oled_update();
+
+    // Serial Plotter Output for Tuning
+    Serial.print("Target_Speed:");
+    Serial.print(target_v);
+    Serial.print(",Current_Speed:");
+    Serial.print(velocity_controller_get_speed());
+    Serial.print(",State:");
+    Serial.println(p5_state);
   }
   return;
 #endif
