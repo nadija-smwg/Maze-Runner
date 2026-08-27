@@ -9,6 +9,7 @@
 #include "../config/robot_config.h"
 #include "../hardware/encoder.h"
 #include "../utils/filters.h"
+#include <Arduino.h>
 
 static LowPassFilter left_speed_filter(0.05f);
 static LowPassFilter right_speed_filter(0.05f);
@@ -30,20 +31,26 @@ void velocity_controller_update(float linear_velocity_mm_s,
     float target_left_speed = linear_velocity_mm_s - w_term;
     float target_right_speed = linear_velocity_mm_s + w_term;
     
-    // 2. Measure current wheel speeds (called at 1kHz, so dt=1ms)
-    // Counts per 1ms * 1000 = Counts per sec. We filter this because at 1ms, counts are tiny integers!
-    float raw_left = encoder_counts_to_speed(encoder_get_delta(ENCODER_LEFT) * 1000.0f);
-    float raw_right = encoder_counts_to_speed(encoder_get_delta(ENCODER_RIGHT) * 1000.0f);
+    // 2. Measure current wheel speeds
+    // Calculate exact time delta to prevent massive speed spikes when OLED blocks the loop!
+    static uint32_t last_vel_tick = micros();
+    uint32_t now = micros();
+    float actual_dt = (now - last_vel_tick) / 1000000.0f;
+    last_vel_tick = now;
+    if (actual_dt <= 0.0f) actual_dt = 0.001f; // Prevent divide by zero
+
+    float raw_left = encoder_counts_to_speed(encoder_get_delta(ENCODER_LEFT) / actual_dt);
+    float raw_right = encoder_counts_to_speed(encoder_get_delta(ENCODER_RIGHT) / actual_dt);
     
     float current_left_speed = left_speed_filter.update(raw_left);
     float current_right_speed = right_speed_filter.update(raw_right);
     
     _current_avg_speed = (current_left_speed + current_right_speed) / 2.0f;
     
-    // 3. Pass to speed controller
+    // 3. Pass to speed controller (pass the actual dt!)
     speed_controller_update(target_left_speed, target_right_speed, 
                             current_left_speed, current_right_speed, 
-                            CONTROL_LOOP_DT_S);
+                            actual_dt);
 }
 
 float velocity_controller_get_speed(void) {

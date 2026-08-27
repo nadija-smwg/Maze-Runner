@@ -630,11 +630,12 @@ void loop() {
   if (button_just_pressed(BUTTON_START)) {
     if (p5_state == 0) {
       p5_state = 1;                    // Drive straight
-      target_v = 150.0f;               // 150 mm/s
+      target_v = 300.0f;               // 300 mm/s
       target_h = fusion_get_heading(); // Lock to current heading
-      LOG_INFO("Driving Straight!");
+      Serial.println("\n[DECISION] START pressed. State -> DRIVE (300 mm/s)");
     } else {
       p5_state = 0; // Stop
+      Serial.println("\n[DECISION] START pressed. State -> IDLE (Motors Stopped)");
     }
   }
 
@@ -644,11 +645,15 @@ void loop() {
       live_kp += 0.2f;
       if (live_kp > 3.0f)
         live_kp = 0.0f;
-      // Force KI and KD to 0.0f to isolate KP tuning and prevent derivative
-      // chatter!
-      speed_controller_set_gains(live_kp, 0.0f, 0.0f);
+      // Force KD to 0.0f to prevent derivative chatter, but add a little KI (0.05f) 
+      // so it can overcome the motor deadband!
+      speed_controller_set_gains(live_kp, 0.05f, 0.0f);
+      Serial.print("\n[DECISION] MODE pressed. KP: ");
+      Serial.print(live_kp);
+      Serial.println(" | KI: 0.05");
     } else {
       p5_state = 0;
+      Serial.println("\n[DECISION] MODE pressed while driving. State -> IDLE (Motors Stopped)");
     }
   }
 
@@ -691,13 +696,18 @@ void loop() {
 
     oled_update();
 
-    // Serial Plotter Output for Tuning
-    Serial.print("Target_Speed:");
+    // Serial Monitor Output (Text Format for Debugging)
+    // We don't use Plotter format here because large encoder counts ruin the graph scale
+    Serial.print("Target_v: ");
     Serial.print(target_v);
-    Serial.print(",Current_Speed:");
+    Serial.print(" | Cur_v: ");
     Serial.print(velocity_controller_get_speed());
-    Serial.print(",State:");
-    Serial.println(p5_state);
+    Serial.print(" | EncL: ");
+    Serial.print(encoder_get_count(ENCODER_LEFT));
+    Serial.print(" | EncR: ");
+    Serial.print(encoder_get_count(ENCODER_RIGHT));
+    Serial.print(" | KP: ");
+    Serial.println(live_kp);
   }
   return;
 #endif
