@@ -30,16 +30,15 @@
 #include "src/sensors/sensor_fusion.h"
 #include "src/sensors/sensor_manager.h"
 
-
 // Localization
 #include "src/localization/odometry.h"
 #include "src/localization/position_estimator.h"
 
 // Control
-#include "src/control/motion_controller.h"
-#include "src/control/velocity_controller.h"
 #include "src/control/heading_controller.h"
+#include "src/control/motion_controller.h"
 #include "src/control/speed_controller.h"
+#include "src/control/velocity_controller.h"
 
 // Robot
 #include "src/robot/mission_manager.h"
@@ -244,7 +243,7 @@ void setup() {
   sensor_manager_init();
   calibrate_all();
   fusion_init();
-  
+
   // Initialize PID controllers
   velocity_controller_init();
   heading_controller_init();
@@ -431,16 +430,16 @@ void loop() {
     oled_clear();
     oled_print(0, 0, "- Phase 2 Test -");
 
-    sprintf(buf, "Spd L: %.1f mm/s", l_speed);
+    sprintf(buf, "Spd L: %d mm/s", (int)l_speed);
     oled_print(0, 15, buf);
 
-    sprintf(buf, "Spd R: %.1f mm/s", r_speed);
+    sprintf(buf, "Spd R: %d mm/s", (int)r_speed);
     oled_print(0, 25, buf);
 
     sprintf(buf, "Cnt L:%ld R:%ld", l_cnt, r_cnt);
     oled_print(0, 40, buf);
 
-    sprintf(buf, "Dst L:%.0f R:%.0f", l_mm, r_mm);
+    sprintf(buf, "Dst L:%d R:%d", (int)l_mm, (int)r_mm);
     oled_print(0, 50, buf);
 
     oled_update();
@@ -540,7 +539,7 @@ void loop() {
   led_update();
 
   static uint32_t last_sensor_tick = millis();
-  if (millis() - last_sensor_tick >= 10) { 
+  if (millis() - last_sensor_tick >= 10) {
     last_sensor_tick = millis();
     // Thanks to Round-Robin polling, this only takes ~30ms now!
     // It is totally safe to run alongside the gyro.
@@ -554,8 +553,8 @@ void loop() {
     float dt = (now - last_fusion_tick) / 1000.0f;
     last_fusion_tick = now;
 
-    // Guard against bad dt
-    if (dt <= 0.0f || dt > 0.05f) {
+    // Guard against backward time
+    if (dt <= 0.0f) {
       dt = 0.01f;
     }
 
@@ -617,7 +616,9 @@ void loop() {
     uint32_t now = millis();
     float dt = (now - last_fusion_tick) / 1000.0f;
     last_fusion_tick = now;
-    if (dt <= 0.0f || dt > 0.05f) { dt = 0.01f; }
+    if (dt <= 0.0f) {
+      dt = 0.01f;
+    }
     fusion_update(dt);
   }
 
@@ -628,8 +629,8 @@ void loop() {
 
   if (button_just_pressed(BUTTON_START)) {
     if (p5_state == 0) {
-      p5_state = 1; // Drive straight
-      target_v = 150.0f; // 150 mm/s
+      p5_state = 1;                    // Drive straight
+      target_v = 150.0f;               // 150 mm/s
       target_h = fusion_get_heading(); // Lock to current heading
       LOG_INFO("Driving Straight!");
     } else {
@@ -641,8 +642,10 @@ void loop() {
     if (p5_state == 0) {
       // Idle mode: Use BUTTON_MODE to tune SPEED_KP
       live_kp += 0.2f;
-      if (live_kp > 3.0f) live_kp = 0.0f;
-      // Force KI and KD to 0.0f to isolate KP tuning and prevent derivative chatter!
+      if (live_kp > 3.0f)
+        live_kp = 0.0f;
+      // Force KI and KD to 0.0f to isolate KP tuning and prevent derivative
+      // chatter!
       speed_controller_set_gains(live_kp, 0.0f, 0.0f);
     } else {
       p5_state = 0;
@@ -653,13 +656,13 @@ void loop() {
   static uint32_t last_ctrl_tick = micros();
   if (micros() - last_ctrl_tick >= 1000) {
     last_ctrl_tick = micros();
-    
+
     // Run controllers
     if (p5_state == 0) {
       motor_stop();
     } else {
-      float current_h = fusion_get_heading();
-      float omega = heading_controller_update(target_h, current_h, 0.001f);
+      // Force zero rotation (open-loop heading) to isolate velocity PID
+      float omega = 0.0f;
       velocity_controller_update(target_v, omega);
     }
   }
@@ -671,19 +674,21 @@ void loop() {
     char buf[32];
     oled_clear();
     oled_print(0, 0, "Phase 5: Spd Tune");
-    
-    if(p5_state == 0) oled_print(0, 15, "State: IDLE");
-    if(p5_state == 1) oled_print(0, 15, "State: DRIVE");
-    
+
+    if (p5_state == 0)
+      oled_print(0, 15, "State: IDLE");
+    if (p5_state == 1)
+      oled_print(0, 15, "State: DRIVE");
+
     int kp_int = (int)live_kp;
     int kp_dec = (int)(live_kp * 10.0f) % 10;
     sprintf(buf, "SpdKP:%d.%d", kp_int, kp_dec);
     oled_print(0, 30, buf);
-    
+
     int spd_int = (int)velocity_controller_get_speed();
     sprintf(buf, "Spd: %d", spd_int);
     oled_print(0, 45, buf);
-    
+
     oled_update();
 
     // Serial Plotter Output for Tuning

@@ -105,11 +105,13 @@ static LowPassFilter right_speed_filter(0.05f);
 And conversely, if you remove the filter entirely, the PID sees the raw 0/256 noise.
 
 > [!IMPORTANT]
-> **The fix:** Change alpha to `0.15` – `0.25`. This provides enough smoothing to remove the quantization noise, while still being responsive enough for the PID to work.
+> **The REAL fix:** Keep alpha at `0.05`! 
+> 
+> A common mathematical mistake is thinking that a higher alpha (`0.20`) gives *more* smoothing. In standard digital filtering (`y[n] = alpha * x[n] + (1 - alpha) * y[n-1]`), a higher alpha actually means NEW readings have MORE weight. Changing from `0.05` to `0.20` allowed almost 4 times as much encoder quantization noise to pass through into the PID controller, which caused severe stuttering!
 >
 > ```cpp
-> static LowPassFilter left_speed_filter(0.20f);   // ← CHANGE
-> static LowPassFilter right_speed_filter(0.20f);
+> static LowPassFilter left_speed_filter(0.05f);   // ← MUST BE 0.05
+> static LowPassFilter right_speed_filter(0.05f);
 > ```
 
 ### Additional Fix: The Feedforward Is Doing Most of the Work Wrong
@@ -128,15 +130,16 @@ Then the PID **adds more** on top of that 750. When the measured speed bounces t
 > [!TIP]
 > **The feedforward value `FEEDFORWARD_KV = 5.0` must be calibrated to YOUR robot.** Run the motors at several known PWM values, measure actual speed, and compute `KV = PWM / speed`. See [Section 5](#5-calibration-guide) for the exact procedure.
 
-### Quick Summary of Fixes Needed
+### Quick Summary of Final Fixes Applied
 
 | Fix | What to Change | Why |
 |-----|---------------|-----|
-| ① Filter alpha | `0.05f` → `0.20f` | Smooth out encoder quantization noise |
-| ② Speed PID Kp | `2.0f` → `1.0f` | Less aggressive reaction to noise |
-| ③ Speed PID Ki | `1.0f` → `0.5f` | Slower integral buildup, less windup |
-| ④ Speed PID Kd | `0.0f` → `0.01f` | Dampen oscillation |
-| ⑤ Feedforward KV | Calibrate | Must match YOUR motor's actual response |
+| ① Filter alpha | `0.05f` (Kept) | Heavy smoothing is absolutely mandatory for 1kHz encoder quantization noise. |
+| ② Speed PID Kp | `2.0f` → `0.05f` | The 1kHz loop cannot handle high gain PID with this encoder resolution. Rely 95% on Feedforward. |
+| ③ Speed PID Ki | `1.0f` → `0.0f` | Prevent integral windup during tuning. |
+| ④ Speed PID Kd | `0.0f` (Kept) | NEVER use derivative control here. Dividing 1ms noise by `dt=0.001` multiplies the noise by 1000! |
+| ⑤ Feedforward KV | `5.0f` → `4.5f` | Calculated exactly for the 150 mm/s operating point. |
+| ⑥ IMU Filter | `44Hz` (Kept) | We tried dropping DLPF to 10Hz to stop motor vibration, but the 14ms group delay caused the 1kHz Heading PID to oscillate. We must use 44Hz and keep Heading KP low. |
 
 ---
 

@@ -16,7 +16,7 @@
 
 // Feedforward constant: roughly PWM_MAX / max_speed_mm_s.
 // Calibrated value based on test data for ~150-300 mm/s operating range.
-#define FEEDFORWARD_KV 4.5f
+#define FEEDFORWARD_KV 10.0f
 
 static PID _left_pid(SPEED_KP, SPEED_KI, SPEED_KD, -PWM_MAX, PWM_MAX);
 static PID _right_pid(SPEED_KP, SPEED_KI, SPEED_KD, -PWM_MAX, PWM_MAX);
@@ -65,6 +65,6 @@ void speed_controller_reset(void) {
 }
 
 void speed_controller_set_gains(float kp, float ki, float kd) {
-    _left_pid.set_gains(kp, ki, kd);
-    _right_pid.set_gains(kp, ki, kd);
+  _left_pid.set_gains(kp, ki, kd);
+  _right_pid.set_gains(kp, ki, kd);
 }
