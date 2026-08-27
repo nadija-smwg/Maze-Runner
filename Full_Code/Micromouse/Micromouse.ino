@@ -50,8 +50,10 @@
 #include "src/display/status_screen.h"
 
 // Utils
+#include "src/utils/debug_buffer.h"
 #include "src/utils/logger.h"
 #include "src/utils/serial_debug.h"
+
 
 // Phase testing mode flags (set to 1 for active test mode)
 #define PHASE_1_TEST_MODE 0
@@ -719,8 +721,8 @@ void loop() {
       int steering = kp * error;
 
       // Fixed steering polarity (was turning into the wrong wall)
-      left_pwm = 800 - steering;
-      right_pwm = 800 + steering;
+      left_pwm = 850 - steering;
+      right_pwm = 850 + steering;
 
       motor_set_both(left_pwm, right_pwm);
     }
@@ -735,18 +737,18 @@ void loop() {
       // Dead End! Walls on both sides -> Turn 180 degrees
       heading = (heading + 2) % 4; // U-Turn
       LOG_INFO("DEAD END! Turning 180 degrees");
-      motor_set_both(700, -700); // Pivot Right
+      motor_set_both(900, -900); // Pivot Right
       target_angle = 180.0;
     } else if (dist_l > dist_r) {
       // Left side has the massive spike (opening) -> Turn Left
       heading = (heading + 3) % 4; // Fast CCW math
       LOG_INFO("Turning LEFT 90 degrees");
-      motor_set_both(-700, 700); // Pivot Left
+      motor_set_both(-900, 900); // Pivot Left
     } else {
       // Right side has the massive spike -> Turn Right
       heading = (heading + 1) % 4; // Fast CW math
       LOG_INFO("Turning RIGHT 90 degrees");
-      motor_set_both(700, -700); // Pivot Right
+      motor_set_both(900, -900); // Pivot Right
     }
 
     // Gyroscope tracking loop
@@ -773,7 +775,7 @@ void loop() {
     // Go back to driving
     last_cells = 0;
     is_first_run = false; // Turn complete, use normal offsets now
-    encoder_reset_all(); // Reset cells for the new corridor
+    encoder_reset_all();  // Reset cells for the new corridor
     p5_state = 1;
   }
 

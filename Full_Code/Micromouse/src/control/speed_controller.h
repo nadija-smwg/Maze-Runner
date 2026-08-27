@@ -42,4 +42,16 @@ void speed_controller_reset(void);
  */
 void speed_controller_set_gains(float kp, float ki, float kd);
 
+/**
+ * @brief Get the last PWM output for the left motor (for debugging).
+ * @return PWM value in range [-PWM_MAX, PWM_MAX]
+ */
+int16_t speed_controller_get_left_pwm(void);
+
+/**
+ * @brief Get the last PWM output for the right motor (for debugging).
+ * @return PWM value in range [-PWM_MAX, PWM_MAX]
+ */
+int16_t speed_controller_get_right_pwm(void);
+
 #endif /* SPEED_CONTROLLER_H */

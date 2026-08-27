@@ -118,20 +118,32 @@ A revised **bottom-up, test-driven strategy** has been proposed to complete the 
 
 ---
 
-### Phase 5: High-Level Motion & Control ⚠️ SKELETON
+### Phase 5: High-Level Motion & Control ⚠️ IN PROGRESS (Stage A)
 
 | Component | File | Status | Notes |
 |-----------|------|--------|-------|
-| Motion Controller | [motion_controller.cpp](./Full_Code/Micromouse/src/control/motion_controller.cpp) | ❌ TODO stubs | Master 1kHz loop — empty |
-| Speed Controller | [speed_controller.cpp](./Full_Code/Micromouse/src/control/speed_controller.cpp) | ❌ TODO stubs | Per-wheel PID — empty |
-| Heading Controller | [heading_controller.cpp](./Full_Code/Micromouse/src/control/heading_controller.cpp) | ❌ TODO stubs | Heading PID — empty |
-| Velocity Controller | [velocity_controller.cpp](./Full_Code/Micromouse/src/control/velocity_controller.cpp) | ❌ TODO stubs | Diff drive mixer — empty |
+| Speed Controller | [speed_controller.cpp](./Full_Code/Micromouse/src/control/speed_controller.cpp) | ✅ Implemented | Per-motor feedforward (KV_LEFT/KV_RIGHT), PID with KP=0.05, KI=0.02, PWM debug getters |
+| Heading Controller | [heading_controller.cpp](./Full_Code/Micromouse/src/control/heading_controller.cpp) | ✅ Implemented | KP=0.8, KI=0, KD=0.05 — currently disabled in test loop (omega=0) until speed PID is tuned |
+| Velocity Controller | [velocity_controller.cpp](./Full_Code/Micromouse/src/control/velocity_controller.cpp) | ✅ Implemented | Differential mixer + LPF (alpha=0.05) + startup spike fix + per-motor speed getters |
+| PID Class | [pid.cpp](./Full_Code/Micromouse/src/control/pid.cpp) | ✅ Complete | Generic PID with anti-windup, derivative on measurement |
+| Debug Buffer | [debug_buffer.cpp](./Full_Code/Micromouse/src/utils/debug_buffer.cpp) | ✅ NEW | 200-entry ring buffer for offline logging, CSV dump to Serial |
+| Motion Controller | [motion_controller.cpp](./Full_Code/Micromouse/src/control/motion_controller.cpp) | ❌ TODO stubs | Master 1kHz ISR loop — empty (Phase 5 test does this manually) |
 | Cell Controller | [cell_controller.cpp](./Full_Code/Micromouse/src/control/cell_controller.cpp) | ❌ TODO stubs | Distance tracking — empty |
 | Turn Controller | [turn_controller.cpp](./Full_Code/Micromouse/src/control/turn_controller.cpp) | ❌ TODO stubs | In-place turn — empty |
 | Wall Follower | [wall_follower.cpp](./Full_Code/Micromouse/src/control/wall_follower.cpp) | ❌ TODO stubs | Centering PD — empty |
 | Trajectory Controller | [trajectory_controller.cpp](./Full_Code/Micromouse/src/control/trajectory_controller.cpp) | ❌ TODO stubs | S-curve profiler — empty |
 
-**Current Phase 5 Test:** Only a gyro hand-test that displays heading as you turn the robot by hand. No motors are activated.
+**Current Phase 5 Test (Micromouse.ino):**
+- Drives at 150mm/s with speed PID control (heading disabled for isolation)
+- OLED shows: battery, target/current speed, per-motor speed/PWM, heading, buffer count
+- Serial outputs: comprehensive debug data (human-readable or CSV mode)
+- Debug buffer: records 200 entries at 100Hz while driving, dumps via long-press MODE
+- Feedforward calibration mode available
+- Startup speed spike **FIXED** (dt clamping + first-call reset)
+
+**Bugs Fixed:**
+- Motor startup PWM spike (velocity_controller.cpp dt initialization)
+- PID integral windup on IDLE→DRIVE transition
 
 ---
 

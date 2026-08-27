@@ -1,35 +1,54 @@
 /**
  * @file wall_follower.h
- * @brief PID controller for centering the robot using wall sensors.
+ * @brief Simple PD controller for wall following using ToF sensors.
+ *
+ * Abandons velocity PIDs in favor of direct PWM manipulation based on
+ * lateral error (distance from center).
  */
 
 #ifndef WALL_FOLLOWER_H
 #define WALL_FOLLOWER_H
 
-#include "pid.h"
+#include <stdbool.h>
+#include <stdint.h>
 
 /**
- * @brief Initialize wall follower.
+ * @brief Base PWM speeds for open-loop forward movement.
+ * If one motor is weaker, increase its base PWM here so the robot
+ * drives mostly straight even before the PD controller kicks in.
+ */
+#define WALL_FOLLOW_BASE_PWM_LEFT  1500
+#define WALL_FOLLOW_BASE_PWM_RIGHT 1500
+
+/**
+ * @brief Initialize the wall follower PID.
  */
 void wall_follower_init(void);
 
 /**
- * @brief Update the wall follower.
+ * @brief Update the wall follower and apply motor speeds.
  *
- * @param lateral_error_mm Centering error from distance_manager
- * @param dt Time step in seconds
- * @return Angular velocity correction (rad/s or mm/s differential)
+ * Takes the lateral error from the ToF sensors, calculates a PD correction,
+ * applies it to the BASE_PWM, and directly sets the motor speeds.
+ *
+ * @param lateral_error_mm The centering error (positive = too far right)
+ * @param dt Time delta in seconds
  */
-float wall_follower_update(float lateral_error_mm, float dt);
+void wall_follower_update(float lateral_error_mm, float dt);
 
 /**
- * @brief Enable or disable wall following.
+ * @brief Get the last calculated correction value for debugging (OLED).
  */
-void wall_follower_enable(bool enable);
+int16_t wall_follower_get_last_correction(void);
 
 /**
- * @brief Reset wall follower state.
+ * @brief Get current active KP for live tuning.
  */
-void wall_follower_reset(void);
+float wall_follower_get_kp(void);
+
+/**
+ * @brief Live-tune the KP value (e.g. from a button press).
+ */
+void wall_follower_set_kp(float new_kp);
 
 #endif /* WALL_FOLLOWER_H */

@@ -1,33 +1,32 @@
-# Phase 5: High-Level Motion & Control (REVISED)
+# Phase 5: High-Level Motion & Control (WALL-FOLLOWING PIVOT)
 
-> **Goal:** Make the robot actually MOVE autonomously using motors controlled by PID loops, guided by encoder distance and IMU heading. This phase is broken into three testable sub-stages.
+> **Goal:** Abandons the complex Speed PID (encoders) and Heading PID (IMU) due to hardware constraints. Instead, uses a simple, robust **Wall-Following PD Controller** to adjust motor PWM directly based on lateral error from the Left/Right ToF sensors.
 >
-> **Status:** ⚠️ PARTIALLY COMPLETE — Gyro hand-test works, no motorized movement implemented yet.
+> **Status:** ⚠️ WALL-FOLLOWER IMPLEMENTED — Basic open-loop forward movement with closed-loop wall centering is active in `pulina_code.ino`.
+> 
+> **Last Updated:** 2026-08-27
 
 ---
 
 ## Current State of Phase 5 Code
 
-### What Exists (Working)
-- `Micromouse.ino` Phase 5 block: Hand-rotation gyro test (no motors, just display heading)
-- `control/pid.cpp`: Generic PID class with anti-windup — **fully implemented**
-- `hardware/motor.cpp`: Motor control with direction and PWM — **fully implemented**
-- `hardware/encoder.cpp`: Hardware encoder mode with delta tracking — **fully implemented**
-- `sensors/sensor_fusion.cpp`: Fusion pipeline structure — **partially implemented**
+### What Exists (Working ✅)
+- `pulina_code.ino`: **Wall-Following Test Script** — drives forward using BASE_PWM (1500) and corrects centering using ToF sensors. Stops when front wall is < 150mm. Comprehensive OLED + Serial debug.
+- `control/wall_follower.cpp`: **PD Controller** — calculates PWM correction from lateral error.
+- `hardware/motor.cpp`: Motor control with direction and PWM — **fully implemented**.
+- `sensors/distance_manager.cpp`: ToF polling and `distance_get_centering_error()` logic — **fully implemented**.
+- `utils/debug_buffer.cpp`: 200-entry ring buffer for offline logging, CSV dump to Serial.
+
+### Deprecated / Paused (Due to Pivot)
+- `control/speed_controller.cpp`: Encoder-based velocity PID (Paused).
+- `control/heading_controller.cpp`: IMU-based heading PID (Paused).
+- `control/velocity_controller.cpp`: Differential mixer (Paused).
+- `control/pid.cpp`: Generic PID class (Paused).
 
 ### What Exists (Skeleton/TODO)
-- `control/motion_controller.cpp`: All functions are empty TODO stubs
-- `control/speed_controller.cpp`: Empty TODO stubs  
-- `control/heading_controller.cpp`: Empty TODO stubs
-- `control/velocity_controller.cpp`: Empty TODO stubs
-- `control/cell_controller.cpp`: Empty TODO stubs
-- `control/turn_controller.cpp`: Empty TODO stubs
-- `control/wall_follower.cpp`: Empty TODO stubs
-
-### What Works in Testing Codes (Reference)
-- `Motors_Motion_Control_With_PID.ino`: PID speed control with `kp=1.8, ki=0.8, kd=0.02` — **PROVEN WORKING**
-- `Motors_Motion_Control.ino`: Raw encoder delta and speed calculation — **PROVEN WORKING**
-
+- `control/motion_controller.cpp`: All functions are empty TODO stubs.
+- `control/cell_controller.cpp`: Empty TODO stubs.
+- `control/turn_controller.cpp`: Empty TODO stubs (Next step: add IMU 90-degree turning here).
 ---
 
 ## Stage A: Drive Straight One Cell (180mm)
