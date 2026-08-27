@@ -9,6 +9,7 @@
 #ifndef SPEED_CONTROLLER_H
 #define SPEED_CONTROLLER_H
 
+#include <stdint.h>
 #include "pid.h"
 
 /**
