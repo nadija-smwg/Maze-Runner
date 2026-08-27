@@ -9,9 +9,9 @@
 #include "pid.h"
 
 // PID constants for heading control (needs tuning)
-#define HEADING_KP 5.0f
+#define HEADING_KP 1.0f
 #define HEADING_KI 0.0f
-#define HEADING_KD 0.1f
+#define HEADING_KD 0.0f
 #define MAX_OMEGA_RAD_S 5.0f // Max angular velocity correction (rad/s)
 
 static PID _heading_pid(HEADING_KP, HEADING_KI, HEADING_KD, -MAX_OMEGA_RAD_S,
@@ -44,3 +44,7 @@ float heading_controller_update(float target_heading_deg,
 }
 
 void heading_controller_reset(void) { _heading_pid.reset(); }
+
+void heading_controller_set_gains(float kp, float ki, float kd) {
+    _heading_pid.set_gains(kp, ki, kd);
+}

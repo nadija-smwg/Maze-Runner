@@ -33,4 +33,9 @@ float heading_controller_update(float target_heading_deg,
  */
 void heading_controller_reset(void);
 
+/**
+ * @brief Dynamically set heading PID gains.
+ */
+void heading_controller_set_gains(float kp, float ki, float kd);
+
 #endif /* HEADING_CONTROLLER_H */

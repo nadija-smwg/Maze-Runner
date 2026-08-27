@@ -623,6 +623,7 @@ void loop() {
   static int p5_state = 0; // 0=Idle, 1=Drive, 2=Turn
   static float target_v = 0.0f;
   static float target_h = 0.0f;
+  static float live_kp = 1.0f;
 
   if (button_just_pressed(BUTTON_START)) {
     if (p5_state == 0) {
@@ -637,10 +638,10 @@ void loop() {
 
   if (button_just_pressed(BUTTON_MODE)) {
     if (p5_state == 0) {
-      p5_state = 2; // Turn
-      target_v = 0.0f;
-      target_h = fusion_get_heading() + 90.0f; // Target +90
-      LOG_INFO("Turning 90!");
+      // Idle mode: Use BUTTON_MODE to tune KP
+      live_kp += 0.2f;
+      if (live_kp > 3.0f) live_kp = 0.0f;
+      heading_controller_set_gains(live_kp, 0.0f, 0.0f);
     } else {
       p5_state = 0;
     }
@@ -668,16 +669,18 @@ void loop() {
     last_print = millis();
     char buf[32];
     oled_clear();
-    oled_print(0, 0, "Phase 5: PID");
+    oled_print(0, 0, "Phase 5: Tune Mode");
     
     if(p5_state == 0) oled_print(0, 15, "State: IDLE");
     if(p5_state == 1) oled_print(0, 15, "State: DRIVE");
-    if(p5_state == 2) oled_print(0, 15, "State: TURN");
-
-    sprintf(buf, "Tgt H: %.1f", target_h);
+    
+    int kp_int = (int)live_kp;
+    int kp_dec = (int)(live_kp * 10.0f) % 10;
+    sprintf(buf, "KP: %d.%d", kp_int, kp_dec);
     oled_print(0, 30, buf);
     
-    sprintf(buf, "Cur H: %.1f", fusion_get_heading());
+    int h_int = (int)fusion_get_heading();
+    sprintf(buf, "H: %d", h_int);
     oled_print(0, 45, buf);
     
     oled_update();
