@@ -221,7 +221,7 @@ void setup() {
 #endif
 
 #if PHASE_5_TEST_MODE == 1
-  LOG_INFO("=== PHASE 5 MOTION TEST MODE ===");
+  LOG_INFO("=== PHASE 5 TEST MODE ===");
   gpio_init_motor_pins();
   pwm_init();
   encoder_init();
@@ -236,21 +236,15 @@ void setup() {
   Wire.setClock(400000);
   if (oled_init()) {
     oled_clear();
-    oled_print(0, 0, "Phase 5 Booting");
+    oled_print(0, 0, "Phase 5");
     oled_update();
   }
 
   sensor_manager_init();
   calibrate_all();
-  fusion_init();
-
-  // Initialize PID controllers
-  velocity_controller_init();
-  heading_controller_init();
 
   LOG_INFO("Phase 5 Ready!");
-  LOG_INFO("Press START to drive straight.");
-  LOG_INFO("Press MODE to turn 90 deg.");
+  LOG_INFO("Press START to begin Wall Following test.");
   return;
 #endif
 
@@ -603,112 +597,227 @@ void loop() {
 
 #if PHASE_5_TEST_MODE == 1
   button_update();
-  led_update();
+  serial_debug_update();
 
-  static uint32_t last_sensor_tick = millis();
-  if (millis() - last_sensor_tick >= 10) {
-    last_sensor_tick = millis();
-    sensor_manager_update(); // Safe to run now!
+  // Update slow sensors (I2C ToF)
+  sensor_manager_update();
+
+  // Get Distance Readings
+  uint16_t dist_f = distance_get_mm(TOF_FRONT);
+  uint16_t dist_l = distance_get_mm(TOF_LEFT);
+  uint16_t dist_r = distance_get_mm(TOF_RIGHT);
+
+  // Calculate Centering Error
+  // If pushed to the left wall, L decreases, R increases -> Error becomes
+  // positive.
+  int TARGET_DIST =
+      45; // mm (Target distance from a single wall when perfectly centered)
+  int error = 0;
+
+  if (dist_l < 150 && dist_r < 150) {
+    // Both walls present (Double wall following)
+    error = (int)dist_r - (int)dist_l;
+  } else if (dist_l < 150) {
+    // Only left wall present
+    error = (TARGET_DIST - (int)dist_l) * 2;
+  } else if (dist_r < 150) {
+    // Only right wall present
+    error = ((int)dist_r - TARGET_DIST) * 2;
+  } else {
+    // NO walls! Drive straight
+    error = 0;
   }
 
-  static uint32_t last_fusion_tick = millis();
-  if (millis() - last_fusion_tick >= 10) {
-    uint32_t now = millis();
-    float dt = (now - last_fusion_tick) / 1000.0f;
-    last_fusion_tick = now;
-    if (dt <= 0.0f) {
-      dt = 0.01f;
-    }
-    fusion_update(dt);
+  // Grid tracking
+  enum Heading { NORTH = 0, EAST = 1, SOUTH = 2, WEST = 3 };
+  static int grid_x = 0;
+  static int grid_y = 0;
+  static int heading = NORTH;
+  static int last_cells = 0;
+  static bool is_first_run = true;
+
+  static int p5_state = 0; // 0 = IDLE, 1 = DRIVE
+  static int kp = 5;       // Steering power (1 to 15)
+
+  static uint32_t start_press_time = 0;
+  static bool start_was_pressed = false;
+  bool start_pressed = button_is_pressed(BUTTON_START);
+
+  if (start_pressed && !start_was_pressed) {
+    start_press_time = millis();
   }
 
-  static int p5_state = 0; // 0=Idle, 1=Drive
-  static float target_v = 0.0f;
-  static float target_h = 0.0f;
-  static float live_kp = 1.0f;
-
-  if (button_just_pressed(BUTTON_START)) {
-    if (p5_state == 0) {
-      p5_state = 1;                    // Drive straight
-      target_v = 300.0f;               // 300 mm/s
-      target_h = fusion_get_heading(); // Lock to current heading
-      Serial.println("\n[DECISION] START pressed. State -> DRIVE (300 mm/s)");
+  if (!start_pressed && start_was_pressed) {
+    // Button released
+    if (millis() - start_press_time > 1000) { // Held for > 1 second
+      LOG_INFO("Long Press Detected: REBOOTING...");
+      oled_clear();
+      oled_print(0, 0, "REBOOTING...");
+      oled_update();
+      delay(500);
+      NVIC_SystemReset(); // Hardware reboot
     } else {
-      p5_state = 0; // Stop
-      Serial.println("\n[DECISION] START pressed. State -> IDLE (Motors Stopped)");
+      // Short press: Toggle IDLE / DRIVE
+      if (p5_state == 0) {
+        p5_state = 1;
+        is_first_run = true;
+        encoder_reset_all(); // Reset encoders when starting a run
+        LOG_INFO("STATE -> DRIVE");
+      } else {
+        p5_state = 0;
+        motor_stop();
+        LOG_INFO("STATE -> IDLE");
+      }
     }
   }
+  start_was_pressed = start_pressed;
 
-  if (button_just_pressed(BUTTON_MODE)) {
-    if (p5_state == 0) {
-      // Idle mode: Use BUTTON_MODE to tune SPEED_KP
-      live_kp += 0.2f;
-      if (live_kp > 3.0f)
-        live_kp = 0.0f;
-      // Force KD to 0.0f to prevent derivative chatter, but add a little KI (0.05f) 
-      // so it can overcome the motor deadband!
-      speed_controller_set_gains(live_kp, 0.05f, 0.0f);
-      Serial.print("\n[DECISION] MODE pressed. KP: ");
-      Serial.print(live_kp);
-      Serial.println(" | KI: 0.05");
-    } else {
-      p5_state = 0;
-      Serial.println("\n[DECISION] MODE pressed while driving. State -> IDLE (Motors Stopped)");
+  static int left_pwm = 0;
+  static int right_pwm = 0;
+
+  if (p5_state == 0) {
+    motor_stop(); // Ensure motors stay stopped in IDLE
+    left_pwm = 0;
+    right_pwm = 0;
+    if (button_just_pressed(BUTTON_MODE)) {
+      kp++;
+      if (kp > 15)
+        kp = 1;
     }
-  }
+  } else if (p5_state == 1) {
+    // DRIVE State
 
-  // 1kHz Motion Control Loop
-  static uint32_t last_ctrl_tick = micros();
-  if (micros() - last_ctrl_tick >= 1000) {
-    last_ctrl_tick = micros();
+    // Grid Tracker
+    int32_t avg_counts =
+        (encoder_get_count(ENCODER_LEFT) + encoder_get_count(ENCODER_RIGHT)) /
+        2;
+    float dist_traveled_mm = encoder_counts_to_mm(avg_counts);
+    float offset = (is_first_run) ? 0.0f : 90.0f;
+    int current_cells = (int)((dist_traveled_mm + offset) / 180.0f);
+    if (current_cells > last_cells) {
+      if (heading == NORTH)
+        grid_y++;
+      else if (heading == SOUTH)
+        grid_y--;
+      else if (heading == EAST)
+        grid_x++;
+      else if (heading == WEST)
+        grid_x--;
+      last_cells = current_cells;
+    }
 
-    // Run controllers
-    if (p5_state == 0) {
+    // Stop if an obstacle is within 60mm
+    if (dist_f <= 60 && dist_f > 0) {
+      p5_state = 2; // Auto-turn
       motor_stop();
+      left_pwm = 0;
+      right_pwm = 0;
+      LOG_INFO("Obstacle! STATE -> TURN");
     } else {
-      // Force zero rotation (open-loop heading) to isolate velocity PID
-      float omega = 0.0f;
-      velocity_controller_update(target_v, omega);
+      // Wall following P-Controller
+      // Base PWM = 700
+      int steering = kp * error;
+
+      // Fixed steering polarity (was turning into the wrong wall)
+      left_pwm = 800 - steering;
+      right_pwm = 800 + steering;
+
+      motor_set_both(left_pwm, right_pwm);
     }
+  } else if (p5_state == 2) {
+    // TURN State
+    motor_stop();
+    delay(100); // Brief pause before turning
+
+    float target_angle = 90.0;
+
+    if (dist_l < 150 && dist_r < 150) {
+      // Dead End! Walls on both sides -> Turn 180 degrees
+      heading = (heading + 2) % 4; // U-Turn
+      LOG_INFO("DEAD END! Turning 180 degrees");
+      motor_set_both(700, -700); // Pivot Right
+      target_angle = 180.0;
+    } else if (dist_l > dist_r) {
+      // Left side has the massive spike (opening) -> Turn Left
+      heading = (heading + 3) % 4; // Fast CCW math
+      LOG_INFO("Turning LEFT 90 degrees");
+      motor_set_both(-700, 700); // Pivot Left
+    } else {
+      // Right side has the massive spike -> Turn Right
+      heading = (heading + 1) % 4; // Fast CW math
+      LOG_INFO("Turning RIGHT 90 degrees");
+      motor_set_both(700, -700); // Pivot Right
+    }
+
+    // Gyroscope tracking loop
+    float current_angle = 0.0;
+    uint32_t last_time = micros();
+
+    // Loop until we reach target angle
+    while (abs(current_angle) < target_angle) {
+      IMUScaledData imu;
+      mpu6050_read_scaled(&imu); // Read the IMU
+
+      uint32_t now = micros();
+      float dt = (now - last_time) / 1000000.0f; // Time in seconds
+      last_time = now;
+
+      current_angle += imu.gyro_z_dps * dt; // Add degrees turned
+
+      delay(2); // Small delay for stability
+    }
+
+    motor_stop();
+    delay(100); // Brief pause after turning
+
+    // Go back to driving
+    last_cells = 0;
+    is_first_run = false; // Turn complete, use normal offsets now
+    encoder_reset_all(); // Reset cells for the new corridor
+    p5_state = 1;
   }
 
-  // OLED Display and Serial Plotter (10Hz)
+  // Print sensor readings to Serial and OLED
   static uint32_t last_print = 0;
-  if (millis() - last_print >= 100) {
+  if (millis() - last_print >= 100) { // Print at 10Hz
     last_print = millis();
+
+    // Update OLED Display
     char buf[32];
     oled_clear();
-    oled_print(0, 0, "Phase 5: Spd Tune");
 
-    if (p5_state == 0)
-      oled_print(0, 15, "State: IDLE");
-    if (p5_state == 1)
-      oled_print(0, 15, "State: DRIVE");
+    const char *dir_str = (heading == NORTH)   ? "N"
+                          : (heading == EAST)  ? "E"
+                          : (heading == SOUTH) ? "S"
+                                               : "W";
+    if (p5_state == 0) {
+      sprintf(buf, "IDLE | (%d,%d) %s", grid_x, grid_y, dir_str);
+      oled_print(0, 0, buf);
+    } else if (p5_state == 1) {
+      sprintf(buf, "DRV  | (%d,%d) %s", grid_x, grid_y, dir_str);
+      oled_print(0, 0, buf);
+    } else {
+      sprintf(buf, "TURN | (%d,%d) %s", grid_x, grid_y, dir_str);
+      oled_print(0, 0, buf);
+    }
 
-    int kp_int = (int)live_kp;
-    int kp_dec = (int)(live_kp * 10.0f) % 10;
-    sprintf(buf, "SpdKP:%d.%d", kp_int, kp_dec);
+    sprintf(buf, "F:%u L:%u", dist_f, dist_l);
+    oled_print(0, 15, buf);
+
+    sprintf(buf, "R:%u Err:%d", dist_r, error);
     oled_print(0, 30, buf);
 
-    int spd_int = (int)velocity_controller_get_speed();
-    sprintf(buf, "Spd: %d", spd_int);
-    oled_print(0, 45, buf);
+    sprintf(buf, "KP: %d", kp);
+    oled_print(85, 45, buf); // Bottom right
+
+    // Print motor speeds
+    sprintf(buf, "L:%d R:%d", left_pwm, right_pwm);
+    oled_print(0, 45, buf); // Bottom left
 
     oled_update();
-
-    // Serial Monitor Output (Text Format for Debugging)
-    // We don't use Plotter format here because large encoder counts ruin the graph scale
-    Serial.print("Target_v: ");
-    Serial.print(target_v);
-    Serial.print(" | Cur_v: ");
-    Serial.print(velocity_controller_get_speed());
-    Serial.print(" | EncL: ");
-    Serial.print(encoder_get_count(ENCODER_LEFT));
-    Serial.print(" | EncR: ");
-    Serial.print(encoder_get_count(ENCODER_RIGHT));
-    Serial.print(" | KP: ");
-    Serial.println(live_kp);
   }
+
+  delay(5);
   return;
 #endif
 
