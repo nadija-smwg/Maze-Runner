@@ -10,7 +10,7 @@
 
 The Micromouse project has successfully completed hardware bring-up (Phases 1-3) and partially implemented sensor fusion (Phase 4) and motion control (Phase 5). **All 5 ToF sensors, both motors with encoders, the IMU, and the OLED display are fully operational.** The linear distance measurement (X in mm) from encoders is accurate and calibrated.
 
-However, the **heading/angle estimation is broken** in the Full_Code due to 5 interconnected bugs in the sensor fusion pipeline. These have been identified and documented with specific fixes. The motion controller (Phase 5) has been upgraded with a raw-PWM wall-follower featuring **Trapezoidal Motion Profiling**, **EMA Sensor Filtering**, and **Hysteresis**, but full velocity/heading PID loops are still pending.
+However, the **heading/angle estimation is broken** in the Full_Code due to 5 interconnected bugs in the sensor fusion pipeline. These have been identified and documented with specific fixes. The motion controller (Phase 5) remains a skeleton of TODO stubs — no motorized autonomous movement has been implemented yet.
 
 A revised **bottom-up, test-driven strategy** has been proposed to complete the remaining work in 5 isolated, testable stages.
 
@@ -118,7 +118,7 @@ A revised **bottom-up, test-driven strategy** has been proposed to complete the 
 
 ---
 
-### Phase 5: High-Level Motion & Control ⚠️ IN PROGRESS (Wall Follower Active)
+### Phase 5: High-Level Motion & Control ⚠️ IN PROGRESS (Stage A)
 
 | Component | File | Status | Notes |
 |-----------|------|--------|-------|
@@ -134,18 +134,16 @@ A revised **bottom-up, test-driven strategy** has been proposed to complete the 
 | Trajectory Controller | [trajectory_controller.cpp](./Full_Code/Micromouse/src/control/trajectory_controller.cpp) | ❌ TODO stubs | S-curve profiler — empty |
 
 **Current Phase 5 Test (Micromouse.ino):**
-- Features a robust **Wall-Following PD Controller** directly driving PWM.
-- **Trapezoidal Motion Profiling**: Accelerates smoothly (time-based) and decelerates (distance-based) to prevent wheel slip.
-- **Sensor Filtering**: Uses Exponential Moving Average (EMA) on ToF sensors to smooth out noise.
-- **Hysteresis**: Prevents wall detection flickering at threshold boundaries.
-- Uses Gyro integration for precise 90° and 180° turns.
-- OLED shows: Grid coordinates, filtered distances, centering error, and current KP value.
+- Drives at 150mm/s with speed PID control (heading disabled for isolation)
+- OLED shows: battery, target/current speed, per-motor speed/PWM, heading, buffer count
+- Serial outputs: comprehensive debug data (human-readable or CSV mode)
+- Debug buffer: records 200 entries at 100Hz while driving, dumps via long-press MODE
+- Feedforward calibration mode available
+- Startup speed spike **FIXED** (dt clamping + first-call reset)
 
-**Next Immediate Steps for Phase 5:**
-1. Upgrade to **Velocity PID**: Use encoders to maintain constant speed (mm/s) instead of raw PWM.
-2. Upgrade to **PD Wall Following**: Add a Derivative (D) term to the steering controller to stop oscillations.
-3. **Continuous Gyro Heading**: Use the IMU while driving straight to maintain heading when walls are missing.
-4. **Diagonal Sensors**: Use `TOF_FRONT_LEFT` and `TOF_FRONT_RIGHT` for high-speed slalom cornering.
+**Bugs Fixed:**
+- Motor startup PWM spike (velocity_controller.cpp dt initialization)
+- PID integral windup on IDLE→DRIVE transition
 
 ---
 

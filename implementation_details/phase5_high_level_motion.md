@@ -11,7 +11,7 @@
 ## Current State of Phase 5 Code
 
 ### What Exists (Working ✅)
-- `Micromouse.ino` (Phase 5 block): **Wall-Following Test Script** — Drives forward with **Trapezoidal Motion Profiling** and corrects centering using **EMA filtered ToF sensors** with hysteresis. Uses Gyro integration for 90°/180° turns. Comprehensive OLED + Serial debug.
+- `pulina_code.ino`: **Wall-Following Test Script** — drives forward using BASE_PWM (1500) and corrects centering using ToF sensors. Stops when front wall is < 150mm. Comprehensive OLED + Serial debug.
 - `control/wall_follower.cpp`: **PD Controller** — calculates PWM correction from lateral error.
 - `hardware/motor.cpp`: Motor control with direction and PWM — **fully implemented**.
 - `sensors/distance_manager.cpp`: ToF polling and `distance_get_centering_error()` logic — **fully implemented**.
@@ -26,13 +26,7 @@
 ### What Exists (Skeleton/TODO)
 - `control/motion_controller.cpp`: All functions are empty TODO stubs.
 - `control/cell_controller.cpp`: Empty TODO stubs.
-- `control/turn_controller.cpp`: Empty TODO stubs.
-
-### Next Steps for Phase 5 Configuration
-1. **Velocity PID**: Transition from driving with raw PWM to driving with exact velocities (mm/s) using the encoders.
-2. **PD Wall Follower**: Add a Derivative (D) term to the current wall-centering logic to eliminate oscillation.
-3. **Continuous Gyro Heading**: Keep the IMU reading while driving straight to maintain a precise heading when side walls end.
-4. **Diagonal Sensors for Slalom**: Utilize `TOF_FRONT_LEFT` and `TOF_FRONT_RIGHT` to carve fast corners without stopping.
+- `control/turn_controller.cpp`: Empty TODO stubs (Next step: add IMU 90-degree turning here).
 ---
 
 ## Stage A: Drive Straight One Cell (180mm)

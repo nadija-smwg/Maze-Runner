@@ -16,11 +16,11 @@ Based on the completed bring-up phase, the hardware foundation is essentially fi
 ## 2. Overall Development Roadmap
 
 - **Stage 1**: Hardware Bring-up ✅ DONE
-- **Stage 2**: Wall Following (Phase 5 Pivot) ✅ DONE (Raw PWM, Trapezoidal Profile, EMA Filtered)
-- **Stage 3**: Motion Control ⬅️ NEXT (Velocity PID / PD Steering)
-- **Stage 4**: Sensor Integration (Diagonal ToFs)
-- **Stage 5**: Robot Localization
-- **Stage 6**: Motion Primitives
+- **Stage 2**: Motion Control ⬅️ NEXT (Crucial stage)
+- **Stage 3**: Sensor Integration
+- **Stage 4**: Robot Localization
+- **Stage 5**: Motion Primitives
+- **Stage 6**: Wall Following
 - **Stage 7**: Maze Mapping
 - **Stage 8**: Flood Fill
 - **Stage 9**: Speed Runs
@@ -28,14 +28,13 @@ Based on the completed bring-up phase, the hardware foundation is essentially fi
 
 ---
 
-## 3. Immediate Goal: Stage 3 — Motion Control (Velocity PID)
+## 3. Immediate Goal: Stage 2 — Motion Control
 
-We have successfully implemented a raw-PWM **Wall Follower** (Stage 2 / Phase 5 Pivot) with **Trapezoidal Motion Profiling** and **EMA Sensor Filtering**. 
-The next critical step is migrating from open-loop PWM driving to closed-loop **Velocity PID**. Without exact speed control (mm/s), subsequent algorithms (like precise turns and maze mapping) will be affected by battery voltage drop.
+This is the most critical stage. Without precise motion control, subsequent algorithms (like maze mapping and wall following) become unreliable.
 
 **Target Accuracy:**
-- **Command:** Forward 400 mm/s ➡️ **Actual:** 400 mm/s (Regardless of battery voltage)
 - **Command:** Forward 180 mm ➡️ **Actual:** 180.02 mm (Heading error = 0.3°)
+- *NOT* 176 mm with a Heading error of 8°.
 
 ### Module 1: Characterize Motors
 Before implementing PID, you must understand the motors.
