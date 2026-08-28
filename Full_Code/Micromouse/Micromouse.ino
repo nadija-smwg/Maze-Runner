@@ -646,13 +646,6 @@ void loop() {
       int error_diag = ((int)dist_fr - TARGET_DIAG) * 2;
       error = (error + error_diag) / 2;
     }
-    }
-  } else if (has_r) {
-    // Only right wall present
-    error = ((int)dist_r - TARGET_DIST) * 2;
-    if (has_fr) {
-      error += ((int)dist_fr - TARGET_DIAG) * 2;
-    }
   } else {
     // NO walls! Drive straight
     error = 0;
