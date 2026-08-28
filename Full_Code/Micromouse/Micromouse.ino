@@ -718,22 +718,23 @@ void loop() {
       LOG_INFO("Obstacle! STATE -> TURN");
     } else {
       // Wall following PD-Controller
-      // Wall following Bang-Bang Controller
-      int deadband = 15; // Only react if error is larger than 15mm
+      // Wall following PD-Controller
       
-      if (error > deadband) {
-        // Too close to Left Wall (using the robot's specific polarity)
-        left_pwm = 850;
-        right_pwm = 950;
-      } else if (error < -deadband) {
-        // Too close to Right Wall
-        left_pwm = 950;
-        right_pwm = 850;
-      } else {
-        // Centered - Drive straight
-        left_pwm = 950;
-        right_pwm = 950;
+      // Scale the error: For every 3mm of physical difference, the PID error increases by 1
+      error = error / 3;
+
+      int d_error = error - prev_error;
+      prev_error = error;
+
+      int steering = 0;
+      // Do not change motor speed if error is 0 (deadband)
+      if (error != 0) {
+        steering = (kp * error) + (kd * d_error);
       }
+
+      // Fixed steering polarity
+      left_pwm = 950 - steering;
+      right_pwm = 950 + steering;
 
       motor_set_both(left_pwm, right_pwm);
     }
