@@ -755,13 +755,32 @@ void loop() {
       front_visited = visited[next_x][next_y];
     }
 
-    if ((dist_f <= 60 && dist_f > 0) || front_visited) {
-      // Stop if an obstacle is within 60mm OR the cell ahead is already visited
+    // Check visited status of left and right adjacent cells to see if we have unvisited options
+    int left_x = grid_x, left_y = grid_y;
+    int left_h = (heading + 3) % 4;
+    if (left_h == NORTH) left_y++; else if (left_h == SOUTH) left_y--; else if (left_h == EAST) left_x++; else if (left_h == WEST) left_x--;
+    bool left_visited = true;
+    if (left_x >= 0 && left_x < 16 && left_y >= 0 && left_y < 16) left_visited = visited[left_x][left_y];
+
+    int right_x = grid_x, right_y = grid_y;
+    int right_h = (heading + 1) % 4;
+    if (right_h == NORTH) right_y++; else if (right_h == SOUTH) right_y--; else if (right_h == EAST) right_x++; else if (right_h == WEST) right_x--;
+    bool right_visited = true;
+    if (right_x >= 0 && right_x < 16 && right_y >= 0 && right_y < 16) right_visited = visited[right_x][right_y];
+
+    bool has_unvisited_turn = ((dist_l > 150) && !left_visited) || ((dist_r > 150) && !right_visited);
+
+    // Only treat a visited front cell as a wall if we ACTUALLY have an unvisited path to turn into.
+    // Otherwise, just keep driving straight through the visited cells until we find a new path.
+    bool force_virtual_turn = front_visited && has_unvisited_turn;
+
+    if ((dist_f <= 60 && dist_f > 0) || force_virtual_turn) {
+      // Stop if an obstacle is within 60mm OR we need to turn to avoid a visited cell
       p5_state = 2; // Auto-turn
       motor_stop();
       left_pwm = 0;
       right_pwm = 0;
-      LOG_INFO("Obstacle or Visited Cell! STATE -> TURN");
+      LOG_INFO("Obstacle or Unvisited Path Found! STATE -> TURN");
     } else {
       // Wall following PD-Controller
       
