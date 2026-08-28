@@ -97,11 +97,7 @@ float distance_get_centering_error(void) {
 
     if (wall_l && wall_r) {
         // Both walls: Error is simply the difference
-        // Positive error = robot is too far LEFT (L is small, R is large)
-        // Wait, if L is small and R is large, L - R is negative.
-        // Let's define Positive Error = Robot is shifted LEFT. 
-        // L=40, R=60 -> we are 10mm shifted Left. error = 40 - 60 = -20 (Negative)
-        // Let's use (Right - Left). R=60, L=40 -> error = +20 (we are left, need to correct right).
+        // Positive error = Robot is shifted LEFT. Steer RIGHT to correct.
         return (float)_distances_mm[TOF_RIGHT] - (float)_distances_mm[TOF_LEFT];
     } else if (wall_l) {
         // Only left wall present. 
@@ -112,7 +108,8 @@ float distance_get_centering_error(void) {
         // Target is 30mm. If R=20, we are too far right. error = 20 - 30 = -10.
         return (float)_distances_mm[TOF_RIGHT] - TARGET_WALL_DIST_MM;
     }
-
+    
+    // No walls present, drive straight
     return 0.0f;
 }
 
