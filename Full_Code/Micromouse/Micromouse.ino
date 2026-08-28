@@ -777,15 +777,22 @@ void loop() {
     // Only treat a visited front cell as a wall if we ACTUALLY have an unvisited path to turn into.
     // Otherwise, just keep driving straight through the visited cells until we find a new path.
     bool force_virtual_turn = front_visited && has_unvisited_turn;
-    bool at_cell_center = (dist_traveled_mm - boundary_dist) >= 85.0f;
+    
+    // Window to ensure we ONLY turn when physically near the center of the cell, 
+    // preventing early turns if sensors see ahead while still in the previous cell.
+    float dist_into_cell = dist_traveled_mm - boundary_dist;
+    bool at_cell_center = (dist_into_cell >= 80.0f && dist_into_cell <= 110.0f);
 
-    if ((dist_f <= 60 && dist_f > 0) || (force_virtual_turn && at_cell_center)) {
-      // Stop if an obstacle is within 60mm OR we are at the center and need to turn
+    bool front_wall = (dist_f <= 160 && dist_f > 0); // Detect front wall early
+    bool emergency_stop = (dist_f <= 45 && dist_f > 0); // Hard stop to prevent crash
+
+    if (((front_wall || force_virtual_turn) && at_cell_center) || emergency_stop) {
+      // Stop exactly at the center if there is a wall or an unvisited turn!
       p5_state = 2; // Auto-turn
       motor_stop();
       left_pwm = 0;
       right_pwm = 0;
-      LOG_INFO("Obstacle or Unvisited Path Found! STATE -> TURN");
+      LOG_INFO("Center Reached (Wall/Turn)! STATE -> TURN");
     } else {
       // Wall following PD-Controller
       
