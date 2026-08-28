@@ -17,8 +17,8 @@
  * If one motor is weaker, increase its base PWM here so the robot
  * drives mostly straight even before the PD controller kicks in.
  */
-#define WALL_FOLLOW_BASE_PWM_LEFT  1500
-#define WALL_FOLLOW_BASE_PWM_RIGHT 1500
+#define WALL_FOLLOW_BASE_PWM_LEFT 800
+#define WALL_FOLLOW_BASE_PWM_RIGHT 800
 
 /**
  * @brief Initialize the wall follower PID.

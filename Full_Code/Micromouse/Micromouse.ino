@@ -39,10 +39,14 @@
 #include "src/control/motion_controller.h"
 #include "src/control/speed_controller.h"
 #include "src/control/velocity_controller.h"
+#include "src/control/wall_follower.h"
 
 // Robot
 #include "src/robot/mission_manager.h"
 #include "src/robot/robot_state_machine.h"
+
+// Maze
+#include "src/maze/solver.h"
 
 // Display
 #include "src/display/menu.h"
@@ -53,7 +57,6 @@
 #include "src/utils/debug_buffer.h"
 #include "src/utils/logger.h"
 #include "src/utils/serial_debug.h"
-
 
 // Phase testing mode flags (set to 1 for active test mode)
 #define PHASE_1_TEST_MODE 0
@@ -223,7 +226,7 @@ void setup() {
 #endif
 
 #if PHASE_5_TEST_MODE == 1
-  LOG_INFO("=== PHASE 5 TEST MODE ===");
+  LOG_INFO("=== PHASE 5 COMPETITION MODE ===");
   gpio_init_motor_pins();
   pwm_init();
   encoder_init();
@@ -238,15 +241,24 @@ void setup() {
   Wire.setClock(400000);
   if (oled_init()) {
     oled_clear();
-    oled_print(0, 0, "Phase 5");
+    oled_print(0, 0, "MazeX v1.0");
+    oled_print(0, 15, "Initializing...");
     oled_update();
   }
 
   sensor_manager_init();
   calibrate_all();
+  wall_follower_init();
 
-  LOG_INFO("Phase 5 Ready!");
-  LOG_INFO("Press START to begin Wall Following test.");
+  oled_clear();
+  oled_print(0, 0, "MazeX v1.0");
+  oled_print(0, 15, "Ready!");
+  oled_print(0, 30, "START = Search");
+  oled_print(0, 42, "MODE  = KP+");
+  oled_update();
+
+  LOG_INFO("Phase 5 Competition Mode Ready!");
+  LOG_INFO("Press START to begin maze search.");
   return;
 #endif
 
@@ -598,49 +610,38 @@ void loop() {
 #endif
 
 #if PHASE_5_TEST_MODE == 1
-  button_update();
-  serial_debug_update();
+  // ======================================================================
+  //  PHASE 5 â€” COMPETITION MAZE SEARCH (Flood Fill + Wall Following)
+  // ======================================================================
 
-  // Update slow sensors (I2C ToF)
+  // -- State Machine Enum ------------------------------------------------
+  enum P5State {
+    P5_IDLE,             // Waiting for button press
+    P5_SEARCH_DRIVE,     // Wall-following forward through corridor
+    P5_SEARCH_ARRIVED,   // Reached cell center â€” read walls, run solver
+    P5_TURNING,          // Gyro-tracked pivot turn
+    P5_AT_GOAL,          // Reached center goal!
+    P5_RETURN_DRIVE,     // Returning to start
+    P5_RETURN_ARRIVED,   // Cell center on return
+    P5_RETURN_TURNING,   // Turning during return
+    P5_DONE              // Back at start
+  };
+
+  // -- Static State Variables --------------------------------------------
+  static P5State p5_state = P5_IDLE;
+  static Solver solver;
+  static bool solver_initialized = false;
+  static bool is_returning = false;
+  static float drive_target_mm = 180.0f;
+  static Direction target_direction = DIR_NORTH;
+  static uint32_t run_start_time = 0;
+  static uint16_t cells_visited = 0;
+
+  // -- Input Handling ----------------------------------------------------
+  button_update();
   sensor_manager_update();
 
-  // Get Distance Readings
-  uint16_t dist_f = distance_get_mm(TOF_FRONT);
-  uint16_t dist_l = distance_get_mm(TOF_LEFT);
-  uint16_t dist_r = distance_get_mm(TOF_RIGHT);
-
-  // Calculate Centering Error
-  // If pushed to the left wall, L decreases, R increases -> Error becomes
-  // positive.
-  int TARGET_DIST =
-      45; // mm (Target distance from a single wall when perfectly centered)
-  int error = 0;
-
-  if (dist_l < 150 && dist_r < 150) {
-    // Both walls present (Double wall following)
-    error = (int)dist_r - (int)dist_l;
-  } else if (dist_l < 150) {
-    // Only left wall present
-    error = (TARGET_DIST - (int)dist_l) * 2;
-  } else if (dist_r < 150) {
-    // Only right wall present
-    error = ((int)dist_r - TARGET_DIST) * 2;
-  } else {
-    // NO walls! Drive straight
-    error = 0;
-  }
-
-  // Grid tracking
-  enum Heading { NORTH = 0, EAST = 1, SOUTH = 2, WEST = 3 };
-  static int grid_x = 0;
-  static int grid_y = 0;
-  static int heading = NORTH;
-  static int last_cells = 0;
-  static bool is_first_run = true;
-
-  static int p5_state = 0; // 0 = IDLE, 1 = DRIVE
-  static int kp = 5;       // Steering power (1 to 15)
-
+  // Long-press reboot detection
   static uint32_t start_press_time = 0;
   static bool start_was_pressed = false;
   bool start_pressed = button_is_pressed(BUTTON_START);
@@ -648,175 +649,567 @@ void loop() {
   if (start_pressed && !start_was_pressed) {
     start_press_time = millis();
   }
-
   if (!start_pressed && start_was_pressed) {
-    // Button released
-    if (millis() - start_press_time > 1000) { // Held for > 1 second
-      LOG_INFO("Long Press Detected: REBOOTING...");
+    if (millis() - start_press_time > 1500) {
+      LOG_INFO("Long Press: REBOOTING...");
       oled_clear();
-      oled_print(0, 0, "REBOOTING...");
+      oled_print(20, 25, "REBOOTING...");
       oled_update();
       delay(500);
-      NVIC_SystemReset(); // Hardware reboot
-    } else {
-      // Short press: Toggle IDLE / DRIVE
-      if (p5_state == 0) {
-        p5_state = 1;
-        is_first_run = true;
-        encoder_reset_all(); // Reset encoders when starting a run
-        LOG_INFO("STATE -> DRIVE");
-      } else {
-        p5_state = 0;
-        motor_stop();
-        LOG_INFO("STATE -> IDLE");
-      }
+      NVIC_SystemReset();
     }
   }
   start_was_pressed = start_pressed;
 
-  static int left_pwm = 0;
-  static int right_pwm = 0;
+  // -- Sensor Readings (always available) --------------------------------
+  uint16_t dist_f  = distance_get_mm(TOF_FRONT);
+  uint16_t dist_l  = distance_get_mm(TOF_LEFT);
+  uint16_t dist_r  = distance_get_mm(TOF_RIGHT);
+  bool wall_f = distance_has_wall_front();
+  bool wall_l = distance_has_wall_left();
+  bool wall_r = distance_has_wall_right();
+  float centering_error = distance_get_centering_error();
 
-  if (p5_state == 0) {
-    motor_stop(); // Ensure motors stay stopped in IDLE
-    left_pwm = 0;
-    right_pwm = 0;
+  // -- Helper strings ----------------------------------------------------
+  const char* dir_names[] = {"N", "E", "S", "W"};
+  const char* state_names[] = {"IDLE", "DRV", "ARR", "TURN",
+                                "GOAL", "RET", "RARR", "RTURN", "DONE"};
+
+  // ======================================================================
+  //  STATE MACHINE
+  // ======================================================================
+  switch (p5_state) {
+
+  // -- IDLE --------------------------------------------------------------
+  case P5_IDLE: {
+    motor_stop();
+
+    // MODE button: adjust wall follower KP
     if (button_just_pressed(BUTTON_MODE)) {
-      kp++;
-      if (kp > 15)
-        kp = 1;
-    }
-  } else if (p5_state == 1) {
-    // DRIVE State
-
-    // Grid Tracker
-    int32_t avg_counts =
-        (encoder_get_count(ENCODER_LEFT) + encoder_get_count(ENCODER_RIGHT)) /
-        2;
-    float dist_traveled_mm = encoder_counts_to_mm(avg_counts);
-    float offset = (is_first_run) ? 0.0f : 90.0f;
-    int current_cells = (int)((dist_traveled_mm + offset) / 180.0f);
-    if (current_cells > last_cells) {
-      if (heading == NORTH)
-        grid_y++;
-      else if (heading == SOUTH)
-        grid_y--;
-      else if (heading == EAST)
-        grid_x++;
-      else if (heading == WEST)
-        grid_x--;
-      last_cells = current_cells;
+      float kp = wall_follower_get_kp();
+      kp += 1.0f;
+      if (kp > 15.0f) kp = 1.0f;
+      wall_follower_set_kp(kp);
     }
 
-    // Stop if an obstacle is within 60mm
-    if (dist_f <= 60 && dist_f > 0) {
-      p5_state = 2; // Auto-turn
-      motor_stop();
-      left_pwm = 0;
-      right_pwm = 0;
-      LOG_INFO("Obstacle! STATE -> TURN");
-    } else {
-      // Wall following P-Controller
-      // Base PWM = 700
-      int steering = kp * error;
+    // START button (short press): begin search
+    if (button_just_pressed(BUTTON_START)) {
+      LOG_INFO("Starting maze search...");
 
-      // Fixed steering polarity (was turning into the wrong wall)
-      left_pwm = 850 - steering;
-      right_pwm = 850 + steering;
+      // Initialize solver on first run
+      if (!solver_initialized) {
+        solver_init(&solver);
+        solver_initialized = true;
+      }
 
-      motor_set_both(left_pwm, right_pwm);
+      // Robot starts at center of cell (0,0), facing NORTH
+      // Read walls and record in the starting cell
+      solver_record_walls(&solver, wall_f, wall_l, wall_r);
+
+      is_returning = false;
+      encoder_reset_all();
+      run_start_time = millis();
+      cells_visited = 1; // start cell counts
+
+      // Get first direction from flood fill
+      target_direction = solver_search_step(&solver);
+      TurnType turn = get_turn_type(solver.mouse_heading, target_direction);
+
+      if (turn == TURN_NONE) {
+        // Go straight â€” drive to next cell center (180mm)
+        drive_target_mm = 180.0f;
+        encoder_reset_all();
+        p5_state = P5_SEARCH_DRIVE;
+        LOG_INFO("Driving forward");
+      } else {
+        // Need to turn first
+        p5_state = P5_TURNING;
+        LOG_INFO("Turning before first move");
+      }
     }
-  } else if (p5_state == 2) {
-    // TURN State
-    motor_stop();
-    delay(100); // Brief pause before turning
-
-    float target_angle = 90.0;
-
-    if (dist_l < 150 && dist_r < 150) {
-      // Dead End! Walls on both sides -> Turn 180 degrees
-      heading = (heading + 2) % 4; // U-Turn
-      LOG_INFO("DEAD END! Turning 180 degrees");
-      motor_set_both(900, -900); // Pivot Right
-      target_angle = 180.0;
-    } else if (dist_l > dist_r) {
-      // Left side has the massive spike (opening) -> Turn Left
-      heading = (heading + 3) % 4; // Fast CCW math
-      LOG_INFO("Turning LEFT 90 degrees");
-      motor_set_both(-900, 900); // Pivot Left
-    } else {
-      // Right side has the massive spike -> Turn Right
-      heading = (heading + 1) % 4; // Fast CW math
-      LOG_INFO("Turning RIGHT 90 degrees");
-      motor_set_both(900, -900); // Pivot Right
-    }
-
-    // Gyroscope tracking loop
-    float current_angle = 0.0;
-    uint32_t last_time = micros();
-
-    // Loop until we reach target angle
-    while (abs(current_angle) < target_angle) {
-      IMUScaledData imu;
-      mpu6050_read_scaled(&imu); // Read the IMU
-
-      uint32_t now = micros();
-      float dt = (now - last_time) / 1000000.0f; // Time in seconds
-      last_time = now;
-
-      current_angle += imu.gyro_z_dps * dt; // Add degrees turned
-
-      delay(2); // Small delay for stability
-    }
-
-    motor_stop();
-    delay(100); // Brief pause after turning
-
-    // Go back to driving
-    last_cells = 0;
-    is_first_run = false; // Turn complete, use normal offsets now
-    encoder_reset_all();  // Reset cells for the new corridor
-    p5_state = 1;
+    break;
   }
 
-  // Print sensor readings to Serial and OLED
-  static uint32_t last_print = 0;
-  if (millis() - last_print >= 100) { // Print at 10Hz
-    last_print = millis();
+  // -- SEARCH DRIVE / RETURN DRIVE ---------------------------------------
+  case P5_SEARCH_DRIVE:
+  case P5_RETURN_DRIVE: {
+    // Wall-following PD controller drives motors
+    wall_follower_update(centering_error, 0.01f);
 
-    // Update OLED Display
+    // Emergency front wall stop
+    if (dist_f <= 40 && dist_f > 0) {
+      motor_stop();
+      encoder_reset_all();
+      p5_state = is_returning ? P5_RETURN_ARRIVED : P5_SEARCH_ARRIVED;
+      LOG_INFO("Front wall stop!");
+      break;
+    }
+
+    // Check if we've driven enough distance to reach next cell center
+    int32_t avg_counts = (encoder_get_count(ENCODER_LEFT) +
+                          encoder_get_count(ENCODER_RIGHT)) / 2;
+    float dist_driven = encoder_counts_to_mm(avg_counts);
+
+    if (dist_driven >= drive_target_mm) {
+      // Arrived at next cell center!
+      motor_stop();
+      encoder_reset_all();
+      p5_state = is_returning ? P5_RETURN_ARRIVED : P5_SEARCH_ARRIVED;
+    }
+    break;
+  }
+
+  // -- SEARCH ARRIVED (at cell center) -----------------------------------
+  case P5_SEARCH_ARRIVED: {
+    motor_stop();
+    delay(250); // Pause to fully stop and stabilize sensors
+
+    // Re-read sensors after stopping
+    sensor_manager_update();
+    wall_f = distance_has_wall_front();
+    wall_l = distance_has_wall_left();
+    wall_r = distance_has_wall_right();
+
+    // Advance solver position to this new cell
+    solver_advance(&solver, solver.mouse_heading);
+    cells_visited++;
+
+    // Record walls at current cell
+    solver_record_walls(&solver, wall_f, wall_l, wall_r);
+
+    // Check if we reached the goal!
+    if (solver_at_goal(&solver)) {
+      p5_state = P5_AT_GOAL;
+      LOG_INFO("*** GOAL REACHED! ***");
+      led_blink(LED_STATUS, 100);
+      break;
+    }
+
+    // Get next direction from flood fill
+    target_direction = solver_search_step(&solver);
+    TurnType turn = get_turn_type(solver.mouse_heading, target_direction);
+
+    Serial.print("[CELL] (");
+    Serial.print(solver.mouse_x); Serial.print(",");
+    Serial.print(solver.mouse_y); Serial.print(") ");
+    Serial.print(dir_names[solver.mouse_heading]);
+    Serial.print(" W:F"); Serial.print(wall_f);
+    Serial.print(" L"); Serial.print(wall_l);
+    Serial.print(" R"); Serial.print(wall_r);
+    Serial.print(" ->Next:"); Serial.print(dir_names[target_direction]);
+    Serial.print(" Turn:"); Serial.println(turn);
+
+    if (turn == TURN_NONE) {
+      // Continue straight
+      drive_target_mm = 180.0f;
+      encoder_reset_all();
+      p5_state = P5_SEARCH_DRIVE;
+    } else {
+      // Need to turn
+      p5_state = P5_TURNING;
+    }
+    break;
+  }
+
+  // -- TURNING (gyro-tracked pivot) --------------------------------------
+  case P5_TURNING:
+  case P5_RETURN_TURNING: {
+    motor_stop();
+    delay(100); // Stabilize before turn
+
+    TurnType turn = get_turn_type(solver.mouse_heading, target_direction);
+
+    float target_angle = 0.0f;
+    int16_t turn_pwm_l = 0;
+    int16_t turn_pwm_r = 0;
+
+    switch (turn) {
+      case TURN_RIGHT_90:
+        target_angle = 90.0f;
+        turn_pwm_l = 800;
+        turn_pwm_r = -800;
+        LOG_INFO("Turn RIGHT 90");
+        break;
+      case TURN_LEFT_90:
+        target_angle = 90.0f;
+        turn_pwm_l = -800;
+        turn_pwm_r = 800;
+        LOG_INFO("Turn LEFT 90");
+        break;
+      case TURN_180:
+        target_angle = 180.0f;
+        turn_pwm_l = 800;
+        turn_pwm_r = -800;
+        LOG_INFO("Turn 180");
+        break;
+      default:
+        break;
+    }
+
+    if (target_angle > 0.0f) {
+      // Show turn info on OLED before blocking turn
+      char buf[32];
+      oled_clear();
+      sprintf(buf, "TURN %s %d deg",
+              (turn == TURN_RIGHT_90) ? "RIGHT" :
+              (turn == TURN_LEFT_90) ? "LEFT" : "180",
+              (int)target_angle);
+      oled_print(0, 0, buf);
+      sprintf(buf, "(%d,%d) %s->%s",
+              solver.mouse_x, solver.mouse_y,
+              dir_names[solver.mouse_heading],
+              dir_names[target_direction]);
+      oled_print(0, 15, buf);
+      sprintf(buf, "Cells: %u", cells_visited);
+      oled_print(0, 30, buf);
+      oled_update();
+
+      // Execute gyro-tracked turn
+      motor_set_both(turn_pwm_l, turn_pwm_r);
+
+      float accumulated_angle = 0.0f;
+      uint32_t turn_start = micros();
+      uint32_t last_time = micros();
+
+      while (fabs(accumulated_angle) < target_angle) {
+        IMUScaledData imu;
+        mpu6050_read_scaled(&imu);
+
+        uint32_t now = micros();
+        float dt = (now - last_time) / 1000000.0f;
+        last_time = now;
+
+        if (dt > 0.0f && dt < 0.1f) {
+          accumulated_angle += imu.gyro_z_dps * dt;
+        }
+
+        // Safety timeout: 3 seconds max
+        if ((now - turn_start) > 3000000UL) {
+          LOG_ERROR("Turn timeout!");
+          break;
+        }
+        delay(2);
+      }
+
+      motor_stop();
+      delay(100);
+
+      // Post-turn overshoot correction
+      float overshoot = fabs(accumulated_angle) - target_angle;
+      if (overshoot > 3.0f) {
+        LOG_INFO("Fixing overshoot");
+        Serial.println(overshoot, 1);
+
+        motor_set_both(-turn_pwm_l / 2, -turn_pwm_r / 2);
+        float corr_angle = 0.0f;
+        uint32_t corr_start = micros();
+        uint32_t corr_last = micros();
+
+        while (fabs(corr_angle) < (overshoot - 2.0f)) {
+          IMUScaledData imu;
+          mpu6050_read_scaled(&imu);
+          uint32_t now = micros();
+          float dt = (now - corr_last) / 1000000.0f;
+          corr_last = now;
+          if (dt > 0.0f && dt < 0.1f) {
+            corr_angle += imu.gyro_z_dps * dt;
+          }
+          if ((now - corr_start) > 1000000UL) break;
+          delay(2);
+        }
+        motor_stop();
+        delay(50);
+      }
+
+      // Update solver heading
+      solver.mouse_heading = target_direction;
+
+      Serial.print("[TURN] Done: ");
+      Serial.print(fabs(accumulated_angle), 1);
+      Serial.println(" deg");
+    }
+
+    // After turn: drive to next cell
+    drive_target_mm = 180.0f;
+    encoder_reset_all();
+
+    if (p5_state == P5_RETURN_TURNING) {
+      p5_state = P5_RETURN_DRIVE;
+    } else {
+      p5_state = P5_SEARCH_DRIVE;
+    }
+    break;
+  }
+
+  // -- AT GOAL -----------------------------------------------------------
+  case P5_AT_GOAL: {
+    motor_stop();
+    led_update();
+
+    // START button: return to start
+    if (button_just_pressed(BUTTON_START)) {
+      LOG_INFO("Returning to start...");
+
+      // Reverse flood fill: set goal to start cell
+      const uint8_t start_goal[1][2] = {{START_X, START_Y}};
+      flood_fill_compute(&solver.maze, start_goal, 1);
+
+      is_returning = true;
+
+      // Read walls and get return direction
+      sensor_manager_update();
+      wall_f = distance_has_wall_front();
+      wall_l = distance_has_wall_left();
+      wall_r = distance_has_wall_right();
+      solver_record_walls(&solver, wall_f, wall_l, wall_r);
+
+      target_direction = flood_fill_choose_direction(
+          &solver.maze, solver.mouse_x, solver.mouse_y, solver.mouse_heading);
+
+      TurnType turn = get_turn_type(solver.mouse_heading, target_direction);
+      encoder_reset_all();
+
+      if (turn == TURN_NONE) {
+        drive_target_mm = 180.0f;
+        p5_state = P5_RETURN_DRIVE;
+      } else {
+        p5_state = P5_RETURN_TURNING;
+      }
+    }
+    break;
+  }
+
+  // -- RETURN ARRIVED ----------------------------------------------------
+  case P5_RETURN_ARRIVED: {
+    motor_stop();
+    delay(250); // Pause to fully stop and stabilize sensors
+
+    sensor_manager_update();
+    wall_f = distance_has_wall_front();
+    wall_l = distance_has_wall_left();
+    wall_r = distance_has_wall_right();
+
+    solver_advance(&solver, solver.mouse_heading);
+    solver_record_walls(&solver, wall_f, wall_l, wall_r);
+
+    // Check if back at start
+    if (solver_at_start(&solver)) {
+      p5_state = P5_DONE;
+      LOG_INFO("Back at START!");
+      break;
+    }
+
+    // Recompute flood from start
+    const uint8_t ret_goal[1][2] = {{START_X, START_Y}};
+    flood_fill_compute(&solver.maze, ret_goal, 1);
+
+    target_direction = flood_fill_choose_direction(
+        &solver.maze, solver.mouse_x, solver.mouse_y, solver.mouse_heading);
+
+    TurnType turn = get_turn_type(solver.mouse_heading, target_direction);
+    encoder_reset_all();
+
+    if (turn == TURN_NONE) {
+      drive_target_mm = 180.0f;
+      p5_state = P5_RETURN_DRIVE;
+    } else {
+      p5_state = P5_RETURN_TURNING;
+    }
+    break;
+  }
+
+  // -- DONE (back at start) ----------------------------------------------
+  case P5_DONE: {
+    motor_stop();
+
+    // START button: run again with retained maze data
+    if (button_just_pressed(BUTTON_START)) {
+      is_returning = false;
+
+      // Reset solver position to start (maze data kept!)
+      solver.mouse_x = START_X;
+      solver.mouse_y = START_Y;
+      solver.mouse_heading = DIR_NORTH;
+
+      // Re-read walls and recompute flood
+      sensor_manager_update();
+      wall_f = distance_has_wall_front();
+      wall_l = distance_has_wall_left();
+      wall_r = distance_has_wall_right();
+      solver_record_walls(&solver, wall_f, wall_l, wall_r);
+
+      flood_fill_compute(&solver.maze, GOAL_CELLS, NUM_GOAL_CELLS);
+      target_direction = solver_search_step(&solver);
+
+      TurnType turn = get_turn_type(solver.mouse_heading, target_direction);
+      run_start_time = millis();
+      cells_visited = 1;
+      encoder_reset_all();
+
+      if (turn == TURN_NONE) {
+        drive_target_mm = 180.0f;
+        p5_state = P5_SEARCH_DRIVE;
+      } else {
+        p5_state = P5_TURNING;
+      }
+      LOG_INFO("Run again with mapped maze!");
+    }
+    break;
+  }
+
+  default:
+    break;
+  } // end switch
+
+  // ======================================================================
+  //  OLED DEBUG DISPLAY (10Hz update for all states)
+  // ======================================================================
+  static uint32_t last_oled_update = 0;
+  if (millis() - last_oled_update >= 100) {
+    last_oled_update = millis();
+    led_update();
+
     char buf[32];
     oled_clear();
 
-    const char *dir_str = (heading == NORTH)   ? "N"
-                          : (heading == EAST)  ? "E"
-                          : (heading == SOUTH) ? "S"
-                                               : "W";
-    if (p5_state == 0) {
-      sprintf(buf, "IDLE | (%d,%d) %s", grid_x, grid_y, dir_str);
-      oled_print(0, 0, buf);
-    } else if (p5_state == 1) {
-      sprintf(buf, "DRV  | (%d,%d) %s", grid_x, grid_y, dir_str);
-      oled_print(0, 0, buf);
-    } else {
-      sprintf(buf, "TURN | (%d,%d) %s", grid_x, grid_y, dir_str);
-      oled_print(0, 0, buf);
+    uint16_t flood_val = 0;
+    if (solver_initialized) {
+      flood_val = solver_get_flood_value(&solver,
+                   solver.mouse_x, solver.mouse_y);
+    }
+    uint32_t elapsed_s = 0;
+    if (run_start_time > 0) {
+      elapsed_s = (millis() - run_start_time) / 1000;
     }
 
-    sprintf(buf, "F:%u L:%u", dist_f, dist_l);
-    oled_print(0, 15, buf);
+    switch (p5_state) {
 
-    sprintf(buf, "R:%u Err:%d", dist_r, error);
-    oled_print(0, 30, buf);
+    case P5_IDLE: {
+      oled_print(0, 0, "MazeX v1.0  IDLE");
+      sprintf(buf, "KP: %d  MODE=+KP", (int)wall_follower_get_kp());
+      oled_print(0, 12, buf);
+      sprintf(buf, "F:%u L:%u R:%u", dist_f, dist_l, dist_r);
+      oled_print(0, 24, buf);
+      sprintf(buf, "Err:%d", (int)centering_error);
+      oled_print(0, 36, buf);
+      oled_print(0, 52, "START=Go");
+      break;
+    }
 
-    sprintf(buf, "KP: %d", kp);
-    oled_print(85, 45, buf); // Bottom right
+    case P5_SEARCH_DRIVE:
+    case P5_RETURN_DRIVE: {
+      const char* mode = is_returning ? "RET" : "SRC";
+      sprintf(buf, "%s(%d,%d)%s F:%u",
+              mode, solver.mouse_x, solver.mouse_y,
+              dir_names[solver.mouse_heading], flood_val);
+      oled_print(0, 0, buf);
 
-    // Print motor speeds
-    sprintf(buf, "L:%d R:%d", left_pwm, right_pwm);
-    oled_print(0, 45, buf); // Bottom left
+      sprintf(buf, "F:%u L:%u R:%u", dist_f, dist_l, dist_r);
+      oled_print(0, 11, buf);
+
+      sprintf(buf, "W:%c%c%c Err:%d",
+              wall_f ? 'F' : '.', wall_l ? 'L' : '.', wall_r ? 'R' : '.',
+              (int)centering_error);
+      oled_print(0, 22, buf);
+
+      sprintf(buf, "Cor:%d KP:%d",
+              wall_follower_get_last_correction(),
+              (int)wall_follower_get_kp());
+      oled_print(0, 33, buf);
+
+      int32_t avg = (encoder_get_count(ENCODER_LEFT) +
+                     encoder_get_count(ENCODER_RIGHT)) / 2;
+      float driven = encoder_counts_to_mm(avg);
+      sprintf(buf, "D:%.0f/%d C:%u",
+              driven, (int)drive_target_mm, cells_visited);
+      oled_print(0, 44, buf);
+
+      sprintf(buf, "T:%lus", elapsed_s);
+      oled_print(90, 55, buf);
+      break;
+    }
+
+    case P5_SEARCH_ARRIVED:
+    case P5_RETURN_ARRIVED: {
+      sprintf(buf, "ARR (%d,%d) %s",
+              solver.mouse_x, solver.mouse_y,
+              dir_names[solver.mouse_heading]);
+      oled_print(0, 0, buf);
+      sprintf(buf, "F:%u L:%u R:%u", dist_f, dist_l, dist_r);
+      oled_print(0, 12, buf);
+      sprintf(buf, "Walls: %c%c%c",
+              wall_f ? 'F' : '.', wall_l ? 'L' : '.', wall_r ? 'R' : '.');
+      oled_print(0, 24, buf);
+      sprintf(buf, "Flood: %u", flood_val);
+      oled_print(0, 36, buf);
+      sprintf(buf, "Nxt:%s C:%u T:%lus",
+              dir_names[target_direction], cells_visited, elapsed_s);
+      oled_print(0, 48, buf);
+      break;
+    }
+
+    case P5_TURNING:
+    case P5_RETURN_TURNING: {
+      TurnType t = get_turn_type(solver.mouse_heading, target_direction);
+      sprintf(buf, "TURNING %s",
+              (t == TURN_RIGHT_90) ? "RIGHT 90" :
+              (t == TURN_LEFT_90) ? "LEFT 90" : "180");
+      oled_print(0, 0, buf);
+      sprintf(buf, "(%d,%d) %s->%s",
+              solver.mouse_x, solver.mouse_y,
+              dir_names[solver.mouse_heading],
+              dir_names[target_direction]);
+      oled_print(0, 15, buf);
+      sprintf(buf, "Cells:%u T:%lus", cells_visited, elapsed_s);
+      oled_print(0, 36, buf);
+      break;
+    }
+
+    case P5_AT_GOAL: {
+      oled_print(10, 0, "*** GOAL! ***");
+      sprintf(buf, "Cell: (%d,%d)",
+              solver.mouse_x, solver.mouse_y);
+      oled_print(0, 14, buf);
+      sprintf(buf, "Time: %lu:%02lu",
+              elapsed_s / 60, elapsed_s % 60);
+      oled_print(0, 26, buf);
+      sprintf(buf, "Cells: %u/256", cells_visited);
+      oled_print(0, 38, buf);
+      oled_print(0, 52, "START=Return");
+      break;
+    }
+
+    case P5_DONE: {
+      oled_print(0, 0, "** BACK AT START **");
+      sprintf(buf, "Time: %lu:%02lu",
+              elapsed_s / 60, elapsed_s % 60);
+      oled_print(0, 14, buf);
+      sprintf(buf, "Cells: %u mapped", cells_visited);
+      oled_print(0, 26, buf);
+      oled_print(0, 38, "Maze retained!");
+      oled_print(0, 52, "START=Run again");
+      break;
+    }
+
+    default:
+      oled_print(0, 0, "MazeX v1.0");
+      break;
+    }
 
     oled_update();
+
+    // Serial debug output
+    Serial.print("[P5] ");
+    Serial.print(state_names[p5_state]);
+    Serial.print(" ("); Serial.print(solver.mouse_x);
+    Serial.print(","); Serial.print(solver.mouse_y);
+    Serial.print(")"); Serial.print(dir_names[solver.mouse_heading]);
+    Serial.print(" F:"); Serial.print(dist_f);
+    Serial.print(" L:"); Serial.print(dist_l);
+    Serial.print(" R:"); Serial.print(dist_r);
+    Serial.print(" Fl:"); Serial.print(flood_val);
+    Serial.print(" Er:"); Serial.print(centering_error, 0);
+    Serial.println();
   }
 
   delay(5);

@@ -45,6 +45,17 @@ void distance_manager_update(void) {
         
         // Simple Exponential Moving Average (EMA) filter to reduce noise
         if (raw_mm != 8190 && raw_mm < 8000) {
+            int32_t adjusted_mm = raw_mm;
+            if (i == TOF_LEFT) {
+                adjusted_mm -= 12;
+            } else if (i == TOF_RIGHT) {
+                adjusted_mm -= 15;
+            } else if (i == TOF_FRONT) {
+                adjusted_mm -= 21;
+            }
+            if (adjusted_mm < 0) adjusted_mm = 0;
+            raw_mm = (uint16_t)adjusted_mm;
+
             if (_distances_mm[i] == 8190) {
                 _distances_mm[i] = raw_mm; // Initialize on first valid read
             } else {
