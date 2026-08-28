@@ -842,10 +842,9 @@ void loop() {
         steering = (kp * error) + (kd * d_error);
       }
 
-      // Fixed steering polarity! Positive error means too close to LEFT wall.
-      // So if error > 0, we must steer RIGHT (left wheel faster, right wheel slower).
-      left_pwm = 950 + steering;
-      right_pwm = 950 - steering;
+      // PID steering polarity (Reversed per user request)
+      left_pwm = 950 - steering;
+      right_pwm = 950 + steering;
 
       motor_set_both(left_pwm, right_pwm);
     }
