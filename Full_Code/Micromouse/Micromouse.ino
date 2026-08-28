@@ -639,7 +639,7 @@ void loop() {
   static bool is_first_run = true;
 
   static int p5_state = 0; // 0 = IDLE, 1 = DRIVE
-  static int kp = 4;       // Steering power (fixed for Phase 2)
+  static int kp = 3;       // Steering power (fixed for Phase 2)
   static int kd = 0;       // Derivative damper (0 to 60)
   static int prev_error = 0;
 
@@ -721,11 +721,16 @@ void loop() {
       // Wall following PD-Controller
       int d_error = error - prev_error;
       prev_error = error;
-      int steering = (kp * error) + (kd * d_error);
+      
+      int steering = 0;
+      // Do not change motor speed if error is -1, 0, or 1 (deadband)
+      if (error > 1 || error < -1) {
+        steering = (kp * error) + (kd * d_error);
+      }
 
       // Fixed steering polarity (was turning into the wrong wall)
-      left_pwm = 850 - steering;
-      right_pwm = 850 + steering;
+      left_pwm = 950 - steering;
+      right_pwm = 950 + steering;
 
       motor_set_both(left_pwm, right_pwm);
     }
