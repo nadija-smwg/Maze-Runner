@@ -636,6 +636,7 @@ void loop() {
   static int heading = NORTH;
   static int last_cells = 0;
   static bool is_first_run = true;
+  static float boundary_dist = 0.0f;
   
   static bool visited[16][16] = {false};
   static int total_visited = 0;
@@ -676,6 +677,7 @@ void loop() {
         heading = NORTH;
         visited[0][0] = true;
         total_visited = 1;
+        boundary_dist = 0.0f;
         
         LOG_INFO("STATE -> DRIVE");
       } else {
@@ -710,6 +712,8 @@ void loop() {
     float offset = (is_first_run) ? 0.0f : 90.0f;
     int current_cells = (int)((dist_traveled_mm + offset) / 180.0f);
     if (current_cells > last_cells) {
+      boundary_dist = dist_traveled_mm;
+      
       if (heading == NORTH)
         grid_y++;
       else if (heading == SOUTH)
@@ -773,9 +777,10 @@ void loop() {
     // Only treat a visited front cell as a wall if we ACTUALLY have an unvisited path to turn into.
     // Otherwise, just keep driving straight through the visited cells until we find a new path.
     bool force_virtual_turn = front_visited && has_unvisited_turn;
+    bool at_cell_center = (dist_traveled_mm - boundary_dist) >= 85.0f;
 
-    if ((dist_f <= 60 && dist_f > 0) || force_virtual_turn) {
-      // Stop if an obstacle is within 60mm OR we need to turn to avoid a visited cell
+    if ((dist_f <= 60 && dist_f > 0) || (force_virtual_turn && at_cell_center)) {
+      // Stop if an obstacle is within 60mm OR we are at the center and need to turn
       p5_state = 2; // Auto-turn
       motor_stop();
       left_pwm = 0;
@@ -888,6 +893,7 @@ void loop() {
     last_cells = 0;
     is_first_run = false; // Turn complete, use normal offsets now
     encoder_reset_all();  // Reset cells for the new corridor
+    boundary_dist = -90.0f; // Since we are at the center, the boundary is conceptually 90mm behind us
     p5_state = 1;
   } else if (p5_state == 3) {
     // FINISHED State
