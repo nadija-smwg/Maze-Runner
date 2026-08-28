@@ -607,6 +607,8 @@ void loop() {
   uint16_t dist_f = distance_get_mm(TOF_FRONT);
   uint16_t dist_l = distance_get_mm(TOF_LEFT);
   uint16_t dist_r = distance_get_mm(TOF_RIGHT);
+  uint16_t dist_fl = distance_get_mm(TOF_FRONT_LEFT);
+  uint16_t dist_fr = distance_get_mm(TOF_FRONT_RIGHT);
 
   // Calculate Centering Error
   // If pushed to the left wall, L decreases, R increases -> Error becomes
@@ -780,10 +782,11 @@ void loop() {
 
     float dist_into_cell = dist_traveled_mm - boundary_dist;
 
-    // Latch side openings if we see them anywhere near the center of the cell
-    if (dist_into_cell >= 60.0f && dist_into_cell <= 120.0f) {
-      if (dist_l > 150) cell_has_left = true;
-      if (dist_r > 150) cell_has_right = true;
+    // Latch side openings if we see them ANYWHERE in the cell before the center
+    // This widened window prevents wheel-slip from causing missed openings!
+    if (dist_into_cell >= 10.0f && dist_into_cell <= 150.0f) {
+      if (dist_l > 130) cell_has_left = true;
+      if (dist_r > 130) cell_has_right = true;
     }
 
     bool has_unvisited_turn = (cell_has_left && !left_visited) || (cell_has_right && !right_visited);
@@ -808,9 +811,6 @@ void loop() {
       LOG_INFO("Center Reached (Wall/Turn)! STATE -> TURN");
     } else {
       // Wall following PD-Controller
-      
-      // Scale the error: For every 2mm of physical difference, the PID error increases by 1
-      error = error / 2;
 
       int d_error = error - prev_error;
       prev_error = error;
@@ -862,16 +862,10 @@ void loop() {
         LOG_INFO("Turning RIGHT (Unvisited)");
         motor_set_both(900, -900);
       } else {
-        // Both unvisited or both visited. Default to the largest opening.
-        if (dist_l > dist_r) {
-          heading = left_h;
-          LOG_INFO("Turning LEFT (Tiebreaker)");
-          motor_set_both(-900, 900);
-        } else {
-          heading = right_h;
-          LOG_INFO("Turning RIGHT (Tiebreaker)");
-          motor_set_both(900, -900);
-        }
+        // Both unvisited or both visited. Default to RIGHT hand rule to avoid live sensor noise!
+        heading = right_h;
+        LOG_INFO("Turning RIGHT (Tiebreaker)");
+        motor_set_both(900, -900);
       }
     } else if (can_go_left) {
       heading = left_h;
@@ -959,18 +953,18 @@ void loop() {
       oled_print(0, 30, "Map ->");
     } else {
       // Normal driving info
-      sprintf(buf, "F:%u L:%u", dist_f, dist_l);
-      oled_print(0, 15, buf);
+      // Clamp values to 999 so they fit on the left side of the OLED (map is on the right)
+      uint16_t df = (dist_f > 999) ? 999 : dist_f;
+      uint16_t dl = (dist_l > 999) ? 999 : dist_l;
+      uint16_t dr = (dist_r > 999) ? 999 : dist_r;
+      uint16_t dfl = (dist_fl > 999) ? 999 : dist_fl;
+      uint16_t dfr = (dist_fr > 999) ? 999 : dist_fr;
 
-      sprintf(buf, "R:%u Err:%d", dist_r, error);
-      oled_print(0, 30, buf);
-
-      sprintf(buf, "P:%d D:%d", kp, kd);
-      oled_print(60, 45, buf); // Bottom right
-
-      // Print motor speeds
-      sprintf(buf, "L:%d R:%d", left_pwm, right_pwm);
-      oled_print(0, 45, buf); // Bottom left
+      sprintf(buf, "F:%u", df); oled_print(0, 10, buf);
+      sprintf(buf, "L:%u R:%u", dl, dr); oled_print(0, 20, buf);
+      sprintf(buf, "l:%u r:%u", dfl, dfr); oled_print(0, 30, buf); // lower case l/r for FL/FR
+      sprintf(buf, "E:%d D:%d", error, kd); oled_print(0, 40, buf);
+      sprintf(buf, "%d|%d", left_pwm, right_pwm); oled_print(0, 50, buf);
     }
 
     // Draw 16x16 Grid on the right side of the screen
