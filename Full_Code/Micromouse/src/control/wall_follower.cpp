@@ -40,9 +40,9 @@ void wall_follower_update(float lateral_error_mm, float dt) {
     int16_t correction = (int16_t)(P + D);
     _last_correction = correction;
     
-    // 4. Apply to base PWM (inverted polarity for this specific hardware)
-    int16_t left_pwm  = WALL_FOLLOW_BASE_PWM_LEFT - correction;
-    int16_t right_pwm = WALL_FOLLOW_BASE_PWM_RIGHT + correction;
+    // 4. Apply to base PWM
+    int16_t left_pwm  = WALL_FOLLOW_BASE_PWM_LEFT + correction;
+    int16_t right_pwm = WALL_FOLLOW_BASE_PWM_RIGHT - correction;
     
     // 5. Clamp to absolute limits
     if (left_pwm > PWM_MAX) left_pwm = PWM_MAX;

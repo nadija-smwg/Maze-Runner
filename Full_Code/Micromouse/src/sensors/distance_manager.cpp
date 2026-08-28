@@ -43,19 +43,19 @@ void distance_manager_update(void) {
     for (uint8_t i = 0; i < TOF_COUNT; i++) {
         uint16_t raw_mm = vl53l0x_read_distance_mm(&_sensors[i]);
         
+        int32_t adjusted_mm = raw_mm;
+        if (i == TOF_LEFT) {
+            adjusted_mm -= 12;
+        } else if (i == TOF_RIGHT) {
+            adjusted_mm -= 15;
+        } else if (i == TOF_FRONT) {
+            adjusted_mm -= 21;
+        }
+        if (adjusted_mm < 0) adjusted_mm = 0;
+        raw_mm = (uint16_t)adjusted_mm;
+
         // Simple Exponential Moving Average (EMA) filter to reduce noise
         if (raw_mm != 8190 && raw_mm < 8000) {
-            int32_t adjusted_mm = raw_mm;
-            if (i == TOF_LEFT) {
-                adjusted_mm -= 12;
-            } else if (i == TOF_RIGHT) {
-                adjusted_mm -= 15;
-            } else if (i == TOF_FRONT) {
-                adjusted_mm -= 21;
-            }
-            if (adjusted_mm < 0) adjusted_mm = 0;
-            raw_mm = (uint16_t)adjusted_mm;
-
             if (_distances_mm[i] == 8190) {
                 _distances_mm[i] = raw_mm; // Initialize on first valid read
             } else {
@@ -97,7 +97,11 @@ float distance_get_centering_error(void) {
 
     if (wall_l && wall_r) {
         // Both walls: Error is simply the difference
-        // Positive error = Robot is shifted LEFT. Steer RIGHT to correct.
+        // Positive error = robot is too far LEFT (L is small, R is large)
+        // Wait, if L is small and R is large, L - R is negative.
+        // Let's define Positive Error = Robot is shifted LEFT. 
+        // L=40, R=60 -> we are 10mm shifted Left. error = 40 - 60 = -20 (Negative)
+        // Let's use (Right - Left). R=60, L=40 -> error = +20 (we are left, need to correct right).
         return (float)_distances_mm[TOF_RIGHT] - (float)_distances_mm[TOF_LEFT];
     } else if (wall_l) {
         // Only left wall present. 
@@ -108,8 +112,7 @@ float distance_get_centering_error(void) {
         // Target is 30mm. If R=20, we are too far right. error = 20 - 30 = -10.
         return (float)_distances_mm[TOF_RIGHT] - TARGET_WALL_DIST_MM;
     }
-    
-    // No walls present, drive straight
+
     return 0.0f;
 }
 
