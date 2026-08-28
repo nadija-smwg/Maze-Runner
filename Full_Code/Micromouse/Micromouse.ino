@@ -742,34 +742,27 @@ void loop() {
       }
     }
 
-    if (p5_state == 3) {
-      // Do nothing, just stay stopped
+    // Determine if the next cell straight ahead is visited
+    int next_x = grid_x;
+    int next_y = grid_y;
+    if (heading == NORTH) next_y++;
+    else if (heading == SOUTH) next_y--;
+    else if (heading == EAST) next_x++;
+    else if (heading == WEST) next_x--;
+
+    bool front_visited = true; // Default to true if out of bounds
+    if (next_x >= 0 && next_x < 16 && next_y >= 0 && next_y < 16) {
+      front_visited = visited[next_x][next_y];
+    }
+
+    if ((dist_f <= 60 && dist_f > 0) || front_visited) {
+      // Stop if an obstacle is within 60mm OR the cell ahead is already visited
+      p5_state = 2; // Auto-turn
       motor_stop();
       left_pwm = 0;
       right_pwm = 0;
+      LOG_INFO("Obstacle or Visited Cell! STATE -> TURN");
     } else {
-      // Determine if the next cell straight ahead is visited
-      int next_x = grid_x;
-      int next_y = grid_y;
-      if (heading == NORTH) next_y++;
-      else if (heading == SOUTH) next_y--;
-      else if (heading == EAST) next_x++;
-      else if (heading == WEST) next_x--;
-
-      bool front_visited = true; // Default to true if out of bounds
-      if (next_x >= 0 && next_x < 16 && next_y >= 0 && next_y < 16) {
-        front_visited = visited[next_x][next_y];
-      }
-
-      if ((dist_f <= 60 && dist_f > 0) || front_visited) {
-        // Stop if an obstacle is within 60mm OR the cell ahead is already visited
-        p5_state = 2; // Auto-turn
-        motor_stop();
-        left_pwm = 0;
-        right_pwm = 0;
-        LOG_INFO("Obstacle or Visited Cell! STATE -> TURN");
-      } else {
-      // Wall following PD-Controller
       // Wall following PD-Controller
       
       // Scale the error: For every 2mm of physical difference, the PID error increases by 1
@@ -877,6 +870,11 @@ void loop() {
     is_first_run = false; // Turn complete, use normal offsets now
     encoder_reset_all();  // Reset cells for the new corridor
     p5_state = 1;
+  } else if (p5_state == 3) {
+    // FINISHED State
+    motor_stop();
+    left_pwm = 0;
+    right_pwm = 0;
   }
 
   // Print sensor readings to Serial and OLED
