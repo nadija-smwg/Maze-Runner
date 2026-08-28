@@ -781,7 +781,7 @@ void loop() {
     // Window to ensure we ONLY turn when physically near the center of the cell, 
     // preventing early turns if sensors see ahead while still in the previous cell.
     float dist_into_cell = dist_traveled_mm - boundary_dist;
-    bool at_cell_center = (dist_into_cell >= 80.0f && dist_into_cell <= 110.0f);
+    bool at_cell_center = (dist_into_cell >= 90.0f && dist_into_cell <= 110.0f);
 
     bool front_wall = (dist_f <= 160 && dist_f > 0); // Detect front wall early
     bool emergency_stop = (dist_f <= 45 && dist_f > 0); // Hard stop to prevent crash
