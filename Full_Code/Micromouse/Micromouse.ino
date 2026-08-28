@@ -636,6 +636,9 @@ void loop() {
   static int heading = NORTH;
   static int last_cells = 0;
   static bool is_first_run = true;
+  
+  static bool visited[16][16] = {false};
+  static int total_visited = 0;
 
   static int p5_state = 0; // 0 = IDLE, 1 = DRIVE
   static int kp = 2;       // Steering power (reduced to stop oscillation)
@@ -665,6 +668,15 @@ void loop() {
         p5_state = 1;
         is_first_run = true;
         encoder_reset_all(); // Reset encoders when starting a run
+        
+        // Reset grid tracker
+        memset(visited, 0, sizeof(visited));
+        grid_x = 0;
+        grid_y = 0;
+        heading = NORTH;
+        visited[0][0] = true;
+        total_visited = 1;
+        
         LOG_INFO("STATE -> DRIVE");
       } else {
         p5_state = 0;
@@ -707,10 +719,36 @@ void loop() {
       else if (heading == WEST)
         grid_x--;
       last_cells = current_cells;
+
+      // Mark cell as visited
+      if (grid_x >= 0 && grid_x < 16 && grid_y >= 0 && grid_y < 16) {
+        if (!visited[grid_x][grid_y]) {
+          visited[grid_x][grid_y] = true;
+          total_visited++;
+        }
+      }
+
+      // Check if we hit 10 cells
+      if (total_visited >= 10) {
+        p5_state = 3; // FINISHED state
+        motor_stop();
+        left_pwm = 0;
+        right_pwm = 0;
+        LOG_INFO("10 Cells Reached! STATE -> FINISHED");
+      } else {
+        // Take a tiny 10ms stop each time a cell (180mm) is crossed
+        motor_stop();
+        delay(10);
+      }
     }
 
-    // Stop if an obstacle is within 60mm
-    if (dist_f <= 60 && dist_f > 0) {
+    if (p5_state == 3) {
+      // Do nothing, just stay stopped
+      motor_stop();
+      left_pwm = 0;
+      right_pwm = 0;
+    } else if (dist_f <= 60 && dist_f > 0) {
+      // Stop if an obstacle is within 60mm
       p5_state = 2; // Auto-turn
       motor_stop();
       left_pwm = 0;
@@ -720,8 +758,8 @@ void loop() {
       // Wall following PD-Controller
       // Wall following PD-Controller
       
-      // Scale the error: For every 3mm of physical difference, the PID error increases by 1
-      error = error / 3;
+      // Scale the error: For every 2mm of physical difference, the PID error increases by 1
+      error = error / 2;
 
       int d_error = error - prev_error;
       prev_error = error;
@@ -810,23 +848,52 @@ void loop() {
     } else if (p5_state == 1) {
       sprintf(buf, "DRV  | (%d,%d) %s", grid_x, grid_y, dir_str);
       oled_print(0, 0, buf);
-    } else {
+    } else if (p5_state == 2) {
       sprintf(buf, "TURN | (%d,%d) %s", grid_x, grid_y, dir_str);
+      oled_print(0, 0, buf);
+    } else if (p5_state == 3) {
+      sprintf(buf, "DONE! 10 Cells");
       oled_print(0, 0, buf);
     }
 
-    sprintf(buf, "F:%u L:%u", dist_f, dist_l);
-    oled_print(0, 15, buf);
+    if (p5_state == 3) {
+      // If finished, only show the map and some basic info
+      sprintf(buf, "Pos: (%d,%d)", grid_x, grid_y);
+      oled_print(0, 15, buf);
+      oled_print(0, 30, "Map ->");
+    } else {
+      // Normal driving info
+      sprintf(buf, "F:%u L:%u", dist_f, dist_l);
+      oled_print(0, 15, buf);
 
-    sprintf(buf, "R:%u Err:%d", dist_r, error);
-    oled_print(0, 30, buf);
+      sprintf(buf, "R:%u Err:%d", dist_r, error);
+      oled_print(0, 30, buf);
 
-    sprintf(buf, "P:%d D:%d", kp, kd);
-    oled_print(60, 45, buf); // Bottom right
+      sprintf(buf, "P:%d D:%d", kp, kd);
+      oled_print(60, 45, buf); // Bottom right
 
-    // Print motor speeds
-    sprintf(buf, "L:%d R:%d", left_pwm, right_pwm);
-    oled_print(0, 45, buf); // Bottom left
+      // Print motor speeds
+      sprintf(buf, "L:%d R:%d", left_pwm, right_pwm);
+      oled_print(0, 45, buf); // Bottom left
+    }
+
+    // Draw 16x16 Grid on the right side of the screen
+    for (int x = 0; x < 16; x++) {
+      for (int y = 0; y < 16; y++) {
+        if (visited[x][y]) {
+          // Bottom-left is (0,0). So OLED y should be inverted.
+          // Cell size 4x4. Placed starting at x=64 so it uses the right half.
+          int oled_x = 64 + (x * 4);
+          int oled_y = 60 - (y * 4); // 64 - 4 = 60 (top-left of the 4x4 rect)
+          
+          // Flash the current position if we are in state 3
+          if (p5_state == 3 && x == grid_x && y == grid_y && (millis() / 500) % 2 == 0) {
+            continue; // Blink
+          }
+          oled_fill_rect(oled_x, oled_y, 4, 4);
+        }
+      }
+    }
 
     oled_update();
   }

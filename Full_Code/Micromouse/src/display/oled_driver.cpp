@@ -39,6 +39,10 @@ void oled_print(uint8_t x, uint8_t y, const char* str) {
     _display.print(str);
 }
 
+void oled_fill_rect(uint8_t x, uint8_t y, uint8_t w, uint8_t h) {
+    _display.fillRect(x, y, w, h, SSD1306_WHITE);
+}
+
 void oled_draw_maze(void) {
     /** TODO: Implementation */
 }

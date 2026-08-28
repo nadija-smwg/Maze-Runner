@@ -31,6 +31,11 @@ void oled_update(void);
 void oled_print(uint8_t x, uint8_t y, const char* str);
 
 /**
+ * @brief Fill a rectangle on the display.
+ */
+void oled_fill_rect(uint8_t x, uint8_t y, uint8_t w, uint8_t h);
+
+/**
  * @brief Draw a mini map of the maze.
  */
 void oled_draw_maze(void);
