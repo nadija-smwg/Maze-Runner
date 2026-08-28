@@ -54,7 +54,6 @@
 #include "src/utils/logger.h"
 #include "src/utils/serial_debug.h"
 
-
 // Phase testing mode flags (set to 1 for active test mode)
 #define PHASE_1_TEST_MODE 0
 #define PHASE_2_TEST_MODE 0
@@ -721,7 +720,7 @@ void loop() {
       // Wall following PD-Controller
       int d_error = error - prev_error;
       prev_error = error;
-      
+
       int steering = 0;
       // Do not change motor speed if error is 0 (deadband)
       if (error != 0) {
@@ -737,7 +736,7 @@ void loop() {
   } else if (p5_state == 2) {
     // TURN State
     motor_stop();
-    delay(100); // Brief pause before turning
+    delay(200); // Brief pause before turning
 
     float target_angle = 90.0;
 
