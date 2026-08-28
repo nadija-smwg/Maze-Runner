@@ -639,8 +639,8 @@ void loop() {
   static bool is_first_run = true;
 
   static int p5_state = 0; // 0 = IDLE, 1 = DRIVE
-  static int kp = 3;       // Steering power (fixed for Phase 2)
-  static int kd = 0;       // Derivative damper (0 to 60)
+  static int kp = 2;       // Steering power (reduced to stop oscillation)
+  static int kd = 15;      // Derivative damper (acts as a brake to stop wobble)
   static int prev_error = 0;
 
   static uint32_t start_press_time = 0;
