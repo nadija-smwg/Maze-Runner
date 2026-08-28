@@ -723,8 +723,8 @@ void loop() {
       prev_error = error;
       
       int steering = 0;
-      // Do not change motor speed if error is -1, 0, or 1 (deadband)
-      if (error > 1 || error < -1) {
+      // Do not change motor speed if error is 0 (deadband)
+      if (error != 0) {
         steering = (kp * error) + (kd * d_error);
       }
 
