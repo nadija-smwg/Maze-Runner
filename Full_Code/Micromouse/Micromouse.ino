@@ -637,6 +637,8 @@ void loop() {
   static int last_cells = 0;
   static bool is_first_run = true;
   static float boundary_dist = 0.0f;
+  static bool cell_has_left = false;
+  static bool cell_has_right = false;
   
   static bool visited[16][16] = {false};
   static int total_visited = 0;
@@ -678,6 +680,8 @@ void loop() {
         visited[0][0] = true;
         total_visited = 1;
         boundary_dist = 0.0f;
+        cell_has_left = false;
+        cell_has_right = false;
         
         LOG_INFO("STATE -> DRIVE");
       } else {
@@ -713,6 +717,8 @@ void loop() {
     int current_cells = (int)((dist_traveled_mm + offset) / 180.0f);
     if (current_cells > last_cells) {
       boundary_dist = dist_traveled_mm;
+      cell_has_left = false;
+      cell_has_right = false;
       
       if (heading == NORTH)
         grid_y++;
@@ -772,7 +778,15 @@ void loop() {
     bool right_visited = true;
     if (right_x >= 0 && right_x < 16 && right_y >= 0 && right_y < 16) right_visited = visited[right_x][right_y];
 
-    bool has_unvisited_turn = ((dist_l > 150) && !left_visited) || ((dist_r > 150) && !right_visited);
+    float dist_into_cell = dist_traveled_mm - boundary_dist;
+
+    // Latch side openings if we see them anywhere near the center of the cell
+    if (dist_into_cell >= 60.0f && dist_into_cell <= 120.0f) {
+      if (dist_l > 150) cell_has_left = true;
+      if (dist_r > 150) cell_has_right = true;
+    }
+
+    bool has_unvisited_turn = (cell_has_left && !left_visited) || (cell_has_right && !right_visited);
 
     // Only treat a visited front cell as a wall if we ACTUALLY have an unvisited path to turn into.
     // Otherwise, just keep driving straight through the visited cells until we find a new path.
@@ -780,7 +794,6 @@ void loop() {
     
     // Window to ensure we ONLY turn when physically near the center of the cell, 
     // preventing early turns if sensors see ahead while still in the previous cell.
-    float dist_into_cell = dist_traveled_mm - boundary_dist;
     bool at_cell_center = (dist_into_cell >= 90.0f && dist_into_cell <= 110.0f);
 
     bool front_wall = (dist_f <= 160 && dist_f > 0); // Detect front wall early
@@ -834,8 +847,9 @@ void loop() {
     bool right_visited = true;
     if (right_x >= 0 && right_x < 16 && right_y >= 0 && right_y < 16) right_visited = visited[right_x][right_y];
     
-    bool can_go_left = (dist_l > 150);
-    bool can_go_right = (dist_r > 150);
+    // Use the latched values to prevent errors if the robot slid past the center!
+    bool can_go_left = cell_has_left;
+    bool can_go_right = cell_has_right;
 
     if (can_go_left && can_go_right) {
       // Intersection! Prioritize unvisited paths
@@ -901,6 +915,8 @@ void loop() {
     is_first_run = false; // Turn complete, use normal offsets now
     encoder_reset_all();  // Reset cells for the new corridor
     boundary_dist = -90.0f; // Since we are at the center, the boundary is conceptually 90mm behind us
+    cell_has_left = false;
+    cell_has_right = false;
     p5_state = 1;
   } else if (p5_state == 3) {
     // FINISHED State
