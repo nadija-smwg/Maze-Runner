@@ -618,22 +618,34 @@ void loop() {
 
   bool has_l = (dist_l < 150);
   bool has_r = (dist_r < 150);
-  bool has_fl = (dist_fl < 250); // Diagonals read longer distances
-  bool has_fr = (dist_fr < 250);
+  // Use FL and FR for PID only when they read more than 85mm (and less than 250mm to ignore open space)
+  bool has_fl = (dist_fl > 85 && dist_fl < 250);
+  bool has_fr = (dist_fr > 85 && dist_fr < 250);
 
   if (has_l && has_r) {
     // Both side walls present (Double wall following)
-    error = (int)dist_r - (int)dist_l;
+    int error_side = (int)dist_r - (int)dist_l;
     
-    // Add front diagonal sensors if they are also seeing walls!
     if (has_fl && has_fr) {
-      error += (int)dist_fr - (int)dist_fl;
+      int error_diag = (int)dist_fr - (int)dist_fl;
+      error = (error_side + error_diag) / 2; // Average the errors
+    } else {
+      error = error_side;
     }
   } else if (has_l) {
     // Only left wall present
     error = (TARGET_DIST - (int)dist_l) * 2;
     if (has_fl) {
-      error += (TARGET_DIAG - (int)dist_fl) * 2;
+      int error_diag = (TARGET_DIAG - (int)dist_fl) * 2;
+      error = (error + error_diag) / 2;
+    }
+  } else if (has_r) {
+    // Only right wall present
+    error = ((int)dist_r - TARGET_DIST) * 2;
+    if (has_fr) {
+      int error_diag = ((int)dist_fr - TARGET_DIAG) * 2;
+      error = (error + error_diag) / 2;
+    }
     }
   } else if (has_r) {
     // Only right wall present
@@ -797,11 +809,11 @@ void loop() {
 
     float dist_into_cell = dist_traveled_mm - boundary_dist;
 
-    // Latch side openings if we see them ANYWHERE in the cell before the center
+    // Latch side openings using the front-diagonal sensors!
     // This widened window prevents wheel-slip from causing missed openings!
     if (dist_into_cell >= 10.0f && dist_into_cell <= 150.0f) {
-      if (dist_l > 130) cell_has_left = true;
-      if (dist_r > 130) cell_has_right = true;
+      if (dist_fl > 150) cell_has_left = true;
+      if (dist_fr > 150) cell_has_right = true;
     }
 
     bool has_unvisited_turn = (cell_has_left && !left_visited) || (cell_has_right && !right_visited);
@@ -814,10 +826,11 @@ void loop() {
     // preventing early turns if sensors see ahead while still in the previous cell.
     bool at_cell_center = (dist_into_cell >= 90.0f && dist_into_cell <= 110.0f);
 
-    bool front_wall = (dist_f <= 160 && dist_f > 0); // Detect front wall early
+    // Precise front wall turn trigger based on multiple sensors!
+    bool front_wall = (dist_f < 60 && dist_f > 0) && (dist_fl < 85 && dist_fl > 0) && (dist_fr < 85 && dist_fr > 0);
     bool emergency_stop = (dist_f <= 45 && dist_f > 0); // Hard stop to prevent crash
 
-    if (((front_wall || force_virtual_turn) && at_cell_center) || emergency_stop) {
+    if ((force_virtual_turn && at_cell_center) || front_wall || emergency_stop) {
       // Stop exactly at the center if there is a wall or an unvisited turn!
       p5_state = 2; // Auto-turn
       motor_stop();
