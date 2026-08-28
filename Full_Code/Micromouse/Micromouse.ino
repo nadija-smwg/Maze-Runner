@@ -728,13 +728,13 @@ void loop() {
         }
       }
 
-      // Check if we hit 10 cells
-      if (total_visited >= 10) {
+      // Check if we hit 20 cells
+      if (total_visited >= 20) {
         p5_state = 3; // FINISHED state
         motor_stop();
         left_pwm = 0;
         right_pwm = 0;
-        LOG_INFO("10 Cells Reached! STATE -> FINISHED");
+        LOG_INFO("20 Cells Reached! STATE -> FINISHED");
       } else {
         // Take a tiny 10ms stop each time a cell (180mm) is crossed
         motor_stop();
@@ -747,14 +747,28 @@ void loop() {
       motor_stop();
       left_pwm = 0;
       right_pwm = 0;
-    } else if (dist_f <= 60 && dist_f > 0) {
-      // Stop if an obstacle is within 60mm
-      p5_state = 2; // Auto-turn
-      motor_stop();
-      left_pwm = 0;
-      right_pwm = 0;
-      LOG_INFO("Obstacle! STATE -> TURN");
     } else {
+      // Determine if the next cell straight ahead is visited
+      int next_x = grid_x;
+      int next_y = grid_y;
+      if (heading == NORTH) next_y++;
+      else if (heading == SOUTH) next_y--;
+      else if (heading == EAST) next_x++;
+      else if (heading == WEST) next_x--;
+
+      bool front_visited = true; // Default to true if out of bounds
+      if (next_x >= 0 && next_x < 16 && next_y >= 0 && next_y < 16) {
+        front_visited = visited[next_x][next_y];
+      }
+
+      if ((dist_f <= 60 && dist_f > 0) || front_visited) {
+        // Stop if an obstacle is within 60mm OR the cell ahead is already visited
+        p5_state = 2; // Auto-turn
+        motor_stop();
+        left_pwm = 0;
+        right_pwm = 0;
+        LOG_INFO("Obstacle or Visited Cell! STATE -> TURN");
+      } else {
       // Wall following PD-Controller
       // Wall following PD-Controller
       
@@ -783,22 +797,58 @@ void loop() {
 
     float target_angle = 90.0;
 
-    if (dist_l < 150 && dist_r < 150) {
+    // Check visited status of adjacent cells
+    int left_x = grid_x, left_y = grid_y;
+    int left_h = (heading + 3) % 4;
+    if (left_h == NORTH) left_y++; else if (left_h == SOUTH) left_y--; else if (left_h == EAST) left_x++; else if (left_h == WEST) left_x--;
+    bool left_visited = true;
+    if (left_x >= 0 && left_x < 16 && left_y >= 0 && left_y < 16) left_visited = visited[left_x][left_y];
+
+    int right_x = grid_x, right_y = grid_y;
+    int right_h = (heading + 1) % 4;
+    if (right_h == NORTH) right_y++; else if (right_h == SOUTH) right_y--; else if (right_h == EAST) right_x++; else if (right_h == WEST) right_x--;
+    bool right_visited = true;
+    if (right_x >= 0 && right_x < 16 && right_y >= 0 && right_y < 16) right_visited = visited[right_x][right_y];
+    
+    bool can_go_left = (dist_l > 150);
+    bool can_go_right = (dist_r > 150);
+
+    if (can_go_left && can_go_right) {
+      // Intersection! Prioritize unvisited paths
+      if (!left_visited && right_visited) {
+        heading = left_h;
+        LOG_INFO("Turning LEFT (Unvisited)");
+        motor_set_both(-900, 900);
+      } else if (left_visited && !right_visited) {
+        heading = right_h;
+        LOG_INFO("Turning RIGHT (Unvisited)");
+        motor_set_both(900, -900);
+      } else {
+        // Both unvisited or both visited. Default to the largest opening.
+        if (dist_l > dist_r) {
+          heading = left_h;
+          LOG_INFO("Turning LEFT (Tiebreaker)");
+          motor_set_both(-900, 900);
+        } else {
+          heading = right_h;
+          LOG_INFO("Turning RIGHT (Tiebreaker)");
+          motor_set_both(900, -900);
+        }
+      }
+    } else if (can_go_left) {
+      heading = left_h;
+      LOG_INFO("Turning LEFT");
+      motor_set_both(-900, 900);
+    } else if (can_go_right) {
+      heading = right_h;
+      LOG_INFO("Turning RIGHT");
+      motor_set_both(900, -900);
+    } else {
       // Dead End! Walls on both sides -> Turn 180 degrees
       heading = (heading + 2) % 4; // U-Turn
       LOG_INFO("DEAD END! Turning 180 degrees");
       motor_set_both(900, -900); // Pivot Right
       target_angle = 180.0;
-    } else if (dist_l > dist_r) {
-      // Left side has the massive spike (opening) -> Turn Left
-      heading = (heading + 3) % 4; // Fast CCW math
-      LOG_INFO("Turning LEFT 90 degrees");
-      motor_set_both(-900, 900); // Pivot Left
-    } else {
-      // Right side has the massive spike -> Turn Right
-      heading = (heading + 1) % 4; // Fast CW math
-      LOG_INFO("Turning RIGHT 90 degrees");
-      motor_set_both(900, -900); // Pivot Right
     }
 
     // Gyroscope tracking loop
@@ -852,7 +902,7 @@ void loop() {
       sprintf(buf, "TURN | (%d,%d) %s", grid_x, grid_y, dir_str);
       oled_print(0, 0, buf);
     } else if (p5_state == 3) {
-      sprintf(buf, "DONE! 10 Cells");
+      sprintf(buf, "DONE! 20 Cells");
       oled_print(0, 0, buf);
     }
 
