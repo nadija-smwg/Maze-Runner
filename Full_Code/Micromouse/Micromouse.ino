@@ -611,21 +611,36 @@ void loop() {
   uint16_t dist_fr = distance_get_mm(TOF_FRONT_RIGHT);
 
   // Calculate Centering Error
-  // If pushed to the left wall, L decreases, R increases -> Error becomes
-  // positive.
-  int TARGET_DIST =
-      45; // mm (Target distance from a single wall when perfectly centered)
+  // If pushed to the left wall, L decreases, R increases -> Error becomes positive.
+  int TARGET_DIST = 45; // mm (Target distance from a single side wall)
+  int TARGET_DIAG = 65; // mm (Target distance from a single diagonal wall)
   int error = 0;
 
-  if (dist_l < 150 && dist_r < 150) {
-    // Both walls present (Double wall following)
+  bool has_l = (dist_l < 150);
+  bool has_r = (dist_r < 150);
+  bool has_fl = (dist_fl < 250); // Diagonals read longer distances
+  bool has_fr = (dist_fr < 250);
+
+  if (has_l && has_r) {
+    // Both side walls present (Double wall following)
     error = (int)dist_r - (int)dist_l;
-  } else if (dist_l < 150) {
+    
+    // Add front diagonal sensors if they are also seeing walls!
+    if (has_fl && has_fr) {
+      error += (int)dist_fr - (int)dist_fl;
+    }
+  } else if (has_l) {
     // Only left wall present
     error = (TARGET_DIST - (int)dist_l) * 2;
-  } else if (dist_r < 150) {
+    if (has_fl) {
+      error += (TARGET_DIAG - (int)dist_fl) * 2;
+    }
+  } else if (has_r) {
     // Only right wall present
     error = ((int)dist_r - TARGET_DIST) * 2;
+    if (has_fr) {
+      error += ((int)dist_fr - TARGET_DIAG) * 2;
+    }
   } else {
     // NO walls! Drive straight
     error = 0;
@@ -821,9 +836,10 @@ void loop() {
         steering = (kp * error) + (kd * d_error);
       }
 
-      // Fixed steering polarity
-      left_pwm = 950 - steering;
-      right_pwm = 950 + steering;
+      // Fixed steering polarity! Positive error means too close to LEFT wall.
+      // So if error > 0, we must steer RIGHT (left wheel faster, right wheel slower).
+      left_pwm = 950 + steering;
+      right_pwm = 950 - steering;
 
       motor_set_both(left_pwm, right_pwm);
     }
