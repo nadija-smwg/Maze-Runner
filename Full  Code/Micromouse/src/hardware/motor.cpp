@@ -12,6 +12,9 @@
 #include "motor.h"
 #include "pwm.h"
 #include "gpio.h"
+#include "encoder.h"
+#include "../config/robot_config.h"
+#include <math.h>
 
 /* ═══════════════════════════════════════════════════════════════════════════
  *  Private State
@@ -104,4 +107,49 @@ void motor_turn_left(uint16_t pwm) {
 
 void motor_turn_right(uint16_t pwm) {
     motor_set_both((int16_t)pwm, -((int16_t)pwm));
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+ *  Dead-zone Compensation
+ * ═══════════════════════════════════════════════════════════════════════════ */
+
+void motor_set_speed_compensated(MotorID motor, int16_t pwm) {
+    if (pwm == 0) {
+        motor_set_speed(motor, 0);
+        return;
+    }
+
+    int16_t dead = (motor == MOTOR_LEFT) ?
+                   (int16_t)LEFT_MOTOR_DEAD_PWM :
+                   (int16_t)RIGHT_MOTOR_DEAD_PWM;
+
+    /* Add dead-zone in the direction of the requested PWM */
+    if (pwm > 0)
+        pwm = pwm + dead;
+    else
+        pwm = pwm - dead;
+
+    motor_set_speed(motor, pwm);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+ *  Stall Detection
+ * ═══════════════════════════════════════════════════════════════════════════ */
+
+/** PWM magnitude that must be exceeded before stall detection is active. */
+#define STALL_PWM_THRESHOLD         800
+
+/** Speed below which stall is flagged (mm/s). */
+#define STALL_SPEED_THRESHOLD_MMS   20.0f
+
+bool motor_is_stalled(MotorID motor, int16_t cmd_pwm) {
+    if (cmd_pwm < 0) cmd_pwm = -cmd_pwm;
+
+    if (cmd_pwm < (int16_t)STALL_PWM_THRESHOLD)
+        return false;
+
+    float speed = encoder_get_speed_mms(motor == MOTOR_LEFT ?
+                                        ENCODER_LEFT : ENCODER_RIGHT);
+
+    return (fabsf(speed) < STALL_SPEED_THRESHOLD_MMS);
 }

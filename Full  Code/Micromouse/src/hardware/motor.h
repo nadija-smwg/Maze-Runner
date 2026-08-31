@@ -152,4 +152,39 @@ void motor_turn_left(uint16_t pwm);
  */
 void motor_turn_right(uint16_t pwm);
 
+/* ═══════════════════════════════════════════════════════════════════════════
+ *  Dead-zone Compensation & Diagnostics
+ * ═══════════════════════════════════════════════════════════════════════════ */
+
+/**
+ * @brief Set motor speed with dead-zone compensation.
+ *
+ * Adds LEFT_MOTOR_DEAD_PWM / RIGHT_MOTOR_DEAD_PWM (from robot_config.h)
+ * in the direction of motion so the motor overcomes static friction
+ * immediately. Zero input still brakes cleanly.
+ *
+ * Use this instead of motor_set_speed() when the velocity controller
+ * is providing a corrective output on top of feed-forward.
+ *
+ * @param motor Motor identifier
+ * @param pwm   Signed corrective PWM (-PWM_MAX to PWM_MAX). 0 = brake.
+ */
+void motor_set_speed_compensated(MotorID motor, int16_t pwm);
+
+/**
+ * @brief Check if a motor is stalled.
+ *
+ * Returns true when the commanded PWM is high but the measured speed
+ * is near zero — indicating a blocked wheel or disconnected encoder.
+ *
+ * @param motor   Motor identifier
+ * @param cmd_pwm Absolute magnitude of currently commanded PWM
+ * @return        true if stall detected
+ *
+ * Thresholds:
+ *   PWM must exceed 800 (STALL_PWM_THRESHOLD)
+ *   Speed must be below 20 mm/s (STALL_SPEED_THRESHOLD_MMS)
+ */
+bool motor_is_stalled(MotorID motor, int16_t cmd_pwm);
+
 #endif /* MOTOR_H */

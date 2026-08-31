@@ -52,8 +52,8 @@
 
 // Phase testing mode flags (set to 1 for active test mode)
 #define PHASE_1_TEST_MODE 0
-#define PHASE_2_TEST_MODE 0
-#define PHASE_3_TEST_MODE 1
+#define PHASE_2_TEST_MODE 1
+#define PHASE_3_TEST_MODE 0
 
 #if PHASE_1_TEST_MODE == 1
 volatile uint32_t phase1_timer_ticks = 0;
@@ -208,9 +208,16 @@ void setup() {
   // to change I2C addresses dynamically.
   sensor_manager_init();
 
-  // Optional Gyro Calibration Phase (from plan)
-  LOG_INFO("Calibrating Gyro - Keep Robot Still");
-  // calibrateGyro(); // Assume integrated in fusion_init or sensor_manager
+  /*
+   * Competition Boot Sequence:
+   *   1. 90-second warm-up countdown on OLED (sensor reaches stable temp)
+   *   2. Auto-calibrate at end of warm-up
+   *   3. OLED shows "READY" → press BTN_START to begin run
+   *
+   * Press BTN_START during countdown to skip warm-up and calibrate now.
+   * (Use this if the robot was already warm from a previous run.)
+   */
+  calibrate_with_warmup(90);
 
   // Hardware I2C Watchdog Setup (from plan)
   // setupWatchdog();
@@ -335,6 +342,18 @@ void loop() {
     led_toggle(LED_STATUS);
   }
 
+  /*
+   * Test 3.2 — Velocity filter update.
+   * Call encoder_update_velocity() at 50ms (20 Hz) as a proxy for the
+   * 1kHz control loop. This is fast enough to see the LPF smoothing.
+   * dt = 0.05s (50ms period).
+   */
+  static uint32_t last_vel_update = 0;
+  if ((phase2_timer_ticks - last_vel_update) >= 50) {
+    last_vel_update = phase2_timer_ticks;
+    encoder_update_velocity(0.05f);
+  }
+
   static uint32_t last_enc_print = 0;
   if ((phase2_timer_ticks - last_enc_print) >= 500) {
     last_enc_print = phase2_timer_ticks;
@@ -345,42 +364,48 @@ void loop() {
     float l_mm = encoder_counts_to_mm(l_cnt);
     float r_mm = encoder_counts_to_mm(r_cnt);
 
-    // 2. Get deltas to calculate speed
-    // This block runs every 500ms (0.5s), so multiply delta by 2 for counts_per_sec
+    // 2. Old raw speed (delta / 0.5s) — for comparison
     int32_t l_delta = encoder_get_delta(ENCODER_LEFT);
     int32_t r_delta = encoder_get_delta(ENCODER_RIGHT);
-    
-    float l_speed = encoder_counts_to_speed(l_delta * 2.0f);
-    float r_speed = encoder_counts_to_speed(r_delta * 2.0f);
+    float l_speed_raw = encoder_counts_to_speed(l_delta * 2.0f);
+    float r_speed_raw = encoder_counts_to_speed(r_delta * 2.0f);
 
-    // Update OLED
+    // 3. New LPF-filtered speed — Test 3.2
+    float l_speed_filt = encoder_get_speed_mms(ENCODER_LEFT);
+    float r_speed_filt = encoder_get_speed_mms(ENCODER_RIGHT);
+    float l_dist_filt  = encoder_get_distance_mm(ENCODER_LEFT);
+    float r_dist_filt  = encoder_get_distance_mm(ENCODER_RIGHT);
+
+    // Update OLED — show filtered speed
     char buf[32];
     oled_clear();
     oled_print(0, 0, "- Phase 2 Test -");
-    
-    sprintf(buf, "Spd L: %.1f mm/s", l_speed);
+
+    sprintf(buf, "L: %.1f mm/s", l_speed_filt);
     oled_print(0, 15, buf);
-    
-    sprintf(buf, "Spd R: %.1f mm/s", r_speed);
+
+    sprintf(buf, "R: %.1f mm/s", r_speed_filt);
     oled_print(0, 25, buf);
-    
-    sprintf(buf, "Cnt L:%ld R:%ld", l_cnt, r_cnt);
+
+    sprintf(buf, "dL:%.0f dR:%.0f mm", l_dist_filt, r_dist_filt);
     oled_print(0, 40, buf);
-    
-    sprintf(buf, "Dst L:%.0f R:%.0f", l_mm, r_mm);
+
+    sprintf(buf, "Bat: %u mV", battery_get_voltage_mv());
     oled_print(0, 50, buf);
-    
+
     oled_update();
 
-    Serial.print("[Phase 2 2Hz] L: ");
-    Serial.print(l_mm, 1);
-    Serial.print("mm, ");
-    Serial.print(l_speed, 1);
-    Serial.print("mm/s | R: ");
-    Serial.print(r_mm, 1);
-    Serial.print("mm, ");
-    Serial.print(r_speed, 1);
-    Serial.println("mm/s");
+    // Serial — raw vs filtered comparison
+    Serial.print("[Phase 2 2Hz]");
+    Serial.print(" L_raw:");    Serial.print(l_speed_raw,  1);
+    Serial.print(" L_filt:");   Serial.print(l_speed_filt, 1);
+    Serial.print(" mm/s");
+    Serial.print(" | R_raw:");  Serial.print(r_speed_raw,  1);
+    Serial.print(" R_filt:");   Serial.print(r_speed_filt, 1);
+    Serial.print(" mm/s");
+    Serial.print(" | DistL:");  Serial.print(l_dist_filt,  0);
+    Serial.print(" DistR:");    Serial.print(r_dist_filt,  0);
+    Serial.println(" mm");
   }
 
   delay(5);
@@ -392,8 +417,8 @@ void loop() {
   led_update();
 
   if (button_just_pressed(BUTTON_START)) {
-      LOG_INFO("Re-calibrating Gyro...");
-      calibrate_all();
+      LOG_INFO("Re-calibrating Gyro (no warm-up)...");
+      calibrate_with_warmup(0);  /* 0 = skip warm-up, calibrate immediately */
   }
   
   if (button_just_pressed(BUTTON_MODE)) {
@@ -407,8 +432,15 @@ void loop() {
       
       sensor_manager_update();
       
-      IMUScaledData imu;
-      mpu6050_read_scaled(&imu);
+      // Use the new EMA filter (dt = 0.1s for 10Hz)
+      mpu6050_set_stationary(true); // Tell filter robot is not moving
+      mpu6050_update_filter(0.1f);
+      
+      IMUScaledData imu_filt;
+      mpu6050_get_filtered(&imu_filt);
+      
+      IMUScaledData imu_raw;
+      mpu6050_read_scaled(&imu_raw);
       
       uint16_t dist_f = distance_get_mm(TOF_FRONT);
       uint16_t dist_fl = distance_get_mm(TOF_FRONT_LEFT);
@@ -426,8 +458,8 @@ void loop() {
       sprintf(buf, "L:%u R:%u", dist_l, dist_r);
       oled_print(0, 25, buf);
       
-      String gyroStr = String(imu.gyro_z_dps, 1);
-      sprintf(buf, "GyroZ: %s deg/s", gyroStr.c_str());
+      String gyroStr = String(imu_filt.gyro_z_dps, 1);
+      sprintf(buf, "GzFilt: %s dps", gyroStr.c_str());
       oled_print(0, 40, buf);
       
       sprintf(buf, "Bat: %u mV", battery_get_voltage_mv());
@@ -445,17 +477,14 @@ void loop() {
       Serial.print(dist_l);
       Serial.print(" R:");
       Serial.print(dist_r);
-      Serial.print(" | Gz:");
-      Serial.print(imu.gyro_z_dps, 1);
+      Serial.print(" | GzRaw:");
+      Serial.print(imu_raw.gyro_z_dps, 1);
+      Serial.print(" | GzFilt:");
+      Serial.print(imu_filt.gyro_z_dps, 2);
       Serial.print(" | Bat:");
       Serial.print(battery_get_voltage_mv());
       Serial.print(" | BiasZ:");
-      Serial.print(mpu6050_get_gyro_bias_z(), 1);
-      
-      IMURawData raw;
-      mpu6050_read_raw(&raw);
-      Serial.print(" | RawZ:");
-      Serial.println(raw.gyro_z);
+      Serial.println(mpu6050_get_gyro_bias_z(), 1);
   }
 
   delay(5);

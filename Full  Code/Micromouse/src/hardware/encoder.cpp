@@ -20,6 +20,18 @@ static int32_t _last_left_count  = 0;
 static int32_t _last_right_count = 0;
 
 /* ═══════════════════════════════════════════════════════════════════════════
+ *  Private Velocity State
+ * ═══════════════════════════════════════════════════════════════════════════ */
+
+/** LPF-smoothed counts per second for each wheel. */
+static float _left_filtered_cps  = 0.0f;
+static float _right_filtered_cps = 0.0f;
+
+/** Total accumulated distance per wheel (mm, signed). */
+static float _left_distance_mm   = 0.0f;
+static float _right_distance_mm  = 0.0f;
+
+/* ═══════════════════════════════════════════════════════════════════════════
  *  Initialization
  * ═══════════════════════════════════════════════════════════════════════════ */
 
@@ -167,6 +179,10 @@ void encoder_reset_all(void) {
     TIM3->CNT = 0;
     _last_left_count  = 0;
     _last_right_count = 0;
+    _left_filtered_cps  = 0.0f;
+    _right_filtered_cps = 0.0f;
+    _left_distance_mm   = 0.0f;
+    _right_distance_mm  = 0.0f;
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
@@ -183,4 +199,49 @@ float encoder_counts_to_speed(float counts_per_sec) {
 
 float encoder_counts_to_rpm(float counts_per_sec) {
     return (counts_per_sec * 60.0f) / ENCODER_CPR;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+ *  Velocity Filter
+ * ═══════════════════════════════════════════════════════════════════════════ */
+
+void encoder_update_velocity(float dt) {
+    if (dt <= 0.0f) return;
+
+    /* Read direction-corrected deltas (sign already applied inside get_delta) */
+    int32_t dL = encoder_get_delta(ENCODER_LEFT);
+    int32_t dR = encoder_get_delta(ENCODER_RIGHT);
+
+    /* Instantaneous counts per second */
+    float raw_cps_L = (float)dL / dt;
+    float raw_cps_R = (float)dR / dt;
+
+    /* LPF: filtered = filtered + alpha * (raw - filtered) */
+    _left_filtered_cps  += VELOCITY_LPF_ALPHA * (raw_cps_L - _left_filtered_cps);
+    _right_filtered_cps += VELOCITY_LPF_ALPHA * (raw_cps_R - _right_filtered_cps);
+
+    /* Accumulate signed distance (mm) */
+    _left_distance_mm  += (float)dL * LEFT_MM_PER_COUNT;
+    _right_distance_mm += (float)dR * RIGHT_MM_PER_COUNT;
+}
+
+float encoder_get_speed_mms(EncoderID enc) {
+    if (enc == ENCODER_LEFT)
+        return _left_filtered_cps  * LEFT_MM_PER_COUNT;
+    else
+        return _right_filtered_cps * RIGHT_MM_PER_COUNT;
+}
+
+float encoder_get_rpm(EncoderID enc) {
+    if (enc == ENCODER_LEFT)
+        return (_left_filtered_cps  * 60.0f) / LEFT_ENCODER_CPR;
+    else
+        return (_right_filtered_cps * 60.0f) / RIGHT_ENCODER_CPR;
+}
+
+float encoder_get_distance_mm(EncoderID enc) {
+    if (enc == ENCODER_LEFT)
+        return _left_distance_mm;
+    else
+        return _right_distance_mm;
 }

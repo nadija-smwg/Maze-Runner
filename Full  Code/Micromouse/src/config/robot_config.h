@@ -60,6 +60,75 @@
 /** @} */ // end WheelGeometry
 
 /* ═══════════════════════════════════════════════════════════════════════════
+ *  Per-Wheel Calibration Constants
+ *
+ *  The LEFT/RIGHT variants allow independent calibration of each wheel,
+ *  which is important because:
+ *    - Gearboxes have slight variations even from the same batch
+ *    - Wheel diameters differ due to print tolerances / tire compression
+ *    - Motor windings vary slightly in resistance
+ *
+ *  Calibration procedure:
+ *    CPR:      Lift robot. Mark wheel. Hand-rotate 10 full revolutions.
+ *              CPR = encoder_count / 10
+ *    Diameter: Drive N known revolutions on flat surface. Measure actual
+ *              distance. diameter = distance / (N * π)
+ *    Dead-zone: Slowly increase PWM from 0 until wheel starts moving.
+ *
+ *  TODO: Fill in all four values after running calibration procedure.
+ * ═══════════════════════════════════════════════════════════════════════════ */
+
+/** @defgroup PerWheelCalib Per-Wheel Calibration
+ *  @{
+ */
+
+/** Left wheel counts per revolution (measured). Default = theoretical. */
+#define LEFT_ENCODER_CPR        (ENCODER_PPR * GEAR_RATIO * ENCODER_QUADRATURE)
+
+/** Right wheel counts per revolution (measured). Default = theoretical. */
+#define RIGHT_ENCODER_CPR       (ENCODER_PPR * GEAR_RATIO * ENCODER_QUADRATURE)
+
+/** Left wheel effective outer diameter (mm). TODO: Calibrate. */
+#define LEFT_WHEEL_DIAMETER_MM  34.0f
+
+/** Right wheel effective outer diameter (mm). TODO: Calibrate. */
+#define RIGHT_WHEEL_DIAMETER_MM 34.0f
+
+/** Left wheel circumference (mm) — derived. */
+#define LEFT_WHEEL_CIRC_MM      (3.14159265f * LEFT_WHEEL_DIAMETER_MM)
+
+/** Right wheel circumference (mm) — derived. */
+#define RIGHT_WHEEL_CIRC_MM     (3.14159265f * RIGHT_WHEEL_DIAMETER_MM)
+
+/** Left wheel distance per count (mm/count) — derived. */
+#define LEFT_MM_PER_COUNT       (LEFT_WHEEL_CIRC_MM  / LEFT_ENCODER_CPR)
+
+/** Right wheel distance per count (mm/count) — derived. */
+#define RIGHT_MM_PER_COUNT      (RIGHT_WHEEL_CIRC_MM / RIGHT_ENCODER_CPR)
+
+/**
+ * Minimum PWM to overcome static friction on the left motor.
+ * Below this value the motor won't move at all.
+ * TODO: Increase from 0 in steps of 10 until wheel just starts moving.
+ */
+#define LEFT_MOTOR_DEAD_PWM     0
+
+/**
+ * Minimum PWM to overcome static friction on the right motor.
+ * TODO: Measure separately — motors differ even from the same batch.
+ */
+#define RIGHT_MOTOR_DEAD_PWM    0
+
+/**
+ * EMA coefficient for encoder velocity filtering.
+ * 0.25 = moderate smoothing; increase toward 1.0 for less filtering.
+ * Recommended starting range: 0.20 – 0.35
+ */
+#define VELOCITY_LPF_ALPHA      0.25f
+
+/** @} */ // end PerWheelCalib
+
+/* ═══════════════════════════════════════════════════════════════════════════
  *  Robot Chassis Geometry
  * ═══════════════════════════════════════════════════════════════════════════ */
 

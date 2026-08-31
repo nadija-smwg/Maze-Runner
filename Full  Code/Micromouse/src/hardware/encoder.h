@@ -134,4 +134,48 @@ float encoder_counts_to_speed(float counts_per_sec);
  */
 float encoder_counts_to_rpm(float counts_per_sec);
 
+/* ═══════════════════════════════════════════════════════════════════════════
+ *  Velocity Filter API
+ * ═══════════════════════════════════════════════════════════════════════════ */
+
+/**
+ * @brief Update encoder velocity filters for both wheels.
+ *
+ * Reads encoder deltas, computes instantaneous counts-per-second, applies
+ * the LPF (VELOCITY_LPF_ALPHA from robot_config.h), and accumulates
+ * total distance for each wheel.
+ *
+ * Call this at a fixed rate (e.g. every 1 ms at the 1 kHz control loop).
+ *
+ * @param dt  Time step in seconds (e.g., 0.001f for 1 kHz)
+ */
+void encoder_update_velocity(float dt);
+
+/**
+ * @brief Get the filtered wheel speed in mm/s.
+ *
+ * Returns the LPF-smoothed speed from the last encoder_update_velocity() call.
+ * Positive = forward, negative = reverse.
+ *
+ * @param enc  ENCODER_LEFT or ENCODER_RIGHT
+ * @return     Filtered speed in mm/s
+ */
+float encoder_get_speed_mms(EncoderID enc);
+
+/**
+ * @brief Get the filtered wheel speed in RPM.
+ *
+ * @param enc  ENCODER_LEFT or ENCODER_RIGHT
+ * @return     Filtered motor shaft RPM
+ */
+float encoder_get_rpm(EncoderID enc);
+
+/**
+ * @brief Get total distance accumulated since last encoder_reset().
+ *
+ * @param enc  ENCODER_LEFT or ENCODER_RIGHT
+ * @return     Distance traveled in mm (signed, positive = forward)
+ */
+float encoder_get_distance_mm(EncoderID enc);
+
 #endif /* ENCODER_H */
