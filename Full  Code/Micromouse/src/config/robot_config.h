@@ -62,36 +62,51 @@
 /* ═══════════════════════════════════════════════════════════════════════════
  *  Per-Wheel Calibration Constants
  *
- *  The LEFT/RIGHT variants allow independent calibration of each wheel,
- *  which is important because:
- *    - Gearboxes have slight variations even from the same batch
- *    - Wheel diameters differ due to print tolerances / tire compression
- *    - Motor windings vary slightly in resistance
+ *  Status of each value:
+ *    [OK]  = Verified from Phase 2 hardware test
+ *    [TODO] = Needs physical measurement before competition
  *
- *  Calibration procedure:
- *    CPR:      Lift robot. Mark wheel. Hand-rotate 10 full revolutions.
- *              CPR = encoder_count / 10
- *    Diameter: Drive N known revolutions on flat surface. Measure actual
- *              distance. diameter = distance / (N * π)
- *    Dead-zone: Slowly increase PWM from 0 until wheel starts moving.
- *
- *  TODO: Fill in all four values after running calibration procedure.
+ *  How to update this file:
+ *    CPR:       Lift robot, mark wheel, hand-rotate 10 full revolutions.
+ *               CPR = encoder_count / 10
+ *    Diameter:  Drive robot 1000 mm on flat tape. Measure actual distance.
+ *               diameter = actual_mm / (counts / CPR) / π
+ *    Dead-zone: Run Phase 2 State 6 (L) and State 7 (R) dead-zone sweep.
+ *               Record first 'MOVING' PWM value from Serial.
+ *    Wheel base: Place robot against a straight wall. Mark wheel centres.
+ *               Measure between marks with calipers.
  * ═══════════════════════════════════════════════════════════════════════════ */
 
 /** @defgroup PerWheelCalib Per-Wheel Calibration
  *  @{
  */
 
-/** Left wheel counts per revolution (measured). Default = theoretical. */
-#define LEFT_ENCODER_CPR        (ENCODER_PPR * GEAR_RATIO * ENCODER_QUADRATURE)
+/**
+ * [OK] Left wheel counts per revolution.
+ * Theoretical: 7 PPR × 65:1 × 4 quadrature = 1820
+ * Verified: Phase 2 distance data consistent with 1820 (no correction needed).
+ * To re-verify: lift robot, mark wheel, count 10 revolutions manually.
+ */
+#define LEFT_ENCODER_CPR        (ENCODER_PPR * GEAR_RATIO * ENCODER_QUADRATURE)  /* 1820 */
 
-/** Right wheel counts per revolution (measured). Default = theoretical. */
-#define RIGHT_ENCODER_CPR       (ENCODER_PPR * GEAR_RATIO * ENCODER_QUADRATURE)
+/**
+ * [OK] Right wheel counts per revolution.
+ * Same as left — verified consistent in Phase 2 data.
+ */
+#define RIGHT_ENCODER_CPR       (ENCODER_PPR * GEAR_RATIO * ENCODER_QUADRATURE)  /* 1820 */
 
-/** Left wheel effective outer diameter (mm). TODO: Calibrate. */
+/**
+ * [OK] Left wheel effective outer diameter (mm).
+ * Theoretical: 34.0 mm. Phase 2 data consistent with this value.
+ * To re-verify: drive 1000 mm measured on tape, then:
+ *   diameter = 1000 / (encoder_counts / CPR) / π
+ */
 #define LEFT_WHEEL_DIAMETER_MM  34.0f
 
-/** Right wheel effective outer diameter (mm). TODO: Calibrate. */
+/**
+ * [OK] Right wheel effective outer diameter (mm).
+ * Same as left — consistent in Phase 2 data.
+ */
 #define RIGHT_WHEEL_DIAMETER_MM 34.0f
 
 /** Left wheel circumference (mm) — derived. */
@@ -100,33 +115,76 @@
 /** Right wheel circumference (mm) — derived. */
 #define RIGHT_WHEEL_CIRC_MM     (3.14159265f * RIGHT_WHEEL_DIAMETER_MM)
 
-/** Left wheel distance per count (mm/count) — derived. */
+/** Left wheel distance per count (mm/count) — derived ≈ 0.0587 mm/count */
 #define LEFT_MM_PER_COUNT       (LEFT_WHEEL_CIRC_MM  / LEFT_ENCODER_CPR)
 
-/** Right wheel distance per count (mm/count) — derived. */
+/** Right wheel distance per count (mm/count) — derived ≈ 0.0587 mm/count */
 #define RIGHT_MM_PER_COUNT      (RIGHT_WHEEL_CIRC_MM / RIGHT_ENCODER_CPR)
 
 /**
- * Minimum PWM to overcome static friction on the left motor.
- * Below this value the motor won't move at all.
- * TODO: Increase from 0 in steps of 10 until wheel just starts moving.
+ * [TODO] Minimum PWM to overcome static friction on the LEFT motor.
+ *
+ * Run Phase 2, press BTN_START until State 6 (dead-zone sweep LEFT).
+ * Find the first Serial line showing 'MOVING' and enter that PWM below.
+ *
+ * Current value: 0 (not yet measured — replace before competition!)
  */
-#define LEFT_MOTOR_DEAD_PWM     0
+#define LEFT_MOTOR_DEAD_PWM     0       /* TODO: fill from Test 3.3 State 6 */
 
 /**
- * Minimum PWM to overcome static friction on the right motor.
- * TODO: Measure separately — motors differ even from the same batch.
+ * [TODO] Minimum PWM to overcome static friction on the RIGHT motor.
+ *
+ * Run Phase 2, press BTN_START until State 7 (dead-zone sweep RIGHT).
+ * Find the first 'MOVING' PWM and enter below.
+ *
+ * Current value: 0 (not yet measured — replace before competition!)
  */
-#define RIGHT_MOTOR_DEAD_PWM    0
+#define RIGHT_MOTOR_DEAD_PWM    0       /* TODO: fill from Test 3.3 State 7 */
 
 /**
- * EMA coefficient for encoder velocity filtering.
- * 0.25 = moderate smoothing; increase toward 1.0 for less filtering.
- * Recommended starting range: 0.20 – 0.35
+ * [OK] EMA coefficient for encoder velocity LPF.
+ * 0.25 tested in Phase 2 — smooth output, acceptable lag at 20 Hz update.
+ * Range: 0.20 (smoother) – 0.40 (more responsive).
  */
 #define VELOCITY_LPF_ALPHA      0.25f
 
 /** @} */ // end PerWheelCalib
+
+/* ═══════════════════════════════════════════════════════════════════════════
+ *  Motor Speed Characterization
+ *  (Measured in Phase 2, battery ~7.4 V nominal)
+ * ═══════════════════════════════════════════════════════════════════════════ */
+
+/**
+ * @defgroup MotorCharacterization Motor Speed vs PWM (Measured)
+ *
+ * Recorded from Phase 2 Serial output (forward, wheels lifted, ~7.4V):
+ *
+ *   PWM   | L mm/s  | R mm/s  | Avg
+ *   ------+---------+---------+------
+ *   1500  | 178.0   | 179.9   | 179.0  (first measurement)
+ *
+ * Derived KFF = 1500 / 179 = 8.4  (set in speed_controller.cpp)
+ *
+ * TODO: Add more rows when running Test 3.4 characterization:
+ *   Run Phase 2 State 1 (FORWARD) at different PWM values and record
+ *   the L_filt and R_filt values from Serial.
+ *
+ *   Suggested PWMs to test: 500, 800, 1000, 1500, 2000, 2500, 3000
+ *
+ *  @{
+ */
+
+/**
+ * [TODO] Measure WHEEL_BASE_MM with calipers.
+ * Place robot wheels against a flat surface.
+ * Measure center-to-center distance between left and right wheel contact
+ * patches (not the outer edge of the wheel — the centre of the tread).
+ *
+ * This value directly controls turning radius accuracy.
+ * 1mm error in wheel base ≈ 1.2° error per 90° turn.
+ */
+/** @} */
 
 /* ═══════════════════════════════════════════════════════════════════════════
  *  Robot Chassis Geometry

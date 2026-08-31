@@ -304,9 +304,12 @@ void loop() {
   button_update();
   led_update();
 
-  static int test_state = 0;
+  static int      test_state = 0;
+  static uint16_t dz_pwm     = 150;   /* dead-zone sweep current PWM */
+  static uint32_t last_dz    = 0;     /* dead-zone sweep timer       */
+
   if (button_just_pressed(BUTTON_START)) {
-    test_state = (test_state + 1) % 6;
+    test_state = (test_state + 1) % 8;
     switch (test_state) {
     case 0:
       motor_stop();
@@ -332,8 +335,77 @@ void loop() {
       motor_stop();
       LOG_INFO("[State 5] Motors STOPPED.");
       break;
+    case 6:
+      motor_stop();
+      dz_pwm  = 150;
+      last_dz = phase2_timer_ticks;
+      Serial.println();
+      Serial.println("=== TEST 3.3: DEAD-ZONE SWEEP (LEFT motor) ===");
+      Serial.println("PWM ramps 150 -> 650 every 1.5 sec.");
+      Serial.println("Find FIRST line showing 'MOVING' and record that PWM.");
+      Serial.println("Update LEFT_MOTOR_DEAD_PWM in robot_config.h.");
+      LOG_INFO("[State 6] Dead-Zone Sweep: LEFT motor only.");
+      break;
+    case 7:
+      motor_stop();
+      dz_pwm  = 150;
+      last_dz = phase2_timer_ticks;
+      Serial.println();
+      Serial.println("=== TEST 3.3: DEAD-ZONE SWEEP (RIGHT motor) ===");
+      Serial.println("PWM ramps 150 -> 650 every 1.5 sec.");
+      Serial.println("Find FIRST line showing 'MOVING' and record that PWM.");
+      Serial.println("Update RIGHT_MOTOR_DEAD_PWM in robot_config.h.");
+      LOG_INFO("[State 7] Dead-Zone Sweep: RIGHT motor only.");
+      break;
     }
     led_toggle(LED_DEBUG);
+  }
+
+  /* ── Dead-zone sweep logic (active only in states 6 and 7) ────────────── */
+  if ((test_state == 6 || test_state == 7) &&
+      (phase2_timer_ticks - last_dz) >= 1500) {
+    last_dz = phase2_timer_ticks;
+
+    /* Apply PWM to the selected motor; other motor stays stopped */
+    if (test_state == 6) {
+      motor_set_speed(MOTOR_LEFT,  (int16_t)dz_pwm);
+      motor_set_speed(MOTOR_RIGHT, 0);
+    } else {
+      motor_set_speed(MOTOR_LEFT,  0);
+      motor_set_speed(MOTOR_RIGHT, (int16_t)dz_pwm);
+    }
+
+    /* Wait 300ms for wheel to respond before reading speed */
+    delay(300);
+    encoder_update_velocity(0.05f);
+    float spd = encoder_get_speed_mms(
+                    test_state == 6 ? ENCODER_LEFT : ENCODER_RIGHT);
+    bool moving = (spd > 4.0f);   /* > 4 mm/s = definitely rotating */
+
+    char dz_buf[32];
+    oled_clear();
+    sprintf(dz_buf, "%s PWM=%u",
+            test_state == 6 ? "LEFT" : "RIGHT", dz_pwm);
+    oled_print(0,  0, "Dead-Zone Test");
+    oled_print(0, 15, dz_buf);
+    sprintf(dz_buf, "Spd: %.1f mm/s", spd);
+    oled_print(0, 30, dz_buf);
+    oled_print(0, 45, moving ? ">>> MOVING! <<<" : "not moving");
+    oled_update();
+
+    Serial.print("[DZ] ");
+    Serial.print(test_state == 6 ? "LEFT " : "RIGHT");
+    Serial.print(" PWM:"); Serial.print(dz_pwm);
+    Serial.print(" Spd:"); Serial.print(spd, 1); Serial.print(" mm/s");
+    if (moving) Serial.print("  <<< MOVING - record this PWM!");
+    Serial.println();
+
+    dz_pwm += 25;
+    if (dz_pwm > 650) {
+      dz_pwm = 150;  /* restart sweep */
+      motor_stop();
+      Serial.println("[DZ] Sweep complete. Restarting...");
+    }
   }
 
   if (button_just_pressed(BUTTON_MODE)) {

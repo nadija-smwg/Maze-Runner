@@ -33,8 +33,25 @@
  *  Gain Constants — Tune These
  * ═══════════════════════════════════════════════════════════════════════════ */
 
-/** Feed-forward gain: PWM per mm/s of target speed. */
-#define KFF     3.5f
+/*
+ * Measured characterization data (Phase 2, STBY=HIGH, battery ~7.4V):
+ *   PWM 1500 → L = 178.0 mm/s,  R = 179.9 mm/s
+ *
+ *   KFF  = PWM / speed = 1500 / 179 ≈ 8.4
+ *
+ * Re-run characterization if battery voltage changes significantly
+ * (a fully charged 2S at 8.4V will run faster than at 7.4V).
+ *
+ * Tuning order:
+ *   1. Set Kp=0, Ki=0. Increase KFF until robot moves at roughly the right
+ *      speed open-loop. (Use measured value above as starting point.)
+ *   2. Set KFF to measured value. Increase Kp until response is fast
+ *      without oscillation.
+ *   3. Increase Ki slowly until steady-state error disappears.
+ */
+
+/** Feed-forward gain: PWM per mm/s of target speed (measured). */
+#define KFF     8.4f
 
 /** Proportional gain. */
 #define KP      3.0f
