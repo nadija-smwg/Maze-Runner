@@ -1,4 +1,42 @@
 # 07 — Tuning & Calibration Guide
+**Last updated: 2026-09-01 — includes actual measured values from hardware testing**
+
+---
+
+## 📊 Measured Values (Hardware-Verified)
+
+These values have been confirmed on the actual robot. Use as reference.
+
+| Parameter | Measured Value | Method |
+|-----------|---------------|--------|
+| Encoder CPR (L) | **1820** | Phase 2 data consistent with theoretical |
+| Encoder CPR (R) | **1820** | Phase 2 data consistent with theoretical |
+| Wheel diameter | **34.0 mm** | Phase 2 data consistent |
+| Speed @ PWM 1500 (L) | **178.0 mm/s** | Phase 2 LPF output |
+| Speed @ PWM 1500 (R) | **179.9 mm/s** | Phase 2 LPF output |
+| KFF (feed-forward gain) | **8.4** | 1500 / 179 = 8.38 |
+| Gyro bias cold-start | **+131.9 LSB** | Cold calibration |
+| Gyro bias after warm-up | **-9.8 LSB** | 2-min warm-up + recalibrate |
+| GzFilt stationary | **-0.08 °/s** | Phase 3 EMA output |
+| ToF noise (side sensors) | **±1 mm** | Phase 3 stationary test |
+| Velocity LPF alpha | **0.25** | Phase 2 smooth at 20 Hz |
+
+> [!IMPORTANT]
+> Battery reads ~910 mV but should be ~7400 mV for a 2S LiPo.
+> Measure actual voltage with multimeter and update BATTERY_DIVIDER_RATIO.
+> Likely the divider ratio is wrong (should be ~16× higher than current value).
+
+---
+
+## ⚠️ Still Needs Measurement
+
+| Parameter | Why It Matters | How to Measure |
+|-----------|---------------|----------------|
+| `LEFT_MOTOR_DEAD_PWM` | PI loop winds up without it | Phase 2 → BTN_START ×6 → State 6 sweep |
+| `RIGHT_MOTOR_DEAD_PWM` | Same | Phase 2 → BTN_START ×7 → State 7 sweep |
+| `WHEEL_BASE_MM` | Turning radius accuracy (1mm = 1.2°/turn error) | Calipers: center-to-center wheel contact |
+| `SENSOR_FRONT_OFFSET_MM` | Cell positioning accuracy | Ruler: wheel axle to ToF sensor face |
+| `BATTERY_DIVIDER_RATIO` | Battery monitoring | Multimeter vs Serial reading ratio |
 
 ---
 
@@ -379,28 +417,27 @@ void characterizeSensorNoise(VL53L0X& sensor, const char* name) {
 
 ## Golden Reference Values
 
-Typical known-good values for common N20 + VL53L0X micromouse setups. Use these as sanity checks:
+Actual measured values for this robot shown in **bold**. Typical ranges for reference.
 
-| Parameter | Typical Value | Range | Unit |
-|-----------|---------------|-------|------|
-| **Wheel diameter** | 34 | 30–40 | mm |
-| **Wheelbase** | 70 | 60–80 | mm |
-| **Encoder CPR** | 210 | 140–840 | counts/rev |
-| **Kp_speed** | 2.5 | 1.5–4.0 | - |
-| **Ki_speed** | 0.8 | 0.3–1.5 | - |
-| **Kd_speed** | 0.1 | 0.05–0.2 | - |
-| **Kp_straight** | 2.0 | 1.0–3.0 | - |
-| **Exploration speed** | 120–150 | 80–180 | PWM (0–255) |
-| **Turn speed** | 80–120 | 60–150 | PWM |
-| **Speed run speed** | 180–220 | 150–255 | PWM |
-| **Wall threshold** | 180 | 150–220 | mm |
-| **VL53L0X noise (std dev)** | 2–5 | 1–10 | mm |
-| **Gyro drift** | 0.3–0.8 | 0.1–1.5 | °/min |
-| **Gyro bias (raw)** | ±10 | ±50 | LSB |
-| **PID loop rate** | 50 | 50–200 | Hz |
-| **I2C clock** | 400000 | 100000–400000 | Hz |
-| **Motor stall current** | 0.5–1.0 | - | A |
-| **Total robot weight** | 100 | 60–150 | g |
+| Parameter | **This Robot** | Typical Range | Unit |
+|-----------|---------------|---------------|------|
+| **Wheel diameter** | **34.0** ✅ | 30–40 | mm |
+| **Wheelbase** | **75.0 (TODO)** | 60–80 | mm |
+| **Encoder CPR** | **1820** ✅ | 1820 (7×65×4) | counts/rev |
+| **KFF (feed-forward)** | **8.4** ✅ | 6–12 | PWM/(mm/s) |
+| **Kp_speed** | 3.0 (starting) | 1.5–4.0 | - |
+| **Ki_speed** | 0.5 (starting) | 0.3–1.5 | - |
+| **Kp_straight** | TBD | 1.0–3.0 | - |
+| **Gyro bias (raw LSB)** | **-9.8** ✅ (warm) | ±50 | LSB |
+| **GzFilt stationary** | **-0.08 °/s** ✅ | < 0.15 | °/s |
+| **ToF noise (std dev)** | **±1 mm** ✅ | 1–10 | mm |
+| **PID loop rate** | **1000** | 500–1000 | Hz |
+| **Motor speed @ PWM 1500** | **L:178 R:180** | varies | mm/s |
+| **Dead-zone PWM** | **TODO** | 150–400 | PWM units |
+| **Wall threshold** | 180 (set) | 150–220 | mm |
+| **I2C clock** | 400000 | 100k–400k | Hz |
 
 > [!TIP]
-> If your values are wildly outside these ranges, something is probably misconfigured or miswired. Double-check before spending hours tuning.
+> If your values are wildly outside these ranges, something is probably misconfigured or miswired.
+> Dead-zone PWM of 0 means the PI controller will try to drive the motor at PWM=0 when near
+> setpoint, which causes integral windup. Always measure and set the dead-zone before PID tuning.

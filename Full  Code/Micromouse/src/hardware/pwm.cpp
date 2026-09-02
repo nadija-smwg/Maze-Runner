@@ -69,17 +69,15 @@ void pwm_init(void) {
 }
 
 void pwm_set_left(uint16_t duty) {
-    if (duty > PWM_MAX) {
-        duty = PWM_MAX;
-    }
-    TIM1->CCR1 = duty;
+    if (duty > PWM_MAX) duty = PWM_MAX;
+    /* LEFT motor  = PA9 = TIM1_CH2 → CCR2 (was wrongly CCR1) */
+    TIM1->CCR2 = duty;
 }
 
 void pwm_set_right(uint16_t duty) {
-    if (duty > PWM_MAX) {
-        duty = PWM_MAX;
-    }
-    TIM1->CCR2 = duty;
+    if (duty > PWM_MAX) duty = PWM_MAX;
+    /* RIGHT motor = PA8 = TIM1_CH1 → CCR1 (was wrongly CCR2) */
+    TIM1->CCR1 = duty;
 }
 
 void pwm_set_both(uint16_t left_duty, uint16_t right_duty) {

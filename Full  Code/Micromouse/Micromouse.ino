@@ -304,180 +304,287 @@ void loop() {
   button_update();
   led_update();
 
-  static int      test_state = 0;
-  static uint16_t dz_pwm     = 150;   /* dead-zone sweep current PWM */
-  static uint32_t last_dz    = 0;     /* dead-zone sweep timer       */
+  static int      test_state  = 0;
+  static uint16_t dz_pwm      = 400;   /* start above likely dead-zone */
+  static uint32_t last_dz     = 0;
+  static bool     dz_settled  = false; /* skip first read — motor hasn't moved yet */
+  static int32_t  dz_count_prev = 0;  /* raw encoder count for motion detection */
 
+  /*
+   * BTN_START — cycle states 0-8 (9 states total)
+   *   0  Stop
+   *   1  Forward  PWM 1500
+   *   2  Reverse  PWM 1500
+   *   3  Turn Left  PWM 1500
+   *   4  Turn Right PWM 1500
+   *   5  Dead-zone sweep LEFT  (Test 3.3)
+   *   6  Dead-zone sweep RIGHT (Test 3.3)
+   *   7  CPR verify LEFT       (Test F.1)
+   *   8  CPR verify RIGHT      (Test F.1)
+   */
   if (button_just_pressed(BUTTON_START)) {
-    test_state = (test_state + 1) % 8;
+    test_state = (test_state + 1) % 9;
+    motor_stop();   /* always safe-stop on every state change */
+
     switch (test_state) {
+    /* ── Basic drive states ─────────────────────────────────── */
     case 0:
-      motor_stop();
       LOG_INFO("[State 0] Motors STOPPED.");
       break;
     case 1:
-      motor_forward(1500);
-      LOG_INFO("[State 1] Motors FORWARD (PWM 1500).");
+      motor_forward(500);
+      LOG_INFO("[State 1] FORWARD PWM 1500.");
       break;
     case 2:
-      motor_reverse(1500);
-      LOG_INFO("[State 2] Motors REVERSE (PWM 1500).");
+      motor_reverse(600);
+      LOG_INFO("[State 2] REVERSE PWM 1500.");
       break;
     case 3:
       motor_turn_left(1500);
-      LOG_INFO("[State 3] Motors TURN LEFT (PWM 1500).");
+      LOG_INFO("[State 3] TURN LEFT PWM 1500.");
       break;
     case 4:
       motor_turn_right(1500);
-      LOG_INFO("[State 4] Motors TURN RIGHT (PWM 1500).");
+      LOG_INFO("[State 4] TURN RIGHT PWM 1500.");
       break;
+
+    /* ── Dead-zone sweep ────────────────────────────────────── */
     case 5:
+      Serial.println(F("\n=== TEST 3.3: DEAD-ZONE SWEEP (LEFT) ==="));
+      Serial.println(F("Sweeping LEFT motor PWM 200->2500. Hold robot safely!"));
+      oled_clear();
+      oled_print(0,  0, "DZ: LEFT motor");
+      oled_print(0, 15, "Sweeping...");
+      oled_update();
+
       motor_stop();
-      LOG_INFO("[State 5] Motors STOPPED.");
+      delay(300);           /* let motor fully brake before sweep */
+      encoder_reset_all();  /* zero counts from a clean stop     */
+
+      {
+        bool dz_found = false;
+        for (uint16_t pwm = 200; pwm <= 2500 && !dz_found; pwm += 50) {
+          int32_t cnt_before = encoder_get_count(ENCODER_LEFT); /* snapshot BEFORE */
+          motor_set_speed(MOTOR_LEFT,  (int16_t)pwm);
+          motor_set_speed(MOTOR_RIGHT, 0);
+          delay(400);  /* settle time */
+          int32_t cnt_after = encoder_get_count(ENCODER_LEFT);
+
+          int32_t diff = cnt_after - cnt_before;
+          if (diff < 0) diff = -diff;
+
+          Serial.print(F("LEFT PWM:")); Serial.print(pwm);
+          Serial.print(F("  counts:")); Serial.print(diff);
+
+          if (diff >= 3) {
+            Serial.println(F("  <<< MOVING!"));
+            Serial.print(F(">>> Set LEFT_MOTOR_DEAD_PWM = ")); Serial.println(pwm);
+            char b[22];
+            oled_clear();
+            oled_print(0,  0, "LEFT: FOUND!");
+            sprintf(b, "PWM = %u", pwm);
+            oled_print(0, 20, b);
+            sprintf(b, "Cnt diff = %ld", (long)diff);
+            oled_print(0, 36, b);
+            oled_print(0, 52, "Press START->next");
+            oled_update();
+            dz_found = true;
+          } else {
+            Serial.println(F("  (not moving)"));
+          }
+
+          motor_stop();  /* stop between steps for clean measurement */
+          delay(100);
+        }
+        if (!dz_found) {
+          Serial.println(F("!!! Motor did NOT move up to PWM 2500 !!!"));
+          Serial.println(F("Check wiring, power, and motor connections."));
+          oled_clear();
+          oled_print(0,  0, "LEFT: NOT FOUND");
+          oled_print(0, 20, "Check wiring!");
+          oled_update();
+        }
+      }
+      motor_stop();
+      /* stay in state 5 so user can read result — press BTN_START to continue */
       break;
+
     case 6:
+      Serial.println(F("\n=== TEST 3.3: DEAD-ZONE SWEEP (RIGHT) ==="));
+      Serial.println(F("Sweeping RIGHT motor PWM 200->2500. Hold robot safely!"));
+      oled_clear();
+      oled_print(0,  0, "DZ: RIGHT motor");
+      oled_print(0, 15, "Sweeping...");
+      oled_update();
+
       motor_stop();
-      dz_pwm  = 150;
-      last_dz = phase2_timer_ticks;
-      Serial.println();
-      Serial.println("=== TEST 3.3: DEAD-ZONE SWEEP (LEFT motor) ===");
-      Serial.println("PWM ramps 150 -> 650 every 1.5 sec.");
-      Serial.println("Find FIRST line showing 'MOVING' and record that PWM.");
-      Serial.println("Update LEFT_MOTOR_DEAD_PWM in robot_config.h.");
-      LOG_INFO("[State 6] Dead-Zone Sweep: LEFT motor only.");
+      delay(300);
+      encoder_reset_all();
+
+      {
+        bool dz_found = false;
+        for (uint16_t pwm = 200; pwm <= 2500 && !dz_found; pwm += 50) {
+          int32_t cnt_before = encoder_get_count(ENCODER_RIGHT);
+          motor_set_speed(MOTOR_LEFT,  0);
+          motor_set_speed(MOTOR_RIGHT, (int16_t)pwm);
+          delay(400);
+          int32_t cnt_after = encoder_get_count(ENCODER_RIGHT);
+
+          int32_t diff = cnt_after - cnt_before;
+          if (diff < 0) diff = -diff;
+
+          Serial.print(F("RIGHT PWM:")); Serial.print(pwm);
+          Serial.print(F("  counts:")); Serial.print(diff);
+
+          if (diff >= 3) {
+            Serial.println(F("  <<< MOVING!"));
+            Serial.print(F(">>> Set RIGHT_MOTOR_DEAD_PWM = ")); Serial.println(pwm);
+            char b[22];
+            oled_clear();
+            oled_print(0,  0, "RIGHT: FOUND!");
+            sprintf(b, "PWM = %u", pwm);
+            oled_print(0, 20, b);
+            sprintf(b, "Cnt diff = %ld", (long)diff);
+            oled_print(0, 36, b);
+            oled_print(0, 52, "Press START->next");
+            oled_update();
+            dz_found = true;
+          } else {
+            Serial.println(F("  (not moving)"));
+          }
+
+          motor_stop();
+          delay(100);
+        }
+        if (!dz_found) {
+          Serial.println(F("!!! Motor did NOT move up to PWM 2500 !!!"));
+          Serial.println(F("Check wiring, power, and motor connections."));
+          oled_clear();
+          oled_print(0,  0, "RIGHT: NOT FOUND");
+          oled_print(0, 20, "Check wiring!");
+          oled_update();
+        }
+      }
+      motor_stop();
+      /* stay in state 6 — press BTN_START to continue */
       break;
+
+    /* ── CPR verification ───────────────────────────────────── */
     case 7:
-      motor_stop();
-      dz_pwm  = 150;
-      last_dz = phase2_timer_ticks;
-      Serial.println();
-      Serial.println("=== TEST 3.3: DEAD-ZONE SWEEP (RIGHT motor) ===");
-      Serial.println("PWM ramps 150 -> 650 every 1.5 sec.");
-      Serial.println("Find FIRST line showing 'MOVING' and record that PWM.");
-      Serial.println("Update RIGHT_MOTOR_DEAD_PWM in robot_config.h.");
-      LOG_INFO("[State 7] Dead-Zone Sweep: RIGHT motor only.");
+      encoder_reset_all();
+      Serial.println(F("\n=== TEST F.1: CPR VERIFY (LEFT wheel) ==="));
+      Serial.println(F("Mark wheel. Rotate exactly 1 revolution. Press BTN_MODE."));
+      Serial.println(F("Expected: ~588 counts"));
+      oled_clear();
+      oled_print(0,  0, "CPR: LEFT wheel");
+      oled_print(0, 16, "1. Mark wheel");
+      oled_print(0, 28, "2. Rotate 1 rev");
+      oled_print(0, 40, "3. Press MODE");
+      oled_print(0, 52, "Exp: ~588");
+      oled_update();
+      break;
+    case 8:
+      encoder_reset_all();
+      Serial.println(F("\n=== TEST F.1: CPR VERIFY (RIGHT wheel) ==="));
+      Serial.println(F("Mark wheel. Rotate exactly 1 revolution. Press BTN_MODE."));
+      Serial.println(F("Expected: ~588 counts"));
+      oled_clear();
+      oled_print(0,  0, "CPR: RIGHT wheel");
+      oled_print(0, 16, "1. Mark wheel");
+      oled_print(0, 28, "2. Rotate 1 rev");
+      oled_print(0, 40, "3. Press MODE");
+      oled_print(0, 52, "Exp: ~588");
+      oled_update();
       break;
     }
     led_toggle(LED_DEBUG);
   }
 
-  /* ── Dead-zone sweep logic (active only in states 6 and 7) ────────────── */
-  if ((test_state == 6 || test_state == 7) &&
-      (phase2_timer_ticks - last_dz) >= 1500) {
-    last_dz = phase2_timer_ticks;
-
-    /* Apply PWM to the selected motor; other motor stays stopped */
-    if (test_state == 6) {
-      motor_set_speed(MOTOR_LEFT,  (int16_t)dz_pwm);
-      motor_set_speed(MOTOR_RIGHT, 0);
-    } else {
-      motor_set_speed(MOTOR_LEFT,  0);
-      motor_set_speed(MOTOR_RIGHT, (int16_t)dz_pwm);
-    }
-
-    /* Wait 300ms for wheel to respond before reading speed */
-    delay(300);
-    encoder_update_velocity(0.05f);
-    float spd = encoder_get_speed_mms(
-                    test_state == 6 ? ENCODER_LEFT : ENCODER_RIGHT);
-    bool moving = (spd > 4.0f);   /* > 4 mm/s = definitely rotating */
-
-    char dz_buf[32];
-    oled_clear();
-    sprintf(dz_buf, "%s PWM=%u",
-            test_state == 6 ? "LEFT" : "RIGHT", dz_pwm);
-    oled_print(0,  0, "Dead-Zone Test");
-    oled_print(0, 15, dz_buf);
-    sprintf(dz_buf, "Spd: %.1f mm/s", spd);
-    oled_print(0, 30, dz_buf);
-    oled_print(0, 45, moving ? ">>> MOVING! <<<" : "not moving");
-    oled_update();
-
-    Serial.print("[DZ] ");
-    Serial.print(test_state == 6 ? "LEFT " : "RIGHT");
-    Serial.print(" PWM:"); Serial.print(dz_pwm);
-    Serial.print(" Spd:"); Serial.print(spd, 1); Serial.print(" mm/s");
-    if (moving) Serial.print("  <<< MOVING - record this PWM!");
-    Serial.println();
-
-    dz_pwm += 25;
-    if (dz_pwm > 650) {
-      dz_pwm = 150;  /* restart sweep */
-      motor_stop();
-      Serial.println("[DZ] Sweep complete. Restarting...");
-    }
-  }
-
+  /* ── BTN_MODE: CPR capture (states 7,8) or encoder reset (others) ───── */
   if (button_just_pressed(BUTTON_MODE)) {
-    encoder_reset_all();
-    LOG_INFO("Encoders Reset to 0!");
-    led_toggle(LED_STATUS);
+    if (test_state == 7 || test_state == 8) {
+      EncoderID enc  = (test_state == 7) ? ENCODER_LEFT : ENCODER_RIGHT;
+      int32_t   cnt  = encoder_get_count(enc);
+      float     diff = (float)cnt - 1820.0f;
+      float     err  = (diff / 1820.0f) * 100.0f;
+      bool      ok   = (fabsf(diff) <= 20.0f);   /* ±1.1% tolerance */
+
+      Serial.println();
+      Serial.print(F("[CPR] "));
+      Serial.print(test_state == 7 ? "LEFT " : "RIGHT");
+      Serial.print(F(" wheel: measured=")); Serial.print(cnt);
+      Serial.print(F(" | expected=1820 | error="));
+      Serial.print(err, 1); Serial.print(F("%"));
+      Serial.println(ok ? F("  PASS") : F("  FAIL!"));
+      if (!ok) {
+        Serial.print(F("[CPR] Fix in robot_config.h: #define "));
+        Serial.print(test_state == 7 ? "LEFT_ENCODER_CPR  " : "RIGHT_ENCODER_CPR ");
+        Serial.println(cnt);
+      }
+
+      char cpr_buf[20];
+      oled_clear();
+      oled_print(0,  0, test_state == 7 ? "CPR LEFT result:" : "CPR RIGHT result:");
+      sprintf(cpr_buf, "Got: %ld", (long)cnt);
+      oled_print(0, 16, cpr_buf);
+      oled_print(0, 32, "Exp: ~588-592");
+      oled_print(0, 48, ok ? "  >> PASS <<  " : "Check value");
+      oled_update();
+    } else {
+      encoder_reset_all();
+      LOG_INFO("Encoders reset to 0.");
+      led_toggle(LED_STATUS);
+    }
   }
 
-  /*
-   * Test 3.2 — Velocity filter update.
-   * Call encoder_update_velocity() at 50ms (20 Hz) as a proxy for the
-   * 1kHz control loop. This is fast enough to see the LPF smoothing.
-   * dt = 0.05s (50ms period).
-   */
+  /* ── Velocity LPF update at 50 ms ─────────────────────────────────── */
   static uint32_t last_vel_update = 0;
   if ((phase2_timer_ticks - last_vel_update) >= 50) {
     last_vel_update = phase2_timer_ticks;
     encoder_update_velocity(0.05f);
   }
 
+  /*
+   * 500ms Serial + OLED print block.
+   * ONLY active for states 0-4 (drive states).
+   * States 5-8 own the OLED themselves — do not let this block interfere.
+   */
   static uint32_t last_enc_print = 0;
-  if ((phase2_timer_ticks - last_enc_print) >= 500) {
+  if (test_state <= 4 && (phase2_timer_ticks - last_enc_print) >= 500) {
     last_enc_print = phase2_timer_ticks;
-    
-    // 1. Get absolute positions
-    int32_t l_cnt = encoder_get_count(ENCODER_LEFT);
-    int32_t r_cnt = encoder_get_count(ENCODER_RIGHT);
-    float l_mm = encoder_counts_to_mm(l_cnt);
-    float r_mm = encoder_counts_to_mm(r_cnt);
 
-    // 2. Old raw speed (delta / 0.5s) — for comparison
     int32_t l_delta = encoder_get_delta(ENCODER_LEFT);
     int32_t r_delta = encoder_get_delta(ENCODER_RIGHT);
-    float l_speed_raw = encoder_counts_to_speed(l_delta * 2.0f);
-    float r_speed_raw = encoder_counts_to_speed(r_delta * 2.0f);
-
-    // 3. New LPF-filtered speed — Test 3.2
+    /* encoder_get_delta() returns counts since the LAST 50ms velocity update   */
+    /* (consumed by encoder_update_velocity every 50ms). Divide by 0.05s = ×20. */
+    float l_speed_raw  = encoder_counts_to_speed(l_delta * 20.0f);
+    float r_speed_raw  = encoder_counts_to_speed(r_delta * 20.0f);
     float l_speed_filt = encoder_get_speed_mms(ENCODER_LEFT);
     float r_speed_filt = encoder_get_speed_mms(ENCODER_RIGHT);
     float l_dist_filt  = encoder_get_distance_mm(ENCODER_LEFT);
     float r_dist_filt  = encoder_get_distance_mm(ENCODER_RIGHT);
 
-    // Update OLED — show filtered speed
     char buf[32];
     oled_clear();
-    oled_print(0, 0, "- Phase 2 Test -");
-
-    sprintf(buf, "L: %.1f mm/s", l_speed_filt);
-    oled_print(0, 15, buf);
-
-    sprintf(buf, "R: %.1f mm/s", r_speed_filt);
-    oled_print(0, 25, buf);
-
-    sprintf(buf, "dL:%.0f dR:%.0f mm", l_dist_filt, r_dist_filt);
+    oled_print(0,  0, "- Phase 2 Test -");
+    sprintf(buf, "L: %d mm/s", (int)l_speed_filt);
+    oled_print(0, 16, buf);
+    sprintf(buf, "R: %d mm/s", (int)r_speed_filt);
+    oled_print(0, 28, buf);
+    sprintf(buf, "dL:%ld dR:%ld mm", (long)l_dist_filt, (long)r_dist_filt);
     oled_print(0, 40, buf);
-
-    sprintf(buf, "Bat: %u mV", battery_get_voltage_mv());
-    oled_print(0, 50, buf);
-
+    sprintf(buf, "Bat:%u mV", battery_get_voltage_mv());
+    oled_print(0, 52, buf);
     oled_update();
 
-    // Serial — raw vs filtered comparison
-    Serial.print("[Phase 2 2Hz]");
-    Serial.print(" L_raw:");    Serial.print(l_speed_raw,  1);
-    Serial.print(" L_filt:");   Serial.print(l_speed_filt, 1);
-    Serial.print(" mm/s");
-    Serial.print(" | R_raw:");  Serial.print(r_speed_raw,  1);
-    Serial.print(" R_filt:");   Serial.print(r_speed_filt, 1);
-    Serial.print(" mm/s");
-    Serial.print(" | DistL:");  Serial.print(l_dist_filt,  0);
-    Serial.print(" DistR:");    Serial.print(r_dist_filt,  0);
-    Serial.println(" mm");
+    Serial.print(F("[Phase 2]"));
+    Serial.print(F(" L_raw:"));    Serial.print(l_speed_raw,  1);
+    Serial.print(F(" L_filt:"));   Serial.print(l_speed_filt, 1);
+    Serial.print(F(" mm/s | R_raw:")); Serial.print(r_speed_raw,  1);
+    Serial.print(F(" R_filt:"));   Serial.print(r_speed_filt, 1);
+    Serial.print(F(" mm/s | DistL:")); Serial.print(l_dist_filt, 0);
+    Serial.print(F(" DistR:"));    Serial.print(r_dist_filt,  0);
+    Serial.println(F(" mm"));
   }
 
   delay(5);

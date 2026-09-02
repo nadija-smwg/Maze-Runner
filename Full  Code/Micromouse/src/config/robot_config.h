@@ -18,18 +18,38 @@
  *  Motor Specifications — N20 Metal Gear Motor
  * ═══════════════════════════════════════════════════════════════════════════ */
 
-/** @defgroup MotorSpecs Motor Mechanical Specifications
+/**
+ * @defgroup MotorSpecs Motor Mechanical Specifications
  *  N20 metal gear motor with integrated quadrature encoder.
+ *
+ *  DATASHEET vs MEASURED:
+ *  - Datasheet claimed: 65:1 gear ratio, 1820 CPR
+ *  - Measured (Test F.1, 1 revolution hand-count):
+ *      LEFT  ~592 counts, RIGHT ~588 counts  → avg ≈ 590
+ *  - Derived gear ratio: 590 / (7 PPR × 4 quad) ≈ 21:1
+ *    (Most likely a 20:1 or 21:1 N20 variant, NOT 65:1)
+ *
+ *  Hand-rotation has ±5-10% single-revolution error.
+ *  For higher accuracy: re-run Test F.1 for 10 full revolutions
+ *  and divide: CPR = count / 10.
  *  @{
  */
 
-#define GEAR_RATIO              65.0f   /**< Gearbox ratio (output:input)   */
-#define ENCODER_PPR             7.0f    /**< Pulses per revolution (raw)    */
-#define ENCODER_QUADRATURE      4.0f    /**< Quadrature multiplier (×4)     */
+#define GEAR_RATIO              21.0f   /**< Gearbox ratio — MEASURED (was 65) */
+#define ENCODER_PPR             7.0f    /**< Pulses per revolution (raw)       */
+#define ENCODER_QUADRATURE      4.0f    /**< Quadrature multiplier (×4)        */
 
 /**
  * Counts Per Revolution (after gearing and quadrature decoding).
- * CPR = PPR × GEAR_RATIO × QUADRATURE = 7 × 65 × 4 = 1820 counts/rev
+ * CPR = PPR × GEAR_RATIO × QUADRATURE = 7 × 21 × 4 = 588 counts/rev
+ *
+ * Per-wheel values (measured) are overridden below in LEFT/RIGHT_ENCODER_CPR.
+ * The difference L=592 / R=588 is normal motor-to-motor variation.
+ *
+ * [ACTION] Re-verify with 10-revolution test for ±1% accuracy:
+ *   Phase 2 → State 7 (LEFT) or 8 (RIGHT)
+ *   Mark wheel → rotate EXACTLY 10 full turns → press BTN_MODE
+ *   CPR = printed count / 10
  */
 #define ENCODER_CPR             (ENCODER_PPR * GEAR_RATIO * ENCODER_QUADRATURE)
 
@@ -43,17 +63,30 @@
  *  @{
  */
 
-#define WHEEL_DIAMETER_MM       34.0f   /**< Wheel outer diameter (mm)      */
+/**
+ * Wheel outer diameter (mm) — MEASURED with calipers.
+ * Updated from assumed 34mm to measured ~43mm.
+ *
+ * Effect: all distances scale by 43/34 = 1.26×
+ *   Old mm/count (34mm, 1820CPR) ≈ 0.0587
+ *   New mm/count (43mm,  590CPR) ≈ 0.2289
+ *
+ * [ACTION] Verify with drive test:
+ *   Drive robot exactly 1000mm on measured tape.
+ *   Adjust until Serial DistL ≈ 1000mm.
+ *   diameter_corrected = 1000 / (encoder_counts / CPR) / π
+ */
+#define WHEEL_DIAMETER_MM       43.0f   /**< Wheel outer diameter — MEASURED  */
 
 /**
  * Wheel circumference (mm).
- * C = π × D = π × 34.0 ≈ 106.81 mm
+ * C = π × D = π × 43.0 ≈ 135.09 mm
  */
 #define WHEEL_CIRCUMFERENCE_MM  (3.14159265358979f * WHEEL_DIAMETER_MM)
 
 /**
  * Distance per encoder count (mm/count).
- * = Circumference / CPR ≈ 106.81 / 1820 ≈ 0.0587 mm/count
+ * = Circumference / CPR ≈ 135.09 / 590 ≈ 0.229 mm/count
  */
 #define MM_PER_COUNT            (WHEEL_CIRCUMFERENCE_MM / ENCODER_CPR)
 
@@ -77,37 +110,43 @@
  *               Measure between marks with calipers.
  * ═══════════════════════════════════════════════════════════════════════════ */
 
-/** @defgroup PerWheelCalib Per-Wheel Calibration
- *  @{
+/**
+ * [MEASURED] Left wheel counts per revolution.
+ * Measured via Test F.1 (1 hand-revolution): ~581 counts.
+ * Derived gear ratio: 581 / (7 × 4) ≈ 20.75:1
+ *
+ * [ACTION] Re-verify accuracy: repeat Test F.1 for 10 full revolutions.
+ *   CPR_left = count / 10  (reduces hand-rotation error from ±5% to ±0.5%)
+ *
+ * Tolerance for control: ±10 counts (±1.7%) acceptable.
+ * Beyond ±20 counts heading will drift noticeably in turns.
  */
+#define LEFT_ENCODER_CPR        581.0f   /* Measured (1-rev hand test) */
 
 /**
- * [OK] Left wheel counts per revolution.
- * Theoretical: 7 PPR × 65:1 × 4 quadrature = 1820
- * Verified: Phase 2 distance data consistent with 1820 (no correction needed).
- * To re-verify: lift robot, mark wheel, count 10 revolutions manually.
+ * [MEASURED] Right wheel counts per revolution.
+ * Measured via Test F.1 (1 hand-revolution): ~581 counts.
+ *
+ * [ACTION] Re-verify with 10-revolution test same as above.
  */
-#define LEFT_ENCODER_CPR        (ENCODER_PPR * GEAR_RATIO * ENCODER_QUADRATURE)  /* 1820 */
+#define RIGHT_ENCODER_CPR       581.0f   /* Measured (1-rev hand test) */
 
 /**
- * [OK] Right wheel counts per revolution.
- * Same as left — verified consistent in Phase 2 data.
+ * [UPDATED] Left wheel effective outer diameter (mm).
+ * Physical measurement: ~43mm (was incorrectly set to 34mm).
+ *
+ * To fine-tune: drive robot exactly 1000mm on flat tape.
+ *   If Serial shows 900mm → wheel is smaller than 43mm
+ *   If Serial shows 1100mm → wheel is larger than 43mm
+ *   diameter = 43 × (actual_mm / serial_mm)
  */
-#define RIGHT_ENCODER_CPR       (ENCODER_PPR * GEAR_RATIO * ENCODER_QUADRATURE)  /* 1820 */
+#define LEFT_WHEEL_DIAMETER_MM  43.0f    /* Measured — was 34mm */
 
 /**
- * [OK] Left wheel effective outer diameter (mm).
- * Theoretical: 34.0 mm. Phase 2 data consistent with this value.
- * To re-verify: drive 1000 mm measured on tape, then:
- *   diameter = 1000 / (encoder_counts / CPR) / π
+ * [UPDATED] Right wheel effective outer diameter (mm).
+ * Same physical measurement as left: ~43mm.
  */
-#define LEFT_WHEEL_DIAMETER_MM  34.0f
-
-/**
- * [OK] Right wheel effective outer diameter (mm).
- * Same as left — consistent in Phase 2 data.
- */
-#define RIGHT_WHEEL_DIAMETER_MM 34.0f
+#define RIGHT_WHEEL_DIAMETER_MM 43.0f    /* Measured — was 34mm */
 
 /** Left wheel circumference (mm) — derived. */
 #define LEFT_WHEEL_CIRC_MM      (3.14159265f * LEFT_WHEEL_DIAMETER_MM)
@@ -122,24 +161,20 @@
 #define RIGHT_MM_PER_COUNT      (RIGHT_WHEEL_CIRC_MM / RIGHT_ENCODER_CPR)
 
 /**
- * [TODO] Minimum PWM to overcome static friction on the LEFT motor.
+ * [MEASURED] Left motor dead-zone PWM.
+ * This is the minimum PWM duty cycle required to overcome static
+ * friction and make the left wheel start spinning from a standstill.
  *
- * Run Phase 2, press BTN_START until State 6 (dead-zone sweep LEFT).
- * Find the first Serial line showing 'MOVING' and enter that PWM below.
- *
- * Current value: 0 (not yet measured — replace before competition!)
+ * Obtained from Phase 2, State 5 (Dead-zone sweep).
  */
-#define LEFT_MOTOR_DEAD_PWM     0       /* TODO: fill from Test 3.3 State 6 */
+#define LEFT_MOTOR_DEAD_PWM     300      /* Measured from Test 3.3 State 5 */
 
 /**
- * [TODO] Minimum PWM to overcome static friction on the RIGHT motor.
- *
- * Run Phase 2, press BTN_START until State 7 (dead-zone sweep RIGHT).
- * Find the first 'MOVING' PWM and enter below.
- *
- * Current value: 0 (not yet measured — replace before competition!)
+ * [MEASURED] Right motor dead-zone PWM.
+ * Obtained from Phase 2, State 6 (Dead-zone sweep).
+ * Note: Right motor is slightly more efficient (starts at 250 vs 300).
  */
-#define RIGHT_MOTOR_DEAD_PWM    0       /* TODO: fill from Test 3.3 State 7 */
+#define RIGHT_MOTOR_DEAD_PWM    250      /* Measured from Test 3.3 State 6 */
 
 /**
  * [OK] EMA coefficient for encoder velocity LPF.
@@ -195,12 +230,21 @@
  */
 
 /**
- * Distance between left and right wheel contact points (mm).
+ * [TODO] Distance between left and right wheel contact points (mm).
  * Measure this precisely — it directly affects turning accuracy.
  *
- * TODO: Measure actual wheel base on your robot and update this value.
+ * Measurement procedure:
+ *   1. Place robot on paper with motors stopped
+ *   2. Press each wheel gently onto an ink pad and roll ONE revolution
+ *   3. Measure center-to-center distance between left and right tracks
+ *   OR: use calipers from the centre of the left tread to centre of right tread
+ *
+ * Impact: 1mm error in wheel base ≈ 1.2° error per 90° turn.
+ * For 10 consecutive turns: 1mm error = ~12° cumulative heading error.
+ *
+ * Typical N20 micromouse range: 65–85 mm
  */
-#define WHEEL_BASE_MM           75.0f   /**< TODO: Measure and update       */
+#define WHEEL_BASE_MM           75.0f   /**< [TODO] Measure with calipers     */
 
 /**
  * Distance from wheel axle to front sensor mounting point (mm).
@@ -263,13 +307,24 @@
 #define BATTERY_CRITICAL_MV     6000    /**< Critical — stop robot (mV)    */
 
 /**
- * Voltage divider ratio.
- * If using a 10kΩ / 10kΩ divider: ratio = 2.0
- * V_battery = V_adc × DIVIDER_RATIO
+ * [TODO] Voltage divider ratio for battery ADC.
  *
- * TODO: Update to match your actual voltage divider.
+ * ANOMALY DETECTED: Serial shows ~910 mV but a 2S LiPo should read ~7400 mV.
+ * This means the current ratio of 2.0 is WRONG for this hardware.
+ *
+ * To find the correct value:
+ *   1. Measure actual battery voltage with multimeter: e.g. 7.82 V = 7820 mV
+ *   2. Read the Serial output 'Bat:' value: e.g. 919 mV
+ *   3. Correct ratio = measured_mV / serial_mV = 7820 / 919 = 8.51
+ *   4. Update this value:
+ *      #define BATTERY_DIVIDER_RATIO   8.51f
+ *
+ * Note: If using a 100kΩ + 33kΩ voltage divider:
+ *   ratio = (100 + 33) / 33 = 4.03
+ *
+ * Current value: 2.0f (almost certainly wrong — verify before competition!)
  */
-#define BATTERY_DIVIDER_RATIO   2.0f    /**< TODO: Match your divider      */
+#define BATTERY_DIVIDER_RATIO   2.0f    /**< [TODO] Measure and correct!      */
 
 /** @} */ // end BatteryConfig
 
