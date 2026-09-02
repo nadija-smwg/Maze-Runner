@@ -231,20 +231,16 @@
 
 /**
  * [TODO] Distance between left and right wheel contact points (mm).
- * Measure this precisely — it directly affects turning accuracy.
+ * [MEASURED] Distance between the center of the left wheel tread
+ * and the center of the right wheel tread (track width).
  *
- * Measurement procedure:
- *   1. Place robot on paper with motors stopped
- *   2. Press each wheel gently onto an ink pad and roll ONE revolution
- *   3. Measure center-to-center distance between left and right tracks
- *   OR: use calipers from the centre of the left tread to centre of right tread
+ * Current: ~80.0 mm
  *
- * Impact: 1mm error in wheel base ≈ 1.2° error per 90° turn.
- * For 10 consecutive turns: 1mm error = ~12° cumulative heading error.
- *
- * Typical N20 micromouse range: 65–85 mm
+ * [ACTION] Verify via turn test:
+ *   If robot turns 4x90° and ends up short of 360°, actual base is SMALLER.
+ *   If it turns too far, actual base is LARGER.
  */
-#define WHEEL_BASE_MM           75.0f   /**< [TODO] Measure with calipers     */
+#define WHEEL_BASE_MM           80.0f    /* Measured (calipers) */
 
 /**
  * Distance from wheel axle to front sensor mounting point (mm).

@@ -10,10 +10,10 @@
     1.  Open `src/config/robot_config.h` (or directly inside `odometry.cpp`).
     2.  Update the constants from the outdated testing codes to the true, verified constants:
         ```cpp
-        #define ENCODER_CPR   1820.0f
-        #define WHEELBASE_MM  75.0f
-        #define MM_PER_COUNT  0.05869f 
-        // 0.05869 is derived from: (PI * 34.0mm wheel diameter) / 1820 CPR
+        #define ENCODER_CPR   581.0f
+        #define WHEELBASE_MM  80.0f
+        #define MM_PER_COUNT  0.2325f 
+        // 0.2325 is derived from: (PI * 43.0mm wheel diameter) / 581 CPR
         ```
 
 ## 2. Odometry Math (`localization/odometry.cpp`)
