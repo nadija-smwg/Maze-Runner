@@ -50,14 +50,17 @@
  *   3. Increase Ki slowly until steady-state error disappears.
  */
 
-/** Feed-forward gain: PWM per mm/s of target speed (measured). */
-#define KFF     8.4f
+// ==========================================
+// TUNING CONSTANTS
+// ==========================================
+// Baseline PWM to roughly hit target. Found via Phase 4 Auto-Tuner
+#define KFF     2.4f
 
-/** Proportional gain. */
-#define KP      3.0f
+// Proportional: Corrects immediate error quickly
+#define KP      13.0f
 
-/** Integral gain. */
-#define KI      0.5f
+// Integral: Corrects steady-state error over time
+#define KI      2.0f
 
 /** Anti-windup clamp on integral accumulator (PWM units). */
 #define INTEGRAL_LIMIT  1000.0f
@@ -94,26 +97,36 @@ void speed_controller_update(float target_left_mm_s,
                              float current_right_mm_s,
                              float dt) {
     /* ── Left wheel ─────────────────────────────────────────────────────── */
-    float err_L   = target_left_mm_s - current_left_mm_s;
-    _left_integral = clampf(_left_integral + err_L * dt,
-                            -INTEGRAL_LIMIT, INTEGRAL_LIMIT);
+    float out_L = 0.0f;
+    if (target_left_mm_s == 0.0f) {
+        _left_integral = 0.0f; // Clear windup
+    } else {
+        float err_L = target_left_mm_s - current_left_mm_s;
+        _left_integral = clampf(_left_integral + err_L * dt,
+                                -INTEGRAL_LIMIT, INTEGRAL_LIMIT);
 
-    float out_L = KFF * target_left_mm_s
-                + KP  * err_L
-                + KI  * _left_integral;
+        out_L = KFF * target_left_mm_s
+              + KP  * err_L
+              + KI  * _left_integral;
 
-    out_L = clampf(out_L, -(float)PWM_MAX, (float)PWM_MAX);
+        out_L = clampf(out_L, -(float)PWM_MAX, (float)PWM_MAX);
+    }
 
     /* ── Right wheel ────────────────────────────────────────────────────── */
-    float err_R    = target_right_mm_s - current_right_mm_s;
-    _right_integral = clampf(_right_integral + err_R * dt,
-                             -INTEGRAL_LIMIT, INTEGRAL_LIMIT);
+    float out_R = 0.0f;
+    if (target_right_mm_s == 0.0f) {
+        _right_integral = 0.0f; // Clear windup
+    } else {
+        float err_R = target_right_mm_s - current_right_mm_s;
+        _right_integral = clampf(_right_integral + err_R * dt,
+                                 -INTEGRAL_LIMIT, INTEGRAL_LIMIT);
 
-    float out_R = KFF * target_right_mm_s
-                + KP  * err_R
-                + KI  * _right_integral;
+        out_R = KFF * target_right_mm_s
+              + KP  * err_R
+              + KI  * _right_integral;
 
-    out_R = clampf(out_R, -(float)PWM_MAX, (float)PWM_MAX);
+        out_R = clampf(out_R, -(float)PWM_MAX, (float)PWM_MAX);
+    }
 
     /* ── Output with dead-zone compensation ─────────────────────────────── */
     motor_set_speed_compensated(MOTOR_LEFT,  (int16_t)out_L);

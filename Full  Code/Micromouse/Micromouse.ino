@@ -84,8 +84,8 @@ void phase3_timer_callback(void) { phase3_timer_ticks++; }
 volatile uint32_t phase4_timer_ticks = 0;
 volatile float    _p4_target_mm_s    = 0.0f;
 volatile float    _p4_kff            = 2.4f; // Default KFF based on tuning
-volatile float    _p4_kp             = 4.0f; // Default KP based on tuning
-volatile float    _p4_ki             = 0.40f; // Default KI based on tuning
+volatile float    _p4_kp             = 13.0f; // Default KP based on autotune
+volatile float    _p4_ki             = 2.0f;  // Default KI based on autotune
 
 /*
  * speed_controller_update_live — same math as speed_controller.cpp
@@ -94,6 +94,12 @@ volatile float    _p4_ki             = 0.40f; // Default KI based on tuning
  */
 static float _p4_int_L = 0.0f;
 static float _p4_int_R = 0.0f;
+
+// Auto-tuner variables
+volatile bool     _autotune_running  = false;
+volatile uint32_t _autotune_time_ms  = 0;
+volatile float    _autotune_score    = 0.0f;
+volatile float    _autotune_max_spd  = 0.0f;
 
 static inline float _p4_clamp(float v, float lo, float hi) {
     return (v < lo) ? lo : (v > hi) ? hi : v;
@@ -115,19 +121,44 @@ void phase4_timer_callback(void) {
     float actual_R = encoder_get_speed_mms(ENCODER_RIGHT);
 
     // Left wheel PI
-    float err_L  = tgt - actual_L;
-    _p4_int_L    = _p4_clamp(_p4_int_L + err_L * dt, -1000.0f, 1000.0f);
-    float out_L  = kff * tgt + kp * err_L + ki * _p4_int_L;
-    out_L        = _p4_clamp(out_L, -(float)PWM_MAX, (float)PWM_MAX);
+    float out_L = 0.0f;
+    float err_L = 0.0f;
+    if (tgt == 0.0f) {
+        _p4_int_L = 0.0f; // Clear windup while stopped
+    } else {
+        err_L  = tgt - actual_L;
+        _p4_int_L    = _p4_clamp(_p4_int_L + err_L * dt, -1000.0f, 1000.0f);
+        out_L  = kff * tgt + kp * err_L + ki * _p4_int_L;
+        out_L  = _p4_clamp(out_L, -(float)PWM_MAX, (float)PWM_MAX);
+    }
 
     // Right wheel PI
-    float err_R  = tgt - actual_R;
-    _p4_int_R    = _p4_clamp(_p4_int_R + err_R * dt, -1000.0f, 1000.0f);
-    float out_R  = kff * tgt + kp * err_R + ki * _p4_int_R;
-    out_R        = _p4_clamp(out_R, -(float)PWM_MAX, (float)PWM_MAX);
+    float out_R = 0.0f;
+    float err_R = 0.0f;
+    if (tgt == 0.0f) {
+        _p4_int_R = 0.0f;
+    } else {
+        err_R  = tgt - actual_R;
+        _p4_int_R    = _p4_clamp(_p4_int_R + err_R * dt, -1000.0f, 1000.0f);
+        out_R  = kff * tgt + kp * err_R + ki * _p4_int_R;
+        out_R  = _p4_clamp(out_R, -(float)PWM_MAX, (float)PWM_MAX);
+    }
 
     motor_set_speed_compensated(MOTOR_LEFT,  (int16_t)out_L);
     motor_set_speed_compensated(MOTOR_RIGHT, (int16_t)out_R);
+
+    // Auto-tuner tracking
+    if (_autotune_running && tgt > 0.0f) {
+        _autotune_time_ms++;
+        float abs_err_L = (err_L > 0.0f) ? err_L : -err_L;
+        float abs_err_R = (err_R > 0.0f) ? err_R : -err_R;
+        float time_sec = _autotune_time_ms * 0.001f;
+        // ITAE = sum of (absolute error * time)
+        _autotune_score += (abs_err_L + abs_err_R) * 0.5f * time_sec * dt;
+
+        if (actual_L > _autotune_max_spd) _autotune_max_spd = actual_L;
+        if (actual_R > _autotune_max_spd) _autotune_max_spd = actual_R;
+    }
 }
 #endif
 
@@ -866,21 +897,194 @@ void loop() {
       _mode_was_pressed = false;
   }
 
-  /* ── BTN_START: toggle run / stop ───────────────────── */
-  if (button_just_pressed(BUTTON_START)) {
-      _p4_running = !_p4_running;
-      _p4_target_mm_s = _p4_running ? 300.0f : 0.0f;
-      // Always clear integrators on state change
-      _p4_int_L = 0.0f;
-      _p4_int_R = 0.0f;
-      encoder_reset_all();
+  /* ── Auto-tune state & structure ────────────────────── */
+  struct AutoTuneResult {
+      float kp;
+      float ki;
+      float score;
+      float max_overshoot;
+  };
+  static bool           _autotune_active = false;
+  static int            _autotune_kp_idx = 0;
+  static int            _autotune_ki_idx = 0;
+  static int            _autotune_state  = 0; // 0=resting, 1=running
+  static uint32_t       _autotune_state_start_ms = 0;
+  static AutoTuneResult _autotune_results[100];
 
-      if (_p4_running) {
-          LOG_INFO("[Phase4] ▶ Running — target 300 mm/s");
-      } else {
-          LOG_INFO("[Phase4] ■ Stopped — target 0");
+  /* ── BTN_START: toggle run/stop OR long-press autotune ── */
+  bool start_down = button_is_pressed(BUTTON_START);
+  static bool _start_was_pressed = false;
+  static uint32_t _start_press_ms = 0;
+  static bool _start_long_triggered = false;
+
+  if (start_down && !_start_was_pressed) {
+      _start_was_pressed = true;
+      _start_press_ms = millis();
+      _start_long_triggered = false;
+  }
+  
+  if (start_down && _start_was_pressed && !_start_long_triggered) {
+      if (millis() - _start_press_ms >= 2000) {
+          // LONG PRESS -> Start Autotune
+          _start_long_triggered = true;
+          _autotune_active = true;
+          _autotune_kp_idx = 0;
+          _autotune_ki_idx = 0;
+          _autotune_state = 0; // begin with rest
+          _autotune_state_start_ms = millis();
+          _p4_running = false;
+          _p4_target_mm_s = 0;
+          _autotune_running = false;
+          
+          LOG_INFO("=== AUTOTUNE STARTED ===");
+          oled_clear();
+          oled_print(0, 0, "AUTOTUNING...");
+          oled_update();
       }
-      led_toggle(LED_DEBUG);
+  }
+  
+  if (!start_down && _start_was_pressed) {
+      if (!_start_long_triggered && (millis() - _start_press_ms < 2000)) {
+          // SHORT PRESS -> Toggle run/stop
+          if (!_autotune_active) {
+              _p4_running = !_p4_running;
+              _p4_target_mm_s = _p4_running ? 300.0f : 0.0f;
+              _p4_int_L = 0.0f; _p4_int_R = 0.0f;
+              encoder_reset_all();
+              if (_p4_running) LOG_INFO("[Phase4] ▶ Running — target 300 mm/s");
+              else LOG_INFO("[Phase4] ■ Stopped — target 0");
+              led_toggle(LED_DEBUG);
+          } else {
+              // Abort autotune
+              _autotune_active = false;
+              _p4_running = false;
+              _p4_target_mm_s = 0;
+              _autotune_running = false;
+              LOG_INFO("=== AUTOTUNE ABORTED ===");
+          }
+      }
+      _start_was_pressed = false;
+  }
+
+  /* ── Autotune State Machine ─────────────────────────── */
+  if (_autotune_active) {
+      if (_autotune_state == 0) {
+          // Resting phase (500ms) to let motors completely stop
+          if (millis() - _autotune_state_start_ms >= 500) {
+              _autotune_state = 1;
+              _autotune_state_start_ms = millis();
+              
+              // Calculate parameters for this iteration
+              _p4_kp = 4.0f + _autotune_kp_idx * 1.0f; // 4.0 to 13.0
+              _p4_ki = 0.6f + _autotune_ki_idx * 0.2f; // 0.6 to 2.4
+              
+              Serial.print(F("Testing [")); 
+              Serial.print(_autotune_kp_idx * 10 + _autotune_ki_idx + 1);
+              Serial.print(F("/100] KP: ")); Serial.print(_p4_kp, 1);
+              Serial.print(F(" KI: ")); Serial.println(_p4_ki, 2);
+              
+              // Reset state for new step response
+              _p4_int_L = 0.0f;
+              _p4_int_R = 0.0f;
+              encoder_reset_all();
+              
+              _autotune_running = true;
+              _autotune_time_ms = 0;
+              _autotune_score   = 0.0f;
+              _autotune_max_spd = 0.0f;
+              
+              _p4_target_mm_s = 300.0f; // GO!
+          }
+      } else if (_autotune_state == 1) {
+          // Running phase (1500ms step response window)
+          if (millis() - _autotune_state_start_ms >= 1500) {
+              _p4_target_mm_s = 0.0f; // STOP!
+              _autotune_running = false;
+              
+              // Record result
+              float overshoot = _autotune_max_spd - 300.0f;
+              if (overshoot < 0) overshoot = 0.0f;
+              
+              // Massive penalty for overshooting more than 15% (345 mm/s)
+              float penalty = 0.0f;
+              if (overshoot > 45.0f) penalty = overshoot * 1000.0f;
+              
+              int result_idx = _autotune_kp_idx * 10 + _autotune_ki_idx;
+              _autotune_results[result_idx].kp = _p4_kp;
+              _autotune_results[result_idx].ki = _p4_ki;
+              _autotune_results[result_idx].score = _autotune_score + penalty;
+              _autotune_results[result_idx].max_overshoot = overshoot;
+              
+              Serial.print(F("Result - Score: ")); Serial.print(_autotune_results[result_idx].score, 0);
+              Serial.print(F(" Max Spd: ")); Serial.println(_autotune_max_spd, 1);
+              
+              // Advance indices
+              _autotune_ki_idx++;
+              if (_autotune_ki_idx >= 10) {
+                  _autotune_ki_idx = 0;
+                  _autotune_kp_idx++;
+              }
+              
+              if (_autotune_kp_idx >= 10) {
+                  // ALL DONE
+                  _autotune_active = false;
+                  LOG_INFO("=== AUTOTUNE COMPLETE ===");
+                  
+                  // Sort results (Bubble sort - simple and fine for 100 items)
+                  for (int i = 0; i < 100 - 1; i++) {
+                      for (int j = 0; j < 100 - i - 1; j++) {
+                          if (_autotune_results[j].score > _autotune_results[j+1].score) {
+                              AutoTuneResult temp = _autotune_results[j];
+                              _autotune_results[j] = _autotune_results[j+1];
+                              _autotune_results[j+1] = temp;
+                          }
+                      }
+                  }
+                  
+                  // Print Top 3
+                  Serial.println(F("--- TOP 3 COMBINATIONS ---"));
+                  for (int i=0; i<3; i++) {
+                      Serial.print(i+1); Serial.print(F(". KP:")); Serial.print(_autotune_results[i].kp, 1);
+                      Serial.print(F(" KI:")); Serial.print(_autotune_results[i].ki, 2);
+                      Serial.print(F(" Score:")); Serial.println(_autotune_results[i].score, 0);
+                  }
+                  
+                  // Apply the best values automatically
+                  _p4_kp = _autotune_results[0].kp;
+                  _p4_ki = _autotune_results[0].ki;
+                  
+                  oled_clear();
+                  oled_print(0, 0, "BEST TUNING:");
+                  char b[32];
+                  sprintf(b, "KP: %d.%d", (int)_p4_kp, (int)(_p4_kp*10)%10);
+                  oled_print(0, 16, b);
+                  sprintf(b, "KI: %d.%02d", (int)_p4_ki, (int)(_p4_ki*100)%100);
+                  oled_print(0, 32, b);
+                  oled_print(0, 48, "Values Applied!");
+                  oled_update();
+              } else {
+                  // Go back to resting for next test
+                  _autotune_state = 0; 
+                  _autotune_state_start_ms = millis();
+              }
+          }
+      }
+      
+      // Update OLED progress at 4Hz
+      static uint32_t last_at_oled = 0;
+      if (millis() - last_at_oled > 250) {
+          last_at_oled = millis();
+          oled_clear();
+          oled_print(0, 0, "AUTOTUNING...");
+          char b[32];
+          sprintf(b, "KP %d/10 KI %d/10", _autotune_kp_idx+1, _autotune_ki_idx+1);
+          oled_print(0, 16, b);
+          oled_print(0, 32, _autotune_state == 1 ? "TESTING..." : "RESTING");
+          oled_update();
+      }
+      
+      delay(5);
+      return; // Skip normal button processing and printing while autotuning
   }
 
   /* ── Serial + OLED print every 50ms ─────────────────── */
