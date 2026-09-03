@@ -36,6 +36,8 @@
 
 // Control
 #include "src/control/motion_controller.h"
+#include "src/control/speed_controller.h"
+#include "src/control/velocity_controller.h"
 
 // Robot
 #include "src/robot/mission_manager.h"
@@ -52,8 +54,9 @@
 
 // Phase testing mode flags (set to 1 for active test mode)
 #define PHASE_1_TEST_MODE 0
-#define PHASE_2_TEST_MODE 1
+#define PHASE_2_TEST_MODE 0
 #define PHASE_3_TEST_MODE 0
+#define PHASE_4_TEST_MODE 1   // ← Step 4.1: PI Velocity Tuning
 
 #if PHASE_1_TEST_MODE == 1
 volatile uint32_t phase1_timer_ticks = 0;
@@ -68,6 +71,64 @@ void phase2_timer_callback(void) { phase2_timer_ticks++; }
 #if PHASE_3_TEST_MODE == 1
 volatile uint32_t phase3_timer_ticks = 0;
 void phase3_timer_callback(void) { phase3_timer_ticks++; }
+#endif
+
+#if PHASE_4_TEST_MODE == 1
+/*
+ * Phase 4 — 1kHz velocity PI control loop callback.
+ *
+ * KFF, KP, KI are runtime-adjustable via buttons (no reflash needed).
+ * Globals below are written by loop() and read here in the ISR.
+ * volatile ensures the compiler doesn't cache stale values.
+ */
+volatile uint32_t phase4_timer_ticks = 0;
+volatile float    _p4_target_mm_s    = 0.0f;
+volatile float    _p4_kff            = 2.4f; // Default KFF based on tuning
+volatile float    _p4_kp             = 4.0f; // Default KP based on tuning
+volatile float    _p4_ki             = 0.40f; // Default KI based on tuning
+
+/*
+ * speed_controller_update_live — same math as speed_controller.cpp
+ * but uses the runtime _p4_kff/_p4_kp/_p4_ki instead of compile-time defines.
+ * This lets you tune without reflashing.
+ */
+static float _p4_int_L = 0.0f;
+static float _p4_int_R = 0.0f;
+
+static inline float _p4_clamp(float v, float lo, float hi) {
+    return (v < lo) ? lo : (v > hi) ? hi : v;
+}
+
+void phase4_timer_callback(void) {
+    phase4_timer_ticks++;
+
+    // 1. Update velocity LPF
+    encoder_update_velocity(CONTROL_LOOP_DT_S);
+
+    float tgt   = _p4_target_mm_s;
+    float kff   = _p4_kff;
+    float kp    = _p4_kp;
+    float ki    = _p4_ki;
+    float dt    = CONTROL_LOOP_DT_S;  // 0.001s
+
+    float actual_L = encoder_get_speed_mms(ENCODER_LEFT);
+    float actual_R = encoder_get_speed_mms(ENCODER_RIGHT);
+
+    // Left wheel PI
+    float err_L  = tgt - actual_L;
+    _p4_int_L    = _p4_clamp(_p4_int_L + err_L * dt, -1000.0f, 1000.0f);
+    float out_L  = kff * tgt + kp * err_L + ki * _p4_int_L;
+    out_L        = _p4_clamp(out_L, -(float)PWM_MAX, (float)PWM_MAX);
+
+    // Right wheel PI
+    float err_R  = tgt - actual_R;
+    _p4_int_R    = _p4_clamp(_p4_int_R + err_R * dt, -1000.0f, 1000.0f);
+    float out_R  = kff * tgt + kp * err_R + ki * _p4_int_R;
+    out_R        = _p4_clamp(out_R, -(float)PWM_MAX, (float)PWM_MAX);
+
+    motor_set_speed_compensated(MOTOR_LEFT,  (int16_t)out_L);
+    motor_set_speed_compensated(MOTOR_RIGHT, (int16_t)out_R);
+}
 #endif
 
 void setup() {
@@ -179,6 +240,48 @@ void setup() {
   LOG_INFO("Phase 3 Ready!");
   LOG_INFO(" - BTN_START: Re-calibrate Gyro");
   LOG_INFO(" - BTN_MODE: Toggle Debug LED");
+  return;
+#endif
+
+#if PHASE_4_TEST_MODE == 1
+  LOG_INFO("=== PHASE 4 TEST MODE: PI VELOCITY TUNING ===");
+
+  // Hardware init (same as Phase 2 — motors + encoders are needed)
+  gpio_init_motor_pins();
+  pwm_init();
+  encoder_init();
+  motor_init();
+  button_init();
+  led_init();
+  battery_init();
+
+  Wire.setSCL(PIN_I2C_SCL);
+  Wire.setSDA(PIN_I2C_SDA);
+  Wire.begin();
+  Wire.setClock(400000);
+  if (oled_init()) {
+      oled_clear();
+      oled_print(0, 0, "Phase 4 PI Tune");
+      oled_print(0, 16, "BTN_START = GO");
+      oled_print(0, 32, "BTN_MODE  = STOP");
+      oled_update();
+  } else {
+      LOG_ERROR("OLED Init Failed");
+  }
+
+  // Init PI controller state
+  velocity_controller_init();
+  encoder_reset_all();
+
+  // Start 1kHz PI control loop
+  timer_init(phase4_timer_callback);
+  timer_start();
+
+  LOG_INFO("Phase 4 Ready!");
+  LOG_INFO(" - BTN_START : Step to 300 mm/s (lift wheels first!)");
+  LOG_INFO(" - BTN_MODE  : Stop motors (target = 0)");
+  LOG_INFO(" - Serial prints [PI] L:xxx R:xxx every 50ms");
+  LOG_INFO(" - Tune KFF/KP/KI in speed_controller.cpp, re-flash, repeat.");
   return;
 #endif
 
@@ -664,6 +767,164 @@ void loop() {
       Serial.print(battery_get_voltage_mv());
       Serial.print(" | BiasZ:");
       Serial.println(mpu6050_get_gyro_bias_z(), 1);
+  }
+
+  delay(5);
+  return;
+#endif
+
+#if PHASE_4_TEST_MODE == 1
+  button_update();
+  led_update();
+
+  /*
+   * ═══════════════════════════════════════════════════════
+   *  PHASE 4 LIVE TUNING — Button Scheme
+   * ═══════════════════════════════════════════════════════
+   *
+   *  BTN_START  (single press)
+   *    • Motors stopped → step to 300 mm/s
+   *    • Motors running → stop (target = 0)
+   *    Resets integrators + encoders on every press.
+   *
+   *  BTN_MODE  (SHORT press  < 600ms)
+   *    → Increase the currently selected gain:
+   *        KFF mode : +0.2 per press
+   *        KP  mode : +0.5 per press
+   *        KI  mode : +0.1 per press
+   *
+   *  BTN_MODE  (LONG press  ≥ 600ms)
+   *    → Cycle selected gain:  KFF → KP → KI → KFF …
+   *      Resets integrators on switch so you get a clean step.
+   *
+   *  Serial output (every 50ms):
+   *    [PI] L:xxx  R:xxx  tgt:300  KFF:4.0  KP:0.0  KI:0.0  [KFF]
+   *              ^--- * marks selected parameter
+   * ═══════════════════════════════════════════════════════
+   */
+
+  /* ── Gain select state (0=KFF, 1=KP, 2=KI) ─────────── */
+  static uint8_t  _p4_param   = 0;     // 0=KFF, 1=KP, 2=KI
+  static bool     _p4_running = false;
+
+  /* ── Long-press detection for BTN_MODE ──────────────── */
+  static bool     _mode_was_pressed    = false;
+  static uint32_t _mode_press_start_ms = 0;
+  static bool     _mode_long_triggered = false;
+
+  bool mode_down = button_is_pressed(BUTTON_MODE);  // raw held state
+
+  if (mode_down && !_mode_was_pressed) {
+      // Rising edge — record press start
+      _mode_was_pressed    = true;
+      _mode_press_start_ms = millis();
+      _mode_long_triggered = false;
+  }
+
+  if (mode_down && _mode_was_pressed && !_mode_long_triggered) {
+      uint32_t held_ms = millis() - _mode_press_start_ms;
+      if (held_ms >= 600) {
+          // ── LONG PRESS ── cycle parameter
+          _p4_param = (_p4_param + 1) % 3;
+          // Reset integrators for a clean step after param change
+          _p4_int_L = 0.0f;
+          _p4_int_R = 0.0f;
+          _mode_long_triggered = true;
+
+          const char* names[] = {"KFF", "KP", "KI"};
+          Serial.print(F("[Phase4] Selected param: "));
+          Serial.println(names[_p4_param]);
+
+          oled_clear();
+          oled_print(0, 0, "Select param:");
+          oled_print(0, 16, names[_p4_param]);
+          oled_update();
+          led_toggle(LED_STATUS);
+      }
+  }
+
+  if (!mode_down && _mode_was_pressed) {
+      // Falling edge
+      uint32_t held_ms = millis() - _mode_press_start_ms;
+      if (!_mode_long_triggered && held_ms < 600) {
+          // ── SHORT PRESS ── increase selected gain
+          if      (_p4_param == 0) { _p4_kff += 0.2f; }
+          else if (_p4_param == 1) { _p4_kp  += 0.5f; }
+          else                     { _p4_ki  += 0.1f; }
+
+          // Clear integrators so the step response is repeatable
+          _p4_int_L = 0.0f;
+          _p4_int_R = 0.0f;
+
+          const char* names[] = {"KFF", "KP", "KI"};
+          Serial.print(F("[Phase4] "));
+          Serial.print(names[_p4_param]);
+          Serial.print(F(" = "));
+          float vals[] = {_p4_kff, _p4_kp, _p4_ki};
+          Serial.println(vals[_p4_param], 2);
+      }
+      _mode_was_pressed = false;
+  }
+
+  /* ── BTN_START: toggle run / stop ───────────────────── */
+  if (button_just_pressed(BUTTON_START)) {
+      _p4_running = !_p4_running;
+      _p4_target_mm_s = _p4_running ? 300.0f : 0.0f;
+      // Always clear integrators on state change
+      _p4_int_L = 0.0f;
+      _p4_int_R = 0.0f;
+      encoder_reset_all();
+
+      if (_p4_running) {
+          LOG_INFO("[Phase4] ▶ Running — target 300 mm/s");
+      } else {
+          LOG_INFO("[Phase4] ■ Stopped — target 0");
+      }
+      led_toggle(LED_DEBUG);
+  }
+
+  /* ── Serial + OLED print every 50ms ─────────────────── */
+  static uint32_t last_pi_print = 0;
+  if ((phase4_timer_ticks - last_pi_print) >= 50) {
+      last_pi_print = phase4_timer_ticks;
+
+      float l_spd = encoder_get_speed_mms(ENCODER_LEFT);
+      float r_spd = encoder_get_speed_mms(ENCODER_RIGHT);
+      const char* pnames[] = {"KFF", "KP ", "KI "};
+
+      // Serial line — compact, easy to read in Serial Plotter too
+      Serial.print(F("[PI] L:"));    Serial.print(l_spd, 1);
+      Serial.print(F("  R:"));       Serial.print(r_spd, 1);
+      Serial.print(F("  tgt:"));     Serial.print(_p4_target_mm_s, 0);
+      Serial.print(F("  KFF:"));     Serial.print(_p4_kff, 2);
+      Serial.print(F("  KP:"));      Serial.print(_p4_kp, 2);
+      Serial.print(F("  KI:"));      Serial.print(_p4_ki, 2);
+      Serial.print(F("  ["));        Serial.print(pnames[_p4_param]);
+      Serial.println(F("]"));
+
+      // OLED — 6 rows
+      char buf[24];
+      oled_clear();
+      oled_print(0,  0, _p4_running ? "P4 RUNNING" : "P4 STOPPED");
+      sprintf(buf, "L:%d R:%d mm/s", (int)l_spd, (int)r_spd);
+      oled_print(0, 12, buf);
+      
+      int kff_int = (int)_p4_kff;
+      int kff_dec = (int)(_p4_kff * 10) % 10;
+      sprintf(buf, "KFF:%d.%d%s", kff_int, kff_dec, _p4_param==0 ? "<" : " ");
+      oled_print(0, 24, buf);
+      
+      int kp_int = (int)_p4_kp;
+      int kp_dec = (int)(_p4_kp * 10) % 10;
+      sprintf(buf, "KP :%d.%d%s", kp_int, kp_dec,  _p4_param==1 ? "<" : " ");
+      oled_print(0, 36, buf);
+      
+      int ki_int = (int)_p4_ki;
+      int ki_dec = (int)(_p4_ki * 100) % 100;
+      sprintf(buf, "KI :%d.%02d%s", ki_int, ki_dec,  _p4_param==2 ? "<" : " ");
+      oled_print(0, 48, buf);
+      
+      oled_update();
   }
 
   delay(5);
