@@ -64,29 +64,29 @@
  */
 
 /**
- * Wheel outer diameter (mm) — MEASURED with calipers.
- * Updated from assumed 34mm to measured ~43mm.
+ * Wheel outer diameter (mm) — CALIBRATED via Test 4.3.
+ * Push test: robot pushed 180mm, odometry showed 165mm.
+ * Correction: diameter = 43.0 × (180/165) = 46.9 mm
  *
- * Effect: all distances scale by 43/34 = 1.26×
- *   Old mm/count (34mm, 1820CPR) ≈ 0.0587
- *   New mm/count (43mm,  590CPR) ≈ 0.2289
+ * History:
+ *   34.0 mm  — initial assumption (wrong)
+ *   43.0 mm  — caliper measurement
+ *   46.9 mm  — calibrated via Test 4.3 push test ✅
  *
- * [ACTION] Verify with drive test:
- *   Drive robot exactly 1000mm on measured tape.
- *   Adjust until Serial DistL ≈ 1000mm.
- *   diameter_corrected = 1000 / (encoder_counts / CPR) / π
+ * To re-verify: push robot exactly 180mm, read X from Serial.
+ *   new_diameter = 46.9 × (180 / X_shown)
  */
-#define WHEEL_DIAMETER_MM       43.0f   /**< Wheel outer diameter — MEASURED  */
+#define WHEEL_DIAMETER_MM       46.9f   /**< Wheel outer diameter — CALIBRATED via Test 4.3 */
 
 /**
  * Wheel circumference (mm).
- * C = π × D = π × 43.0 ≈ 135.09 mm
+ * C = π × D = π × 46.9 ≈ 147.34 mm
  */
 #define WHEEL_CIRCUMFERENCE_MM  (3.14159265358979f * WHEEL_DIAMETER_MM)
 
 /**
  * Distance per encoder count (mm/count).
- * = Circumference / CPR ≈ 135.09 / 590 ≈ 0.229 mm/count
+ * = Circumference / CPR ≈ 147.34 / 581 ≈ 0.2536 mm/count
  */
 #define MM_PER_COUNT            (WHEEL_CIRCUMFERENCE_MM / ENCODER_CPR)
 
@@ -132,32 +132,32 @@
 #define RIGHT_ENCODER_CPR       581.0f   /* Measured (1-rev hand test) */
 
 /**
- * [UPDATED] Left wheel effective outer diameter (mm).
- * Physical measurement: ~43mm (was incorrectly set to 34mm).
+ * [CALIBRATED] Left wheel effective outer diameter (mm).
+ * Test 4.3 push calibration: pushed 180mm → showed 165mm
+ * Correction: 43.0 × (180/165) = 46.9 mm
  *
- * To fine-tune: drive robot exactly 1000mm on flat tape.
- *   If Serial shows 900mm → wheel is smaller than 43mm
- *   If Serial shows 1100mm → wheel is larger than 43mm
- *   diameter = 43 × (actual_mm / serial_mm)
+ * To re-calibrate:
+ *   Push robot exactly 180mm on flat floor.
+ *   new_diameter = 46.9 × (180 / X_shown)
  */
-#define LEFT_WHEEL_DIAMETER_MM  43.0f    /* Measured — was 34mm */
+#define LEFT_WHEEL_DIAMETER_MM  46.9f    /* Calibrated via Test 4.3 push test */
 
 /**
- * [UPDATED] Right wheel effective outer diameter (mm).
- * Same physical measurement as left: ~43mm.
+ * [CALIBRATED] Right wheel effective outer diameter (mm).
+ * Same correction as left: 46.9 mm.
  */
-#define RIGHT_WHEEL_DIAMETER_MM 43.0f    /* Measured — was 34mm */
+#define RIGHT_WHEEL_DIAMETER_MM 46.9f    /* Calibrated via Test 4.3 push test */
 
-/** Left wheel circumference (mm) — derived. */
+/** Left wheel circumference (mm) — derived: π × 46.9 ≈ 147.34 mm */
 #define LEFT_WHEEL_CIRC_MM      (3.14159265f * LEFT_WHEEL_DIAMETER_MM)
 
-/** Right wheel circumference (mm) — derived. */
+/** Right wheel circumference (mm) — derived: π × 46.9 ≈ 147.34 mm */
 #define RIGHT_WHEEL_CIRC_MM     (3.14159265f * RIGHT_WHEEL_DIAMETER_MM)
 
-/** Left wheel distance per count (mm/count) — derived ≈ 0.0587 mm/count */
+/** Left wheel distance per count (mm/count) — derived ≈ 0.2536 mm/count */
 #define LEFT_MM_PER_COUNT       (LEFT_WHEEL_CIRC_MM  / LEFT_ENCODER_CPR)
 
-/** Right wheel distance per count (mm/count) — derived ≈ 0.0587 mm/count */
+/** Right wheel distance per count (mm/count) — derived ≈ 0.2536 mm/count */
 #define RIGHT_MM_PER_COUNT      (RIGHT_WHEEL_CIRC_MM / RIGHT_ENCODER_CPR)
 
 /**
@@ -234,13 +234,13 @@
  * [MEASURED] Distance between the center of the left wheel tread
  * and the center of the right wheel tread (track width).
  *
- * Current: ~80.0 mm
+ * Current: 95.3 mm
  *
  * [ACTION] Verify via turn test:
  *   If robot turns 4x90° and ends up short of 360°, actual base is SMALLER.
  *   If it turns too far, actual base is LARGER.
  */
-#define WHEEL_BASE_MM           80.0f    /* Measured (calipers) */
+#define WHEEL_BASE_MM           95.3f    /* Tuned via Test 4.4 after fixing wheel diameter */
 
 /**
  * Distance from wheel axle to front sensor mounting point (mm).

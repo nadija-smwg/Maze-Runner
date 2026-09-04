@@ -25,12 +25,13 @@
 
 // Sensors
 #include "src/sensors/calibration.h"
-#include "src/sensors/sensor_fusion.h"
-#include "src/sensors/sensor_manager.h"
 #include "src/sensors/distance_manager.h"
 #include "src/sensors/mpu6050.h"
+#include "src/sensors/sensor_fusion.h"
+#include "src/sensors/sensor_manager.h"
 
 // Localization
+#include "src/localization/heading_estimator.h"
 #include "src/localization/odometry.h"
 #include "src/localization/position_estimator.h"
 
@@ -56,7 +57,7 @@
 #define PHASE_1_TEST_MODE 0
 #define PHASE_2_TEST_MODE 0
 #define PHASE_3_TEST_MODE 0
-#define PHASE_4_TEST_MODE 1   // ← Step 4.1: PI Velocity Tuning
+#define PHASE_4_TEST_MODE 1 // ← Step 4.1: PI Velocity Tuning
 
 #if PHASE_1_TEST_MODE == 1
 volatile uint32_t phase1_timer_ticks = 0;
@@ -82,10 +83,10 @@ void phase3_timer_callback(void) { phase3_timer_ticks++; }
  * volatile ensures the compiler doesn't cache stale values.
  */
 volatile uint32_t phase4_timer_ticks = 0;
-volatile float    _p4_target_mm_s    = 0.0f;
-volatile float    _p4_kff            = 2.4f; // Default KFF based on tuning
-volatile float    _p4_kp             = 13.0f; // Default KP based on autotune
-volatile float    _p4_ki             = 2.0f;  // Default KI based on autotune
+volatile float _p4_target_mm_s = 0.0f;
+volatile float _p4_kff = 2.4f; // Default KFF based on tuning
+volatile float _p4_kp = 13.0f; // Default KP based on autotune
+volatile float _p4_ki = 2.0f;  // Default KI based on autotune
 
 /*
  * speed_controller_update_live — same math as speed_controller.cpp
@@ -96,69 +97,85 @@ static float _p4_int_L = 0.0f;
 static float _p4_int_R = 0.0f;
 
 // Auto-tuner variables
-volatile bool     _autotune_running  = false;
-volatile uint32_t _autotune_time_ms  = 0;
-volatile float    _autotune_score    = 0.0f;
-volatile float    _autotune_max_spd  = 0.0f;
+volatile bool _autotune_running = false;
+volatile uint32_t _autotune_time_ms = 0;
+volatile float _autotune_score = 0.0f;
+volatile float _autotune_max_spd = 0.0f;
 
 static inline float _p4_clamp(float v, float lo, float hi) {
-    return (v < lo) ? lo : (v > hi) ? hi : v;
+  return (v < lo) ? lo : (v > hi) ? hi : v;
 }
 
 void phase4_timer_callback(void) {
-    phase4_timer_ticks++;
+  phase4_timer_ticks++;
 
-    // 1. Update velocity LPF
-    encoder_update_velocity(CONTROL_LOOP_DT_S);
+  // 1. Capture encoder deltas FIRST (before velocity LPF resets them)
+  int32_t l_ticks = encoder_get_delta(ENCODER_LEFT);
+  int32_t r_ticks = encoder_get_delta(ENCODER_RIGHT);
 
-    float tgt   = _p4_target_mm_s;
-    float kff   = _p4_kff;
-    float kp    = _p4_kp;
-    float ki    = _p4_ki;
-    float dt    = CONTROL_LOOP_DT_S;  // 0.001s
+  // 2. Update velocity LPF (smoothed mm/s for PI controller)
+  encoder_update_velocity(CONTROL_LOOP_DT_S);
 
-    float actual_L = encoder_get_speed_mms(ENCODER_LEFT);
-    float actual_R = encoder_get_speed_mms(ENCODER_RIGHT);
+  // 3. Odometry pose update (Step 4.2)
+  odometry_update(l_ticks * LEFT_MM_PER_COUNT, r_ticks * RIGHT_MM_PER_COUNT);
 
-    // Left wheel PI
-    float out_L = 0.0f;
-    float err_L = 0.0f;
-    if (tgt == 0.0f) {
-        _p4_int_L = 0.0f; // Clear windup while stopped
-    } else {
-        err_L  = tgt - actual_L;
-        _p4_int_L    = _p4_clamp(_p4_int_L + err_L * dt, -1000.0f, 1000.0f);
-        out_L  = kff * tgt + kp * err_L + ki * _p4_int_L;
-        out_L  = _p4_clamp(out_L, -(float)PWM_MAX, (float)PWM_MAX);
-    }
+  // 4. Heading fusion (gyro + encoder) (Step 4.3)
+  // NOTE: mpu6050_update_filter() CANNOT be called here (ISR + I2C = deadlock).
+  // It is called from loop() at ~200Hz instead. We just read the cached value.
+  IMUScaledData imu;
+  mpu6050_get_filtered(&imu);
+  heading_estimator_update(imu.gyro_z_dps, odometry_get_pose().theta_rad, CONTROL_LOOP_DT_S);
 
-    // Right wheel PI
-    float out_R = 0.0f;
-    float err_R = 0.0f;
-    if (tgt == 0.0f) {
-        _p4_int_R = 0.0f;
-    } else {
-        err_R  = tgt - actual_R;
-        _p4_int_R    = _p4_clamp(_p4_int_R + err_R * dt, -1000.0f, 1000.0f);
-        out_R  = kff * tgt + kp * err_R + ki * _p4_int_R;
-        out_R  = _p4_clamp(out_R, -(float)PWM_MAX, (float)PWM_MAX);
-    }
+  float tgt = _p4_target_mm_s;
+  float kff = _p4_kff;
+  float kp = _p4_kp;
+  float ki = _p4_ki;
+  float dt = CONTROL_LOOP_DT_S; // 0.001s
 
-    motor_set_speed_compensated(MOTOR_LEFT,  (int16_t)out_L);
-    motor_set_speed_compensated(MOTOR_RIGHT, (int16_t)out_R);
+  float actual_L = encoder_get_speed_mms(ENCODER_LEFT);
+  float actual_R = encoder_get_speed_mms(ENCODER_RIGHT);
 
-    // Auto-tuner tracking
-    if (_autotune_running && tgt > 0.0f) {
-        _autotune_time_ms++;
-        float abs_err_L = (err_L > 0.0f) ? err_L : -err_L;
-        float abs_err_R = (err_R > 0.0f) ? err_R : -err_R;
-        float time_sec = _autotune_time_ms * 0.001f;
-        // ITAE = sum of (absolute error * time)
-        _autotune_score += (abs_err_L + abs_err_R) * 0.5f * time_sec * dt;
+  // Left wheel PI
+  float out_L = 0.0f;
+  float err_L = 0.0f;
+  if (tgt == 0.0f) {
+    _p4_int_L = 0.0f; // Clear windup while stopped
+  } else {
+    err_L = tgt - actual_L;
+    _p4_int_L = _p4_clamp(_p4_int_L + err_L * dt, -1000.0f, 1000.0f);
+    out_L = kff * tgt + kp * err_L + ki * _p4_int_L;
+    out_L = _p4_clamp(out_L, -(float)PWM_MAX, (float)PWM_MAX);
+  }
 
-        if (actual_L > _autotune_max_spd) _autotune_max_spd = actual_L;
-        if (actual_R > _autotune_max_spd) _autotune_max_spd = actual_R;
-    }
+  // Right wheel PI
+  float out_R = 0.0f;
+  float err_R = 0.0f;
+  if (tgt == 0.0f) {
+    _p4_int_R = 0.0f;
+  } else {
+    err_R = tgt - actual_R;
+    _p4_int_R = _p4_clamp(_p4_int_R + err_R * dt, -1000.0f, 1000.0f);
+    out_R = kff * tgt + kp * err_R + ki * _p4_int_R;
+    out_R = _p4_clamp(out_R, -(float)PWM_MAX, (float)PWM_MAX);
+  }
+
+  motor_set_speed_compensated(MOTOR_LEFT, (int16_t)out_L);
+  motor_set_speed_compensated(MOTOR_RIGHT, (int16_t)out_R);
+
+  // Auto-tuner tracking
+  if (_autotune_running && tgt > 0.0f) {
+    _autotune_time_ms++;
+    float abs_err_L = (err_L > 0.0f) ? err_L : -err_L;
+    float abs_err_R = (err_R > 0.0f) ? err_R : -err_R;
+    float time_sec = _autotune_time_ms * 0.001f;
+    // ITAE = sum of (absolute error * time)
+    _autotune_score += (abs_err_L + abs_err_R) * 0.5f * time_sec * dt;
+
+    if (actual_L > _autotune_max_spd)
+      _autotune_max_spd = actual_L;
+    if (actual_R > _autotune_max_spd)
+      _autotune_max_spd = actual_R;
+  }
 }
 #endif
 
@@ -179,11 +196,11 @@ void setup() {
   Wire.begin();
   Wire.setClock(400000);
   if (oled_init()) {
-      oled_clear();
-      oled_print(0, 0, "Phase 1 Test Mode");
-      oled_update();
+    oled_clear();
+    oled_print(0, 0, "Phase 1 Test Mode");
+    oled_update();
   } else {
-      LOG_ERROR("OLED Init Failed");
+    LOG_ERROR("OLED Init Failed");
   }
 
   uint16_t v_mv = battery_get_voltage_mv();
@@ -219,11 +236,11 @@ void setup() {
   Wire.begin();
   Wire.setClock(400000);
   if (oled_init()) {
-      oled_clear();
-      oled_print(0, 0, "Phase 2 Test Mode");
-      oled_update();
+    oled_clear();
+    oled_print(0, 0, "Phase 2 Test Mode");
+    oled_update();
   } else {
-      LOG_ERROR("OLED Init Failed");
+    LOG_ERROR("OLED Init Failed");
   }
 
   // Reset encoders to zero
@@ -251,11 +268,11 @@ void setup() {
   Wire.begin();
   Wire.setClock(400000);
   if (oled_init()) {
-      oled_clear();
-      oled_print(0, 0, "Phase 3 Booting");
-      oled_update();
+    oled_clear();
+    oled_print(0, 0, "Phase 3 Booting");
+    oled_update();
   } else {
-      LOG_ERROR("OLED Init Failed");
+    LOG_ERROR("OLED Init Failed");
   }
 
   // Initialize Sensors
@@ -291,31 +308,39 @@ void setup() {
   Wire.begin();
   Wire.setClock(400000);
   if (oled_init()) {
-      oled_clear();
-      oled_print(0, 0, "Phase 4 PI Tune");
-      oled_print(0, 16, "BTN_START = GO");
-      oled_print(0, 32, "BTN_MODE  = STOP");
-      oled_update();
+    oled_clear();
+    oled_print(0, 0, "Phase 4 PI Tune");
+    oled_print(0, 16, "BTN_START = GO");
+    oled_print(0, 32, "BTN_MODE  = STOP");
+    oled_update();
   } else {
-      LOG_ERROR("OLED Init Failed");
+    LOG_ERROR("OLED Init Failed");
   }
+
+  // Init sensors (Step 4.2 — MPU6050 needed for future heading step)
+  sensor_manager_init();
+  calibrate_all();  // zero gyro bias at startup
 
   // Init PI controller state
   velocity_controller_init();
   encoder_reset_all();
 
+  // Init odometry & heading estimator (Step 4.2 & 4.3)
+  odometry_init();
+  heading_estimator_init();
+
   // Start 1kHz PI control loop
   timer_init(phase4_timer_callback);
   timer_start();
 
-  LOG_INFO("Phase 4 Ready!");
+  LOG_INFO("Phase 4 Ready! (Step 4.2: Odometry active)");
   LOG_INFO(" - BTN_START : Step to 300 mm/s (lift wheels first!)");
   LOG_INFO(" - BTN_MODE  : Stop motors (target = 0)");
   LOG_INFO(" - Serial prints [PI] L:xxx R:xxx every 50ms");
-  LOG_INFO(" - Tune KFF/KP/KI in speed_controller.cpp, re-flash, repeat.");
+  LOG_INFO(" - Long-press BTN_MODE 4x to reach ODOM mode -> see X/Y/Theta live");
+  LOG_INFO(" - In ODOM mode, short-press BTN_MODE to reset pose to 0,0,0");
   return;
 #endif
-
 
   // 1. Hardware Initialization (Motors, Pins, Encoders, Battery, etc.)
   gpio_init_motor_pins();
@@ -413,7 +438,7 @@ void loop() {
   static uint32_t last_print_ticks = 0;
   if ((phase1_timer_ticks - last_print_ticks) >= 1000) {
     last_print_ticks = phase1_timer_ticks;
-    
+
     char buf[32];
     oled_clear();
     oled_print(0, 0, "Phase 1 Test");
@@ -438,11 +463,11 @@ void loop() {
   button_update();
   led_update();
 
-  static int      test_state  = 0;
-  static uint16_t dz_pwm      = 400;   /* start above likely dead-zone */
-  static uint32_t last_dz     = 0;
-  static bool     dz_settled  = false; /* skip first read — motor hasn't moved yet */
-  static int32_t  dz_count_prev = 0;  /* raw encoder count for motion detection */
+  static int test_state = 0;
+  static uint16_t dz_pwm = 400; /* start above likely dead-zone */
+  static uint32_t last_dz = 0;
+  static bool dz_settled = false; /* skip first read — motor hasn't moved yet */
+  static int32_t dz_count_prev = 0; /* raw encoder count for motion detection */
 
   /*
    * BTN_START — cycle states 0-8 (9 states total)
@@ -458,7 +483,7 @@ void loop() {
    */
   if (button_just_pressed(BUTTON_START)) {
     test_state = (test_state + 1) % 9;
-    motor_stop();   /* always safe-stop on every state change */
+    motor_stop(); /* always safe-stop on every state change */
 
     switch (test_state) {
     /* ── Basic drive states ─────────────────────────────────── */
@@ -485,37 +510,43 @@ void loop() {
     /* ── Dead-zone sweep ────────────────────────────────────── */
     case 5:
       Serial.println(F("\n=== TEST 3.3: DEAD-ZONE SWEEP (LEFT) ==="));
-      Serial.println(F("Sweeping LEFT motor PWM 200->2500. Hold robot safely!"));
+      Serial.println(
+          F("Sweeping LEFT motor PWM 200->2500. Hold robot safely!"));
       oled_clear();
-      oled_print(0,  0, "DZ: LEFT motor");
+      oled_print(0, 0, "DZ: LEFT motor");
       oled_print(0, 15, "Sweeping...");
       oled_update();
 
       motor_stop();
-      delay(300);           /* let motor fully brake before sweep */
-      encoder_reset_all();  /* zero counts from a clean stop     */
+      delay(300);          /* let motor fully brake before sweep */
+      encoder_reset_all(); /* zero counts from a clean stop     */
 
       {
         bool dz_found = false;
         for (uint16_t pwm = 200; pwm <= 2500 && !dz_found; pwm += 50) {
-          int32_t cnt_before = encoder_get_count(ENCODER_LEFT); /* snapshot BEFORE */
-          motor_set_speed(MOTOR_LEFT,  (int16_t)pwm);
+          int32_t cnt_before =
+              encoder_get_count(ENCODER_LEFT); /* snapshot BEFORE */
+          motor_set_speed(MOTOR_LEFT, (int16_t)pwm);
           motor_set_speed(MOTOR_RIGHT, 0);
-          delay(400);  /* settle time */
+          delay(400); /* settle time */
           int32_t cnt_after = encoder_get_count(ENCODER_LEFT);
 
           int32_t diff = cnt_after - cnt_before;
-          if (diff < 0) diff = -diff;
+          if (diff < 0)
+            diff = -diff;
 
-          Serial.print(F("LEFT PWM:")); Serial.print(pwm);
-          Serial.print(F("  counts:")); Serial.print(diff);
+          Serial.print(F("LEFT PWM:"));
+          Serial.print(pwm);
+          Serial.print(F("  counts:"));
+          Serial.print(diff);
 
           if (diff >= 3) {
             Serial.println(F("  <<< MOVING!"));
-            Serial.print(F(">>> Set LEFT_MOTOR_DEAD_PWM = ")); Serial.println(pwm);
+            Serial.print(F(">>> Set LEFT_MOTOR_DEAD_PWM = "));
+            Serial.println(pwm);
             char b[22];
             oled_clear();
-            oled_print(0,  0, "LEFT: FOUND!");
+            oled_print(0, 0, "LEFT: FOUND!");
             sprintf(b, "PWM = %u", pwm);
             oled_print(0, 20, b);
             sprintf(b, "Cnt diff = %ld", (long)diff);
@@ -527,27 +558,29 @@ void loop() {
             Serial.println(F("  (not moving)"));
           }
 
-          motor_stop();  /* stop between steps for clean measurement */
+          motor_stop(); /* stop between steps for clean measurement */
           delay(100);
         }
         if (!dz_found) {
           Serial.println(F("!!! Motor did NOT move up to PWM 2500 !!!"));
           Serial.println(F("Check wiring, power, and motor connections."));
           oled_clear();
-          oled_print(0,  0, "LEFT: NOT FOUND");
+          oled_print(0, 0, "LEFT: NOT FOUND");
           oled_print(0, 20, "Check wiring!");
           oled_update();
         }
       }
       motor_stop();
-      /* stay in state 5 so user can read result — press BTN_START to continue */
+      /* stay in state 5 so user can read result — press BTN_START to continue
+       */
       break;
 
     case 6:
       Serial.println(F("\n=== TEST 3.3: DEAD-ZONE SWEEP (RIGHT) ==="));
-      Serial.println(F("Sweeping RIGHT motor PWM 200->2500. Hold robot safely!"));
+      Serial.println(
+          F("Sweeping RIGHT motor PWM 200->2500. Hold robot safely!"));
       oled_clear();
-      oled_print(0,  0, "DZ: RIGHT motor");
+      oled_print(0, 0, "DZ: RIGHT motor");
       oled_print(0, 15, "Sweeping...");
       oled_update();
 
@@ -559,23 +592,27 @@ void loop() {
         bool dz_found = false;
         for (uint16_t pwm = 200; pwm <= 2500 && !dz_found; pwm += 50) {
           int32_t cnt_before = encoder_get_count(ENCODER_RIGHT);
-          motor_set_speed(MOTOR_LEFT,  0);
+          motor_set_speed(MOTOR_LEFT, 0);
           motor_set_speed(MOTOR_RIGHT, (int16_t)pwm);
           delay(400);
           int32_t cnt_after = encoder_get_count(ENCODER_RIGHT);
 
           int32_t diff = cnt_after - cnt_before;
-          if (diff < 0) diff = -diff;
+          if (diff < 0)
+            diff = -diff;
 
-          Serial.print(F("RIGHT PWM:")); Serial.print(pwm);
-          Serial.print(F("  counts:")); Serial.print(diff);
+          Serial.print(F("RIGHT PWM:"));
+          Serial.print(pwm);
+          Serial.print(F("  counts:"));
+          Serial.print(diff);
 
           if (diff >= 3) {
             Serial.println(F("  <<< MOVING!"));
-            Serial.print(F(">>> Set RIGHT_MOTOR_DEAD_PWM = ")); Serial.println(pwm);
+            Serial.print(F(">>> Set RIGHT_MOTOR_DEAD_PWM = "));
+            Serial.println(pwm);
             char b[22];
             oled_clear();
-            oled_print(0,  0, "RIGHT: FOUND!");
+            oled_print(0, 0, "RIGHT: FOUND!");
             sprintf(b, "PWM = %u", pwm);
             oled_print(0, 20, b);
             sprintf(b, "Cnt diff = %ld", (long)diff);
@@ -594,7 +631,7 @@ void loop() {
           Serial.println(F("!!! Motor did NOT move up to PWM 2500 !!!"));
           Serial.println(F("Check wiring, power, and motor connections."));
           oled_clear();
-          oled_print(0,  0, "RIGHT: NOT FOUND");
+          oled_print(0, 0, "RIGHT: NOT FOUND");
           oled_print(0, 20, "Check wiring!");
           oled_update();
         }
@@ -607,10 +644,11 @@ void loop() {
     case 7:
       encoder_reset_all();
       Serial.println(F("\n=== TEST F.1: CPR VERIFY (LEFT wheel) ==="));
-      Serial.println(F("Mark wheel. Rotate exactly 1 revolution. Press BTN_MODE."));
+      Serial.println(
+          F("Mark wheel. Rotate exactly 1 revolution. Press BTN_MODE."));
       Serial.println(F("Expected: ~588 counts"));
       oled_clear();
-      oled_print(0,  0, "CPR: LEFT wheel");
+      oled_print(0, 0, "CPR: LEFT wheel");
       oled_print(0, 16, "1. Mark wheel");
       oled_print(0, 28, "2. Rotate 1 rev");
       oled_print(0, 40, "3. Press MODE");
@@ -620,10 +658,11 @@ void loop() {
     case 8:
       encoder_reset_all();
       Serial.println(F("\n=== TEST F.1: CPR VERIFY (RIGHT wheel) ==="));
-      Serial.println(F("Mark wheel. Rotate exactly 1 revolution. Press BTN_MODE."));
+      Serial.println(
+          F("Mark wheel. Rotate exactly 1 revolution. Press BTN_MODE."));
       Serial.println(F("Expected: ~588 counts"));
       oled_clear();
-      oled_print(0,  0, "CPR: RIGHT wheel");
+      oled_print(0, 0, "CPR: RIGHT wheel");
       oled_print(0, 16, "1. Mark wheel");
       oled_print(0, 28, "2. Rotate 1 rev");
       oled_print(0, 40, "3. Press MODE");
@@ -637,28 +676,32 @@ void loop() {
   /* ── BTN_MODE: CPR capture (states 7,8) or encoder reset (others) ───── */
   if (button_just_pressed(BUTTON_MODE)) {
     if (test_state == 7 || test_state == 8) {
-      EncoderID enc  = (test_state == 7) ? ENCODER_LEFT : ENCODER_RIGHT;
-      int32_t   cnt  = encoder_get_count(enc);
-      float     diff = (float)cnt - 1820.0f;
-      float     err  = (diff / 1820.0f) * 100.0f;
-      bool      ok   = (fabsf(diff) <= 20.0f);   /* ±1.1% tolerance */
+      EncoderID enc = (test_state == 7) ? ENCODER_LEFT : ENCODER_RIGHT;
+      int32_t cnt = encoder_get_count(enc);
+      float diff = (float)cnt - 1820.0f;
+      float err = (diff / 1820.0f) * 100.0f;
+      bool ok = (fabsf(diff) <= 20.0f); /* ±1.1% tolerance */
 
       Serial.println();
       Serial.print(F("[CPR] "));
       Serial.print(test_state == 7 ? "LEFT " : "RIGHT");
-      Serial.print(F(" wheel: measured=")); Serial.print(cnt);
+      Serial.print(F(" wheel: measured="));
+      Serial.print(cnt);
       Serial.print(F(" | expected=1820 | error="));
-      Serial.print(err, 1); Serial.print(F("%"));
+      Serial.print(err, 1);
+      Serial.print(F("%"));
       Serial.println(ok ? F("  PASS") : F("  FAIL!"));
       if (!ok) {
         Serial.print(F("[CPR] Fix in robot_config.h: #define "));
-        Serial.print(test_state == 7 ? "LEFT_ENCODER_CPR  " : "RIGHT_ENCODER_CPR ");
+        Serial.print(test_state == 7 ? "LEFT_ENCODER_CPR  "
+                                     : "RIGHT_ENCODER_CPR ");
         Serial.println(cnt);
       }
 
       char cpr_buf[20];
       oled_clear();
-      oled_print(0,  0, test_state == 7 ? "CPR LEFT result:" : "CPR RIGHT result:");
+      oled_print(0, 0,
+                 test_state == 7 ? "CPR LEFT result:" : "CPR RIGHT result:");
       sprintf(cpr_buf, "Got: %ld", (long)cnt);
       oled_print(0, 16, cpr_buf);
       oled_print(0, 32, "Exp: ~588-592");
@@ -689,18 +732,19 @@ void loop() {
 
     int32_t l_delta = encoder_get_delta(ENCODER_LEFT);
     int32_t r_delta = encoder_get_delta(ENCODER_RIGHT);
-    /* encoder_get_delta() returns counts since the LAST 50ms velocity update   */
-    /* (consumed by encoder_update_velocity every 50ms). Divide by 0.05s = ×20. */
-    float l_speed_raw  = encoder_counts_to_speed(l_delta * 20.0f);
-    float r_speed_raw  = encoder_counts_to_speed(r_delta * 20.0f);
+    /* encoder_get_delta() returns counts since the LAST 50ms velocity update */
+    /* (consumed by encoder_update_velocity every 50ms). Divide by 0.05s = ×20.
+     */
+    float l_speed_raw = encoder_counts_to_speed(l_delta * 20.0f);
+    float r_speed_raw = encoder_counts_to_speed(r_delta * 20.0f);
     float l_speed_filt = encoder_get_speed_mms(ENCODER_LEFT);
     float r_speed_filt = encoder_get_speed_mms(ENCODER_RIGHT);
-    float l_dist_filt  = encoder_get_distance_mm(ENCODER_LEFT);
-    float r_dist_filt  = encoder_get_distance_mm(ENCODER_RIGHT);
+    float l_dist_filt = encoder_get_distance_mm(ENCODER_LEFT);
+    float r_dist_filt = encoder_get_distance_mm(ENCODER_RIGHT);
 
     char buf[32];
     oled_clear();
-    oled_print(0,  0, "- Phase 2 Test -");
+    oled_print(0, 0, "- Phase 2 Test -");
     sprintf(buf, "L: %d mm/s", (int)l_speed_filt);
     oled_print(0, 16, buf);
     sprintf(buf, "R: %d mm/s", (int)r_speed_filt);
@@ -712,12 +756,18 @@ void loop() {
     oled_update();
 
     Serial.print(F("[Phase 2]"));
-    Serial.print(F(" L_raw:"));    Serial.print(l_speed_raw,  1);
-    Serial.print(F(" L_filt:"));   Serial.print(l_speed_filt, 1);
-    Serial.print(F(" mm/s | R_raw:")); Serial.print(r_speed_raw,  1);
-    Serial.print(F(" R_filt:"));   Serial.print(r_speed_filt, 1);
-    Serial.print(F(" mm/s | DistL:")); Serial.print(l_dist_filt, 0);
-    Serial.print(F(" DistR:"));    Serial.print(r_dist_filt,  0);
+    Serial.print(F(" L_raw:"));
+    Serial.print(l_speed_raw, 1);
+    Serial.print(F(" L_filt:"));
+    Serial.print(l_speed_filt, 1);
+    Serial.print(F(" mm/s | R_raw:"));
+    Serial.print(r_speed_raw, 1);
+    Serial.print(F(" R_filt:"));
+    Serial.print(r_speed_filt, 1);
+    Serial.print(F(" mm/s | DistL:"));
+    Serial.print(l_dist_filt, 0);
+    Serial.print(F(" DistR:"));
+    Serial.print(r_dist_filt, 0);
     Serial.println(F(" mm"));
   }
 
@@ -730,74 +780,74 @@ void loop() {
   led_update();
 
   if (button_just_pressed(BUTTON_START)) {
-      LOG_INFO("Re-calibrating Gyro (no warm-up)...");
-      calibrate_with_warmup(0);  /* 0 = skip warm-up, calibrate immediately */
+    LOG_INFO("Re-calibrating Gyro (no warm-up)...");
+    calibrate_with_warmup(0); /* 0 = skip warm-up, calibrate immediately */
   }
-  
+
   if (button_just_pressed(BUTTON_MODE)) {
-      led_toggle(LED_DEBUG);
+    led_toggle(LED_DEBUG);
   }
 
   static uint32_t last_sensor_print = 0;
   // Update sensors every 100ms (10Hz)
   if ((phase3_timer_ticks - last_sensor_print) >= 100) {
-      last_sensor_print = phase3_timer_ticks;
-      
-      sensor_manager_update();
-      
-      // Use the new EMA filter (dt = 0.1s for 10Hz)
-      mpu6050_set_stationary(true); // Tell filter robot is not moving
-      mpu6050_update_filter(0.1f);
-      
-      IMUScaledData imu_filt;
-      mpu6050_get_filtered(&imu_filt);
-      
-      IMUScaledData imu_raw;
-      mpu6050_read_scaled(&imu_raw);
-      
-      uint16_t dist_f = distance_get_mm(TOF_FRONT);
-      uint16_t dist_fl = distance_get_mm(TOF_FRONT_LEFT);
-      uint16_t dist_fr = distance_get_mm(TOF_FRONT_RIGHT);
-      uint16_t dist_l = distance_get_mm(TOF_LEFT);
-      uint16_t dist_r = distance_get_mm(TOF_RIGHT);
-      
-      char buf[32];
-      oled_clear();
-      oled_print(0, 0, "- Phase 3 Test -");
-      
-      sprintf(buf, "F:%u FL:%u FR:%u", dist_f, dist_fl, dist_fr);
-      oled_print(0, 15, buf);
-      
-      sprintf(buf, "L:%u R:%u", dist_l, dist_r);
-      oled_print(0, 25, buf);
-      
-      String gyroStr = String(imu_filt.gyro_z_dps, 1);
-      sprintf(buf, "GzFilt: %s dps", gyroStr.c_str());
-      oled_print(0, 40, buf);
-      
-      sprintf(buf, "Bat: %u mV", battery_get_voltage_mv());
-      oled_print(0, 50, buf);
-      
-      oled_update();
-      
-      Serial.print("[Phase3] F:");
-      Serial.print(dist_f);
-      Serial.print(" FL:");
-      Serial.print(dist_fl);
-      Serial.print(" FR:");
-      Serial.print(dist_fr);
-      Serial.print(" L:");
-      Serial.print(dist_l);
-      Serial.print(" R:");
-      Serial.print(dist_r);
-      Serial.print(" | GzRaw:");
-      Serial.print(imu_raw.gyro_z_dps, 1);
-      Serial.print(" | GzFilt:");
-      Serial.print(imu_filt.gyro_z_dps, 2);
-      Serial.print(" | Bat:");
-      Serial.print(battery_get_voltage_mv());
-      Serial.print(" | BiasZ:");
-      Serial.println(mpu6050_get_gyro_bias_z(), 1);
+    last_sensor_print = phase3_timer_ticks;
+
+    sensor_manager_update();
+
+    // Use the new EMA filter (dt = 0.1s for 10Hz)
+    mpu6050_set_stationary(true); // Tell filter robot is not moving
+    mpu6050_update_filter(0.1f);
+
+    IMUScaledData imu_filt;
+    mpu6050_get_filtered(&imu_filt);
+
+    IMUScaledData imu_raw;
+    mpu6050_read_scaled(&imu_raw);
+
+    uint16_t dist_f = distance_get_mm(TOF_FRONT);
+    uint16_t dist_fl = distance_get_mm(TOF_FRONT_LEFT);
+    uint16_t dist_fr = distance_get_mm(TOF_FRONT_RIGHT);
+    uint16_t dist_l = distance_get_mm(TOF_LEFT);
+    uint16_t dist_r = distance_get_mm(TOF_RIGHT);
+
+    char buf[32];
+    oled_clear();
+    oled_print(0, 0, "- Phase 3 Test -");
+
+    sprintf(buf, "F:%u FL:%u FR:%u", dist_f, dist_fl, dist_fr);
+    oled_print(0, 15, buf);
+
+    sprintf(buf, "L:%u R:%u", dist_l, dist_r);
+    oled_print(0, 25, buf);
+
+    String gyroStr = String(imu_filt.gyro_z_dps, 1);
+    sprintf(buf, "GzFilt: %s dps", gyroStr.c_str());
+    oled_print(0, 40, buf);
+
+    sprintf(buf, "Bat: %u mV", battery_get_voltage_mv());
+    oled_print(0, 50, buf);
+
+    oled_update();
+
+    Serial.print("[Phase3] F:");
+    Serial.print(dist_f);
+    Serial.print(" FL:");
+    Serial.print(dist_fl);
+    Serial.print(" FR:");
+    Serial.print(dist_fr);
+    Serial.print(" L:");
+    Serial.print(dist_l);
+    Serial.print(" R:");
+    Serial.print(dist_r);
+    Serial.print(" | GzRaw:");
+    Serial.print(imu_raw.gyro_z_dps, 1);
+    Serial.print(" | GzFilt:");
+    Serial.print(imu_filt.gyro_z_dps, 2);
+    Serial.print(" | Bat:");
+    Serial.print(battery_get_voltage_mv());
+    Serial.print(" | BiasZ:");
+    Serial.println(mpu6050_get_gyro_bias_z(), 1);
   }
 
   delay(5);
@@ -807,6 +857,10 @@ void loop() {
 #if PHASE_4_TEST_MODE == 1
   button_update();
   led_update();
+
+  // Update MPU6050 EMA filter here (main loop, safe for I2C — NOT in ISR!)
+  // ~200Hz because delay(5) at bottom gives 5ms period
+  mpu6050_update_filter(0.005f);
 
   /*
    * ═══════════════════════════════════════════════════════
@@ -834,81 +888,92 @@ void loop() {
    * ═══════════════════════════════════════════════════════
    */
 
-  /* ── Gain select state (0=KFF, 1=KP, 2=KI) ─────────── */
-  static uint8_t  _p4_param   = 0;     // 0=KFF, 1=KP, 2=KI
-  static bool     _p4_running = false;
+  /* ── Gain select state (0=KFF, 1=KP, 2=KI, 3=ODOM) ─────────── */
+  static uint8_t _p4_param = 0; // 0=KFF, 1=KP, 2=KI, 3=ODOM
+  static bool _p4_running = false;
 
   /* ── Long-press detection for BTN_MODE ──────────────── */
-  static bool     _mode_was_pressed    = false;
+  static bool _mode_was_pressed = false;
   static uint32_t _mode_press_start_ms = 0;
-  static bool     _mode_long_triggered = false;
+  static bool _mode_long_triggered = false;
 
-  bool mode_down = button_is_pressed(BUTTON_MODE);  // raw held state
+  bool mode_down = button_is_pressed(BUTTON_MODE); // raw held state
 
   if (mode_down && !_mode_was_pressed) {
-      // Rising edge — record press start
-      _mode_was_pressed    = true;
-      _mode_press_start_ms = millis();
-      _mode_long_triggered = false;
+    // Rising edge — record press start
+    _mode_was_pressed = true;
+    _mode_press_start_ms = millis();
+    _mode_long_triggered = false;
   }
 
   if (mode_down && _mode_was_pressed && !_mode_long_triggered) {
-      uint32_t held_ms = millis() - _mode_press_start_ms;
-      if (held_ms >= 600) {
-          // ── LONG PRESS ── cycle parameter
-          _p4_param = (_p4_param + 1) % 3;
-          // Reset integrators for a clean step after param change
-          _p4_int_L = 0.0f;
-          _p4_int_R = 0.0f;
-          _mode_long_triggered = true;
+    uint32_t held_ms = millis() - _mode_press_start_ms;
+    if (held_ms >= 600) {
+      // ── LONG PRESS ── cycle parameter
+      _p4_param = (_p4_param + 1) % 4; // Now cycles 0, 1, 2, 3
+      // Reset integrators for a clean step after param change
+      _p4_int_L = 0.0f;
+      _p4_int_R = 0.0f;
+      _mode_long_triggered = true;
 
-          const char* names[] = {"KFF", "KP", "KI"};
-          Serial.print(F("[Phase4] Selected param: "));
-          Serial.println(names[_p4_param]);
+      const char *names[] = {"KFF", "KP", "KI", "ODOM"};
+      Serial.print(F("[Phase4] Selected param: "));
+      Serial.println(names[_p4_param]);
 
-          oled_clear();
-          oled_print(0, 0, "Select param:");
-          oled_print(0, 16, names[_p4_param]);
-          oled_update();
-          led_toggle(LED_STATUS);
-      }
+      oled_clear();
+      oled_print(0, 0, "Select param:");
+      oled_print(0, 16, names[_p4_param]);
+      oled_update();
+      led_toggle(LED_STATUS);
+    }
   }
 
   if (!mode_down && _mode_was_pressed) {
-      // Falling edge
-      uint32_t held_ms = millis() - _mode_press_start_ms;
-      if (!_mode_long_triggered && held_ms < 600) {
-          // ── SHORT PRESS ── increase selected gain
-          if      (_p4_param == 0) { _p4_kff += 0.2f; }
-          else if (_p4_param == 1) { _p4_kp  += 0.5f; }
-          else                     { _p4_ki  += 0.1f; }
-
-          // Clear integrators so the step response is repeatable
-          _p4_int_L = 0.0f;
-          _p4_int_R = 0.0f;
-
-          const char* names[] = {"KFF", "KP", "KI"};
-          Serial.print(F("[Phase4] "));
-          Serial.print(names[_p4_param]);
-          Serial.print(F(" = "));
-          float vals[] = {_p4_kff, _p4_kp, _p4_ki};
-          Serial.println(vals[_p4_param], 2);
+    // Falling edge
+    uint32_t held_ms = millis() - _mode_press_start_ms;
+    if (!_mode_long_triggered && held_ms < 600) {
+      // ── SHORT PRESS ── increase selected gain or reset odom
+      if (_p4_param == 0) {
+        _p4_kff += 0.2f;
+      } else if (_p4_param == 1) {
+        _p4_kp += 0.5f;
+      } else if (_p4_param == 2) {
+        _p4_ki += 0.1f;
+      } else if (_p4_param == 3) {
+        odometry_init();
+        heading_estimator_init();
+        encoder_reset_all();
+        LOG_INFO("[Phase4] Odometry Reset!");
       }
-      _mode_was_pressed = false;
+
+      // Clear integrators so the step response is repeatable
+      _p4_int_L = 0.0f;
+      _p4_int_R = 0.0f;
+
+      if (_p4_param != 3) {
+        const char *names[] = {"KFF", "KP", "KI"};
+        Serial.print(F("[Phase4] "));
+        Serial.print(names[_p4_param]);
+        Serial.print(F(" = "));
+        float vals[] = {_p4_kff, _p4_kp, _p4_ki};
+        Serial.println(vals[_p4_param], 2);
+      }
+    }
+    _mode_was_pressed = false;
   }
 
   /* ── Auto-tune state & structure ────────────────────── */
   struct AutoTuneResult {
-      float kp;
-      float ki;
-      float score;
-      float max_overshoot;
+    float kp;
+    float ki;
+    float score;
+    float max_overshoot;
   };
-  static bool           _autotune_active = false;
-  static int            _autotune_kp_idx = 0;
-  static int            _autotune_ki_idx = 0;
-  static int            _autotune_state  = 0; // 0=resting, 1=running
-  static uint32_t       _autotune_state_start_ms = 0;
+  static bool _autotune_active = false;
+  static int _autotune_kp_idx = 0;
+  static int _autotune_ki_idx = 0;
+  static int _autotune_state = 0; // 0=resting, 1=running
+  static uint32_t _autotune_state_start_ms = 0;
   static AutoTuneResult _autotune_results[100];
 
   /* ── BTN_START: toggle run/stop OR long-press autotune ── */
@@ -918,217 +983,272 @@ void loop() {
   static bool _start_long_triggered = false;
 
   if (start_down && !_start_was_pressed) {
-      _start_was_pressed = true;
-      _start_press_ms = millis();
-      _start_long_triggered = false;
+    _start_was_pressed = true;
+    _start_press_ms = millis();
+    _start_long_triggered = false;
   }
-  
+
   if (start_down && _start_was_pressed && !_start_long_triggered) {
-      if (millis() - _start_press_ms >= 2000) {
-          // LONG PRESS -> Start Autotune
-          _start_long_triggered = true;
-          _autotune_active = true;
-          _autotune_kp_idx = 0;
-          _autotune_ki_idx = 0;
-          _autotune_state = 0; // begin with rest
-          _autotune_state_start_ms = millis();
-          _p4_running = false;
-          _p4_target_mm_s = 0;
-          _autotune_running = false;
-          
-          LOG_INFO("=== AUTOTUNE STARTED ===");
-          oled_clear();
-          oled_print(0, 0, "AUTOTUNING...");
-          oled_update();
-      }
+    if (millis() - _start_press_ms >= 2000) {
+      // LONG PRESS -> Start Autotune
+      _start_long_triggered = true;
+      _autotune_active = true;
+      _autotune_kp_idx = 0;
+      _autotune_ki_idx = 0;
+      _autotune_state = 0; // begin with rest
+      _autotune_state_start_ms = millis();
+      _p4_running = false;
+      _p4_target_mm_s = 0;
+      _autotune_running = false;
+
+      LOG_INFO("=== AUTOTUNE STARTED ===");
+      oled_clear();
+      oled_print(0, 0, "AUTOTUNING...");
+      oled_update();
+    }
   }
-  
+
   if (!start_down && _start_was_pressed) {
-      if (!_start_long_triggered && (millis() - _start_press_ms < 2000)) {
-          // SHORT PRESS -> Toggle run/stop
-          if (!_autotune_active) {
-              _p4_running = !_p4_running;
-              _p4_target_mm_s = _p4_running ? 300.0f : 0.0f;
-              _p4_int_L = 0.0f; _p4_int_R = 0.0f;
-              encoder_reset_all();
-              if (_p4_running) LOG_INFO("[Phase4] ▶ Running — target 300 mm/s");
-              else LOG_INFO("[Phase4] ■ Stopped — target 0");
-              led_toggle(LED_DEBUG);
-          } else {
-              // Abort autotune
-              _autotune_active = false;
-              _p4_running = false;
-              _p4_target_mm_s = 0;
-              _autotune_running = false;
-              LOG_INFO("=== AUTOTUNE ABORTED ===");
-          }
+    if (!_start_long_triggered && (millis() - _start_press_ms < 2000)) {
+      // SHORT PRESS -> Toggle run/stop
+      if (!_autotune_active) {
+        _p4_running = !_p4_running;
+        _p4_target_mm_s = _p4_running ? 300.0f : 0.0f;
+        _p4_int_L = 0.0f;
+        _p4_int_R = 0.0f;
+        encoder_reset_all();
+        if (_p4_running)
+          LOG_INFO("[Phase4] ▶ Running — target 300 mm/s");
+        else
+          LOG_INFO("[Phase4] ■ Stopped — target 0");
+        led_toggle(LED_DEBUG);
+      } else {
+        // Abort autotune
+        _autotune_active = false;
+        _p4_running = false;
+        _p4_target_mm_s = 0;
+        _autotune_running = false;
+        LOG_INFO("=== AUTOTUNE ABORTED ===");
       }
-      _start_was_pressed = false;
+    }
+    _start_was_pressed = false;
   }
 
   /* ── Autotune State Machine ─────────────────────────── */
   if (_autotune_active) {
-      if (_autotune_state == 0) {
-          // Resting phase (500ms) to let motors completely stop
-          if (millis() - _autotune_state_start_ms >= 500) {
-              _autotune_state = 1;
-              _autotune_state_start_ms = millis();
-              
-              // Calculate parameters for this iteration
-              _p4_kp = 4.0f + _autotune_kp_idx * 1.0f; // 4.0 to 13.0
-              _p4_ki = 0.6f + _autotune_ki_idx * 0.2f; // 0.6 to 2.4
-              
-              Serial.print(F("Testing [")); 
-              Serial.print(_autotune_kp_idx * 10 + _autotune_ki_idx + 1);
-              Serial.print(F("/100] KP: ")); Serial.print(_p4_kp, 1);
-              Serial.print(F(" KI: ")); Serial.println(_p4_ki, 2);
-              
-              // Reset state for new step response
-              _p4_int_L = 0.0f;
-              _p4_int_R = 0.0f;
-              encoder_reset_all();
-              
-              _autotune_running = true;
-              _autotune_time_ms = 0;
-              _autotune_score   = 0.0f;
-              _autotune_max_spd = 0.0f;
-              
-              _p4_target_mm_s = 300.0f; // GO!
-          }
-      } else if (_autotune_state == 1) {
-          // Running phase (1500ms step response window)
-          if (millis() - _autotune_state_start_ms >= 1500) {
-              _p4_target_mm_s = 0.0f; // STOP!
-              _autotune_running = false;
-              
-              // Record result
-              float overshoot = _autotune_max_spd - 300.0f;
-              if (overshoot < 0) overshoot = 0.0f;
-              
-              // Massive penalty for overshooting more than 15% (345 mm/s)
-              float penalty = 0.0f;
-              if (overshoot > 45.0f) penalty = overshoot * 1000.0f;
-              
-              int result_idx = _autotune_kp_idx * 10 + _autotune_ki_idx;
-              _autotune_results[result_idx].kp = _p4_kp;
-              _autotune_results[result_idx].ki = _p4_ki;
-              _autotune_results[result_idx].score = _autotune_score + penalty;
-              _autotune_results[result_idx].max_overshoot = overshoot;
-              
-              Serial.print(F("Result - Score: ")); Serial.print(_autotune_results[result_idx].score, 0);
-              Serial.print(F(" Max Spd: ")); Serial.println(_autotune_max_spd, 1);
-              
-              // Advance indices
-              _autotune_ki_idx++;
-              if (_autotune_ki_idx >= 10) {
-                  _autotune_ki_idx = 0;
-                  _autotune_kp_idx++;
-              }
-              
-              if (_autotune_kp_idx >= 10) {
-                  // ALL DONE
-                  _autotune_active = false;
-                  LOG_INFO("=== AUTOTUNE COMPLETE ===");
-                  
-                  // Sort results (Bubble sort - simple and fine for 100 items)
-                  for (int i = 0; i < 100 - 1; i++) {
-                      for (int j = 0; j < 100 - i - 1; j++) {
-                          if (_autotune_results[j].score > _autotune_results[j+1].score) {
-                              AutoTuneResult temp = _autotune_results[j];
-                              _autotune_results[j] = _autotune_results[j+1];
-                              _autotune_results[j+1] = temp;
-                          }
-                      }
-                  }
-                  
-                  // Print Top 3
-                  Serial.println(F("--- TOP 3 COMBINATIONS ---"));
-                  for (int i=0; i<3; i++) {
-                      Serial.print(i+1); Serial.print(F(". KP:")); Serial.print(_autotune_results[i].kp, 1);
-                      Serial.print(F(" KI:")); Serial.print(_autotune_results[i].ki, 2);
-                      Serial.print(F(" Score:")); Serial.println(_autotune_results[i].score, 0);
-                  }
-                  
-                  // Apply the best values automatically
-                  _p4_kp = _autotune_results[0].kp;
-                  _p4_ki = _autotune_results[0].ki;
-                  
-                  oled_clear();
-                  oled_print(0, 0, "BEST TUNING:");
-                  char b[32];
-                  sprintf(b, "KP: %d.%d", (int)_p4_kp, (int)(_p4_kp*10)%10);
-                  oled_print(0, 16, b);
-                  sprintf(b, "KI: %d.%02d", (int)_p4_ki, (int)(_p4_ki*100)%100);
-                  oled_print(0, 32, b);
-                  oled_print(0, 48, "Values Applied!");
-                  oled_update();
-              } else {
-                  // Go back to resting for next test
-                  _autotune_state = 0; 
-                  _autotune_state_start_ms = millis();
-              }
-          }
+    if (_autotune_state == 0) {
+      // Resting phase (500ms) to let motors completely stop
+      if (millis() - _autotune_state_start_ms >= 500) {
+        _autotune_state = 1;
+        _autotune_state_start_ms = millis();
+
+        // Calculate parameters for this iteration
+        _p4_kp = 4.0f + _autotune_kp_idx * 1.0f; // 4.0 to 13.0
+        _p4_ki = 0.6f + _autotune_ki_idx * 0.2f; // 0.6 to 2.4
+
+        Serial.print(F("Testing ["));
+        Serial.print(_autotune_kp_idx * 10 + _autotune_ki_idx + 1);
+        Serial.print(F("/100] KP: "));
+        Serial.print(_p4_kp, 1);
+        Serial.print(F(" KI: "));
+        Serial.println(_p4_ki, 2);
+
+        // Reset state for new step response
+        _p4_int_L = 0.0f;
+        _p4_int_R = 0.0f;
+        encoder_reset_all();
+
+        _autotune_running = true;
+        _autotune_time_ms = 0;
+        _autotune_score = 0.0f;
+        _autotune_max_spd = 0.0f;
+
+        _p4_target_mm_s = 300.0f; // GO!
       }
-      
-      // Update OLED progress at 4Hz
-      static uint32_t last_at_oled = 0;
-      if (millis() - last_at_oled > 250) {
-          last_at_oled = millis();
+    } else if (_autotune_state == 1) {
+      // Running phase (1500ms step response window)
+      if (millis() - _autotune_state_start_ms >= 1500) {
+        _p4_target_mm_s = 0.0f; // STOP!
+        _autotune_running = false;
+
+        // Record result
+        float overshoot = _autotune_max_spd - 300.0f;
+        if (overshoot < 0)
+          overshoot = 0.0f;
+
+        // Massive penalty for overshooting more than 15% (345 mm/s)
+        float penalty = 0.0f;
+        if (overshoot > 45.0f)
+          penalty = overshoot * 1000.0f;
+
+        int result_idx = _autotune_kp_idx * 10 + _autotune_ki_idx;
+        _autotune_results[result_idx].kp = _p4_kp;
+        _autotune_results[result_idx].ki = _p4_ki;
+        _autotune_results[result_idx].score = _autotune_score + penalty;
+        _autotune_results[result_idx].max_overshoot = overshoot;
+
+        Serial.print(F("Result - Score: "));
+        Serial.print(_autotune_results[result_idx].score, 0);
+        Serial.print(F(" Max Spd: "));
+        Serial.println(_autotune_max_spd, 1);
+
+        // Advance indices
+        _autotune_ki_idx++;
+        if (_autotune_ki_idx >= 10) {
+          _autotune_ki_idx = 0;
+          _autotune_kp_idx++;
+        }
+
+        if (_autotune_kp_idx >= 10) {
+          // ALL DONE
+          _autotune_active = false;
+          LOG_INFO("=== AUTOTUNE COMPLETE ===");
+
+          // Sort results (Bubble sort - simple and fine for 100 items)
+          for (int i = 0; i < 100 - 1; i++) {
+            for (int j = 0; j < 100 - i - 1; j++) {
+              if (_autotune_results[j].score > _autotune_results[j + 1].score) {
+                AutoTuneResult temp = _autotune_results[j];
+                _autotune_results[j] = _autotune_results[j + 1];
+                _autotune_results[j + 1] = temp;
+              }
+            }
+          }
+
+          // Print Top 3
+          Serial.println(F("--- TOP 3 COMBINATIONS ---"));
+          for (int i = 0; i < 3; i++) {
+            Serial.print(i + 1);
+            Serial.print(F(". KP:"));
+            Serial.print(_autotune_results[i].kp, 1);
+            Serial.print(F(" KI:"));
+            Serial.print(_autotune_results[i].ki, 2);
+            Serial.print(F(" Score:"));
+            Serial.println(_autotune_results[i].score, 0);
+          }
+
+          // Apply the best values automatically
+          _p4_kp = _autotune_results[0].kp;
+          _p4_ki = _autotune_results[0].ki;
+
           oled_clear();
-          oled_print(0, 0, "AUTOTUNING...");
+          oled_print(0, 0, "BEST TUNING:");
           char b[32];
-          sprintf(b, "KP %d/10 KI %d/10", _autotune_kp_idx+1, _autotune_ki_idx+1);
+          sprintf(b, "KP: %d.%d", (int)_p4_kp, (int)(_p4_kp * 10) % 10);
           oled_print(0, 16, b);
-          oled_print(0, 32, _autotune_state == 1 ? "TESTING..." : "RESTING");
+          sprintf(b, "KI: %d.%02d", (int)_p4_ki, (int)(_p4_ki * 100) % 100);
+          oled_print(0, 32, b);
+          oled_print(0, 48, "Values Applied!");
           oled_update();
+        } else {
+          // Go back to resting for next test
+          _autotune_state = 0;
+          _autotune_state_start_ms = millis();
+        }
       }
-      
-      delay(5);
-      return; // Skip normal button processing and printing while autotuning
+    }
+
+    // Update OLED progress at 4Hz
+    static uint32_t last_at_oled = 0;
+    if (millis() - last_at_oled > 250) {
+      last_at_oled = millis();
+      oled_clear();
+      oled_print(0, 0, "AUTOTUNING...");
+      char b[32];
+      sprintf(b, "KP %d/10 KI %d/10", _autotune_kp_idx + 1,
+              _autotune_ki_idx + 1);
+      oled_print(0, 16, b);
+      oled_print(0, 32, _autotune_state == 1 ? "TESTING..." : "RESTING");
+      oled_update();
+    }
+
+    delay(5);
+    return; // Skip normal button processing and printing while autotuning
   }
 
   /* ── Serial + OLED print every 50ms ─────────────────── */
   static uint32_t last_pi_print = 0;
   if ((phase4_timer_ticks - last_pi_print) >= 50) {
-      last_pi_print = phase4_timer_ticks;
+    last_pi_print = phase4_timer_ticks;
 
+    if (_p4_param == 3) {
+      // ODOMETRY PRINT MODE
+      Pose p = odometry_get_pose();
+      float fused_th = heading_estimator_get();
+      
+      Serial.print(F("[ODOM] X:"));
+      Serial.print(p.x_mm, 1);
+      Serial.print(F(" Y:"));
+      Serial.print(p.y_mm, 1);
+      Serial.print(F(" Th:"));
+      Serial.print(p.theta_rad, 3);
+      Serial.print(F(" FusedTh:"));
+      Serial.println(fused_th, 3);
+
+      oled_clear();
+      oled_print(0, 0, "--- ODOMETRY ---");
+      char buf[32];
+      sprintf(buf, "X: %d mm", (int)p.x_mm);
+      oled_print(0, 16, buf);
+      sprintf(buf, "Y: %d mm", (int)p.y_mm);
+      oled_print(0, 28, buf);
+
+      int th_int = (int)p.theta_rad;
+      int th_dec = abs((int)(p.theta_rad * 100)) % 100;
+      int fused_int = (int)fused_th;
+      int fused_dec = abs((int)(fused_th * 100)) % 100;
+      sprintf(buf, "Th:%d.%02d F:%d.%02d", th_int, th_dec, fused_int, fused_dec);
+      oled_print(0, 40, buf);
+
+      oled_print(0, 52, "BTN_MODE: Reset");
+      oled_update();
+    } else {
+      // PI TUNING PRINT MODE
       float l_spd = encoder_get_speed_mms(ENCODER_LEFT);
       float r_spd = encoder_get_speed_mms(ENCODER_RIGHT);
-      const char* pnames[] = {"KFF", "KP ", "KI "};
+      const char *pnames[] = {"KFF", "KP ", "KI "};
 
       // Serial line — compact, easy to read in Serial Plotter too
-      Serial.print(F("[PI] L:"));    Serial.print(l_spd, 1);
-      Serial.print(F("  R:"));       Serial.print(r_spd, 1);
-      Serial.print(F("  tgt:"));     Serial.print(_p4_target_mm_s, 0);
-      Serial.print(F("  KFF:"));     Serial.print(_p4_kff, 2);
-      Serial.print(F("  KP:"));      Serial.print(_p4_kp, 2);
-      Serial.print(F("  KI:"));      Serial.print(_p4_ki, 2);
-      Serial.print(F("  ["));        Serial.print(pnames[_p4_param]);
+      Serial.print(F("[PI] L:"));
+      Serial.print(l_spd, 1);
+      Serial.print(F("  R:"));
+      Serial.print(r_spd, 1);
+      Serial.print(F("  tgt:"));
+      Serial.print(_p4_target_mm_s, 0);
+      Serial.print(F("  KFF:"));
+      Serial.print(_p4_kff, 2);
+      Serial.print(F("  KP:"));
+      Serial.print(_p4_kp, 2);
+      Serial.print(F("  KI:"));
+      Serial.print(_p4_ki, 2);
+      Serial.print(F("  ["));
+      Serial.print(pnames[_p4_param]);
       Serial.println(F("]"));
 
       // OLED — 6 rows
       char buf[24];
       oled_clear();
-      oled_print(0,  0, _p4_running ? "P4 RUNNING" : "P4 STOPPED");
+      oled_print(0, 0, _p4_running ? "P4 RUNNING" : "P4 STOPPED");
       sprintf(buf, "L:%d R:%d mm/s", (int)l_spd, (int)r_spd);
       oled_print(0, 12, buf);
-      
+
       int kff_int = (int)_p4_kff;
       int kff_dec = (int)(_p4_kff * 10) % 10;
-      sprintf(buf, "KFF:%d.%d%s", kff_int, kff_dec, _p4_param==0 ? "<" : " ");
+      sprintf(buf, "KFF:%d.%d%s", kff_int, kff_dec, _p4_param == 0 ? "<" : " ");
       oled_print(0, 24, buf);
-      
+
       int kp_int = (int)_p4_kp;
       int kp_dec = (int)(_p4_kp * 10) % 10;
-      sprintf(buf, "KP :%d.%d%s", kp_int, kp_dec,  _p4_param==1 ? "<" : " ");
+      sprintf(buf, "KP :%d.%d%s", kp_int, kp_dec, _p4_param == 1 ? "<" : " ");
       oled_print(0, 36, buf);
-      
+
       int ki_int = (int)_p4_ki;
       int ki_dec = (int)(_p4_ki * 100) % 100;
-      sprintf(buf, "KI :%d.%02d%s", ki_int, ki_dec,  _p4_param==2 ? "<" : " ");
+      sprintf(buf, "KI :%d.%02d%s", ki_int, ki_dec, _p4_param == 2 ? "<" : " ");
       oled_print(0, 48, buf);
-      
+
       oled_update();
+    }
   }
 
   delay(5);

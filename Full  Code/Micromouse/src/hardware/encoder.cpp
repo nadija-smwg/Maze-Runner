@@ -9,6 +9,7 @@
  */
 
 #include "encoder.h"
+#include "../localization/odometry.h"
 #include <Arduino.h>
 
 /* ═══════════════════════════════════════════════════════════════════════════
@@ -221,8 +222,13 @@ void encoder_update_velocity(float dt) {
     _right_filtered_cps += VELOCITY_LPF_ALPHA * (raw_cps_R - _right_filtered_cps);
 
     /* Accumulate signed distance (mm) */
-    _left_distance_mm  += (float)dL * LEFT_MM_PER_COUNT;
-    _right_distance_mm += (float)dR * RIGHT_MM_PER_COUNT;
+    float d_left_mm = (float)dL * LEFT_MM_PER_COUNT;
+    float d_right_mm = (float)dR * RIGHT_MM_PER_COUNT;
+    _left_distance_mm  += d_left_mm;
+    _right_distance_mm += d_right_mm;
+
+    /* Update odometry pose */
+    odometry_update(d_left_mm, d_right_mm);
 }
 
 float encoder_get_speed_mms(EncoderID enc) {

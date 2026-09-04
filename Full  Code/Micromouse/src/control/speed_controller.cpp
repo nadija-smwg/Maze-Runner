@@ -25,13 +25,14 @@
  */
 
 #include "speed_controller.h"
-#include "../hardware/motor.h"
 #include "../config/robot_config.h"
+#include "../hardware/motor.h"
 #include <math.h>
 
 /* ═══════════════════════════════════════════════════════════════════════════
  *  Gain Constants — Tune These
- * ═══════════════════════════════════════════════════════════════════════════ */
+ * ═══════════════════════════════════════════════════════════════════════════
+ */
 
 /*
  * Measured characterization data (Phase 2, STBY=HIGH, battery ~7.4V):
@@ -54,86 +55,85 @@
 // TUNING CONSTANTS
 // ==========================================
 // Baseline PWM to roughly hit target. Found via Phase 4 Auto-Tuner
-#define KFF     2.4f
+#define KFF 2.4f
 
 // Proportional: Corrects immediate error quickly
-#define KP      13.0f
+#define KP 13.0f
 
 // Integral: Corrects steady-state error over time
-#define KI      2.0f
+#define KI 2.0f
 
 /** Anti-windup clamp on integral accumulator (PWM units). */
-#define INTEGRAL_LIMIT  1000.0f
+#define INTEGRAL_LIMIT 1000.0f
 
 /* ═══════════════════════════════════════════════════════════════════════════
  *  Private State
- * ═══════════════════════════════════════════════════════════════════════════ */
+ * ═══════════════════════════════════════════════════════════════════════════
+ */
 
-static float _left_integral  = 0.0f;
+static float _left_integral = 0.0f;
 static float _right_integral = 0.0f;
 
 /* ═══════════════════════════════════════════════════════════════════════════
  *  Helper
- * ═══════════════════════════════════════════════════════════════════════════ */
+ * ═══════════════════════════════════════════════════════════════════════════
+ */
 
 static float clampf(float v, float lo, float hi) {
-    if (v < lo) return lo;
-    if (v > hi) return hi;
-    return v;
+  if (v < lo)
+    return lo;
+  if (v > hi)
+    return hi;
+  return v;
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
  *  Public API
- * ═══════════════════════════════════════════════════════════════════════════ */
+ * ═══════════════════════════════════════════════════════════════════════════
+ */
 
 void speed_controller_init(void) {
-    _left_integral  = 0.0f;
-    _right_integral = 0.0f;
+  _left_integral = 0.0f;
+  _right_integral = 0.0f;
 }
 
-void speed_controller_update(float target_left_mm_s,
-                             float target_right_mm_s,
-                             float current_left_mm_s,
-                             float current_right_mm_s,
+void speed_controller_update(float target_left_mm_s, float target_right_mm_s,
+                             float current_left_mm_s, float current_right_mm_s,
                              float dt) {
-    /* ── Left wheel ─────────────────────────────────────────────────────── */
-    float out_L = 0.0f;
-    if (target_left_mm_s == 0.0f) {
-        _left_integral = 0.0f; // Clear windup
-    } else {
-        float err_L = target_left_mm_s - current_left_mm_s;
-        _left_integral = clampf(_left_integral + err_L * dt,
-                                -INTEGRAL_LIMIT, INTEGRAL_LIMIT);
+  /* ── Left wheel ─────────────────────────────────────────────────────── */
+  float out_L = 0.0f;
+  if (target_left_mm_s == 0.0f) {
+    _left_integral = 0.0f; // Clear windup
+  } else {
+    float err_L = target_left_mm_s - current_left_mm_s;
+    _left_integral =
+        clampf(_left_integral + err_L * dt, -INTEGRAL_LIMIT, INTEGRAL_LIMIT);
 
-        out_L = KFF * target_left_mm_s
-              + KP  * err_L
-              + KI  * _left_integral;
+    out_L = KFF * target_left_mm_s + KP * err_L + KI * _left_integral;
 
-        out_L = clampf(out_L, -(float)PWM_MAX, (float)PWM_MAX);
-    }
+    out_L = clampf(out_L, -(float)PWM_MAX, (float)PWM_MAX);
+  }
 
-    /* ── Right wheel ────────────────────────────────────────────────────── */
-    float out_R = 0.0f;
-    if (target_right_mm_s == 0.0f) {
-        _right_integral = 0.0f; // Clear windup
-    } else {
-        float err_R = target_right_mm_s - current_right_mm_s;
-        _right_integral = clampf(_right_integral + err_R * dt,
-                                 -INTEGRAL_LIMIT, INTEGRAL_LIMIT);
+  /* ── Right wheel ────────────────────────────────────────────────────── */
+  float out_R = 0.0f;
+  if (target_right_mm_s == 0.0f) {
+    _right_integral = 0.0f; // Clear windup
+  } else {
+    float err_R = target_right_mm_s - current_right_mm_s;
+    _right_integral =
+        clampf(_right_integral + err_R * dt, -INTEGRAL_LIMIT, INTEGRAL_LIMIT);
 
-        out_R = KFF * target_right_mm_s
-              + KP  * err_R
-              + KI  * _right_integral;
+    out_R = KFF * target_right_mm_s + KP * err_R + KI * _right_integral;
 
-        out_R = clampf(out_R, -(float)PWM_MAX, (float)PWM_MAX);
-    }
+    out_R = clampf(out_R, -(float)PWM_MAX, (float)PWM_MAX);
+  }
 
-    /* ── Output with dead-zone compensation ─────────────────────────────── */
-    motor_set_speed_compensated(MOTOR_LEFT,  (int16_t)out_L);
-    motor_set_speed_compensated(MOTOR_RIGHT, (int16_t)out_R);
+  /* ── Output with dead-zone compensation ─────────────────────────────── */
+  motor_set_speed_compensated(MOTOR_LEFT, (int16_t)out_L);
+  motor_set_speed_compensated(MOTOR_RIGHT, (int16_t)out_R);
 }
 
 void speed_controller_reset(void) {
-    _left_integral  = 0.0f;
-    _right_integral = 0.0f;
+  _left_integral = 0.0f;
+  _right_integral = 0.0f;
 }

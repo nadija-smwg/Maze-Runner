@@ -18,7 +18,7 @@ void heading_estimator_init(void);
  * @param encoder_dtheta_rad Change in heading from encoders
  * @param dt Time step
  */
-void heading_estimator_update(float gyro_z_dps, float encoder_dtheta_rad, float dt);
+void heading_estimator_update(float gyro_z_dps, float encoder_heading_rad, float dt);
 
 /**
  * @brief Get the fused heading.

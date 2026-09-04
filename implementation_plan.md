@@ -51,18 +51,23 @@
 
 ---
 
-## Hardware Constants (Locked — Do Not Change)
+## Hardware Constants (Calibrated ✅ — Phase 4 Complete)
 
-| Constant | Value | How Measured |
-|----------|-------|-------------|
-| `LEFT_ENCODER_CPR` | 581 | Phase 2 State 7 hand-count |
-| `RIGHT_ENCODER_CPR` | 581 | Phase 2 State 8 hand-count |
-| `WHEEL_DIAMETER_MM` | 43.0 mm | Calipers |
-| `WHEEL_BASE_MM` | 80.0 mm | Calipers (center-to-center) |
-| `LEFT_MOTOR_DEAD_PWM` | 300 | Phase 2 State 5 sweep |
-| `RIGHT_MOTOR_DEAD_PWM` | 250 | Phase 2 State 6 sweep |
-| `LEFT_MM_PER_COUNT` | 0.2325 mm | π × 43 / 581 |
-| `KFF` (feed-forward) | 8.4 | PWM 1500 → 179 mm/s measured |
+| Constant | Value | How Measured | Status |
+|----------|-------|-------------|--------|
+| `LEFT_ENCODER_CPR` | 581 | Phase 2 hand-count test | ✅ |
+| `RIGHT_ENCODER_CPR` | 581 | Phase 2 hand-count test | ✅ |
+| `WHEEL_DIAMETER_MM` | **46.9 mm** | **Test 4.3 push calibration (180mm→165mm shown)** | ✅ |
+| `LEFT_WHEEL_DIAMETER_MM` | **46.9 mm** | Test 4.3 calibrated | ✅ |
+| `RIGHT_WHEEL_DIAMETER_MM` | **46.9 mm** | Test 4.3 calibrated | ✅ |
+| `LEFT_MM_PER_COUNT` | **0.2536 mm** | π × 46.9 / 581 | ✅ |
+| `RIGHT_MM_PER_COUNT` | **0.2536 mm** | π × 46.9 / 581 | ✅ |
+| `WHEEL_BASE_MM` | **95.3 mm** | Test 4.4 spin calibration (1.67 rad→1.57 rad corrected) | ✅ |
+| `LEFT_MOTOR_DEAD_PWM` | 300 | Phase 2 State 5 sweep | ✅ |
+| `RIGHT_MOTOR_DEAD_PWM` | 250 | Phase 2 State 6 sweep | ✅ |
+| `KFF` | 2.4 | Step 4.1 live tuning | ✅ |
+| `KP` | 13.0 | Step 4.1 live tuning | ✅ |
+| `KI` | 2.0 | Step 4.1 live tuning | ✅ |
 
 ---
 
