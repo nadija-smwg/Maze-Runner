@@ -57,7 +57,8 @@
 #define PHASE_1_TEST_MODE 0
 #define PHASE_2_TEST_MODE 0
 #define PHASE_3_TEST_MODE 0
-#define PHASE_4_TEST_MODE 1 // ← Step 4.1: PI Velocity Tuning
+#define PHASE_4_TEST_MODE 1 // ← Step 4.1-300: PI Velocity Tuning @ 300 mm/s
+#define PHASE_5_TEST_MODE 0 // ← Enable after speed_controller.cpp is updated
 
 #if PHASE_1_TEST_MODE == 1
 volatile uint32_t phase1_timer_ticks = 0;
@@ -84,9 +85,9 @@ void phase3_timer_callback(void) { phase3_timer_ticks++; }
  */
 volatile uint32_t phase4_timer_ticks = 0;
 volatile float _p4_target_mm_s = 0.0f;
-volatile float _p4_kff = 2.4f; // Default KFF based on tuning
-volatile float _p4_kp = 13.0f; // Default KP based on autotune
-volatile float _p4_ki = 2.0f;  // Default KI based on autotune
+volatile float _p4_kff = 2.4f;  // KFF starting point (same ratio, still valid at 150)
+volatile float _p4_kp  = 0.0f;  // KP reset to 0 — tune from scratch at 300 mm/s
+volatile float _p4_ki  = 0.0f;  // KI reset to 0 — tune from scratch at 300 mm/s
 
 /*
  * speed_controller_update_live — same math as speed_controller.cpp
@@ -109,22 +110,17 @@ static inline float _p4_clamp(float v, float lo, float hi) {
 void phase4_timer_callback(void) {
   phase4_timer_ticks++;
 
-  // 1. Capture encoder deltas FIRST (before velocity LPF resets them)
-  int32_t l_ticks = encoder_get_delta(ENCODER_LEFT);
-  int32_t r_ticks = encoder_get_delta(ENCODER_RIGHT);
-
-  // 2. Update velocity LPF (smoothed mm/s for PI controller)
+  // 1. Update velocity LPF (smoothed mm/s for PI controller)
+  // NOTE: This internally reads encoder_get_delta() and updates odometry!
   encoder_update_velocity(CONTROL_LOOP_DT_S);
-
-  // 3. Odometry pose update (Step 4.2)
-  odometry_update(l_ticks * LEFT_MM_PER_COUNT, r_ticks * RIGHT_MM_PER_COUNT);
 
   // 4. Heading fusion (gyro + encoder) (Step 4.3)
   // NOTE: mpu6050_update_filter() CANNOT be called here (ISR + I2C = deadlock).
   // It is called from loop() at ~200Hz instead. We just read the cached value.
   IMUScaledData imu;
   mpu6050_get_filtered(&imu);
-  heading_estimator_update(imu.gyro_z_dps, odometry_get_pose().theta_rad, CONTROL_LOOP_DT_S);
+  heading_estimator_update(imu.gyro_z_dps, odometry_get_pose().theta_rad,
+                           CONTROL_LOOP_DT_S);
 
   float tgt = _p4_target_mm_s;
   float kff = _p4_kff;
@@ -176,6 +172,28 @@ void phase4_timer_callback(void) {
     if (actual_R > _autotune_max_spd)
       _autotune_max_spd = actual_R;
   }
+}
+#endif
+
+#if PHASE_5_TEST_MODE == 1
+/*
+ * Phase 5 — Step 5.3: Single-cell drive (180mm) test
+ *
+ * Delegates entirely to motion_controller_update() which handles:
+ *   - Encoder deltas, odometry, heading fusion (every 1ms)
+ *   - Trapezoidal profile: 0 -> 300 mm/s cruise -> 0 over 180mm
+ *   - Heading correction (Kp=2.0, Step 5.1)
+ *   - Auto-stop at cell completion
+ *
+ * Speed controller uses Phase 4 tuned gains: KFF=2.4, KP=13.0, KI=2.0
+ */
+volatile uint32_t phase5_timer_ticks = 0;
+
+void phase5_timer_callback(void) {
+  phase5_timer_ticks++;
+  /* All sensor reads, odometry, heading, profile, and motor control
+   * are handled inside motion_controller_update(). */
+  motion_controller_update();
 }
 #endif
 
@@ -319,7 +337,7 @@ void setup() {
 
   // Init sensors (Step 4.2 — MPU6050 needed for future heading step)
   sensor_manager_init();
-  calibrate_all();  // zero gyro bias at startup
+  calibrate_all(); // zero gyro bias at startup
 
   // Init PI controller state
   velocity_controller_init();
@@ -333,12 +351,58 @@ void setup() {
   timer_init(phase4_timer_callback);
   timer_start();
 
-  LOG_INFO("Phase 4 Ready! (Step 4.2: Odometry active)");
+  LOG_INFO("Phase 4 Ready! Tuning @ 300 mm/s");
   LOG_INFO(" - BTN_START : Step to 300 mm/s (lift wheels first!)");
   LOG_INFO(" - BTN_MODE  : Stop motors (target = 0)");
-  LOG_INFO(" - Serial prints [PI] L:xxx R:xxx every 50ms");
-  LOG_INFO(" - Long-press BTN_MODE 4x to reach ODOM mode -> see X/Y/Theta live");
-  LOG_INFO(" - In ODOM mode, short-press BTN_MODE to reset pose to 0,0,0");
+  LOG_INFO(" - Serial prints [PI] L:xxx R:xxx tgt:300 every 50ms");
+  LOG_INFO(" - Tuning order: KFF first -> KP -> KI");
+  LOG_INFO(" - Long-press BTN_MODE to cycle KFF/KP/KI/ODOM");
+  LOG_INFO(" - Short-press BTN_MODE to increment selected gain");
+  LOG_INFO(" - When done: update KFF/KP/KI in speed_controller.cpp");
+  return;
+#endif
+
+#if PHASE_5_TEST_MODE == 1
+  LOG_INFO("=== PHASE 5 TEST MODE: STEP 5.3 — CELL DRIVE (180mm @ 300mm/s) ===");
+
+  gpio_init_motor_pins();
+  pwm_init();
+  encoder_init();
+  motor_init();
+  button_init();
+  led_init();
+  battery_init();
+
+  Wire.setSCL(PIN_I2C_SCL);
+  Wire.setSDA(PIN_I2C_SDA);
+  Wire.begin();
+  Wire.setClock(400000);
+  if (oled_init()) {
+    oled_clear();
+    oled_print(0, 0, "Phase 5 - Step 5.3");
+    oled_print(0, 16, "BTN_START = GO");
+    oled_print(0, 32, "180mm @ 300mm/s");
+    oled_update();
+  } else {
+    LOG_ERROR("OLED Init Failed");
+  }
+
+  sensor_manager_init();
+  calibrate_all(); /* zero gyro bias */
+
+  /* motion_controller_init() initialises velocity_controller, odometry,
+   * heading_estimator, and straight_motion internally. */
+  encoder_reset_all();
+  motion_controller_init();
+
+  /* Register motion_controller_update as the 1kHz ISR */
+  timer_init(phase5_timer_callback);
+  timer_start();
+
+  LOG_INFO("Phase 5 Step 5.3 Ready!");
+  LOG_INFO(" - BTN_START : Drive one cell 180mm (trapezoidal, 300mm/s)");
+  LOG_INFO(" - BTN_MODE  : Emergency stop + reset");
+  LOG_INFO(" - Profile: 0->300->0 mm/s | Accel/Decel=1500 mm/s^2");
   return;
 #endif
 
@@ -964,17 +1028,29 @@ void loop() {
 
   /* ── Auto-tune state & structure ────────────────────── */
   struct AutoTuneResult {
+    float kff;
     float kp;
     float ki;
     float score;
     float max_overshoot;
   };
+  
+  #define AUTOTUNE_KFF_STEPS 5
+  #define AUTOTUNE_KP_STEPS 10
+  #define AUTOTUNE_KI_STEPS 10
+  #define AUTOTUNE_TOTAL (AUTOTUNE_KFF_STEPS * AUTOTUNE_KP_STEPS * AUTOTUNE_KI_STEPS)
+  
   static bool _autotune_active = false;
+  static int _autotune_kff_idx = 0;
   static int _autotune_kp_idx = 0;
   static int _autotune_ki_idx = 0;
   static int _autotune_state = 0; // 0=resting, 1=running
   static uint32_t _autotune_state_start_ms = 0;
-  static AutoTuneResult _autotune_results[100];
+  static AutoTuneResult _autotune_results[AUTOTUNE_TOTAL];
+  
+  static float _autotune_base_kff = 0.0f;
+  static float _autotune_base_kp = 0.0f;
+  static float _autotune_base_ki = 0.0f;
 
   /* ── BTN_START: toggle run/stop OR long-press autotune ── */
   bool start_down = button_is_pressed(BUTTON_START);
@@ -993,10 +1069,17 @@ void loop() {
       // LONG PRESS -> Start Autotune
       _start_long_triggered = true;
       _autotune_active = true;
+      _autotune_kff_idx = 0;
       _autotune_kp_idx = 0;
       _autotune_ki_idx = 0;
       _autotune_state = 0; // begin with rest
       _autotune_state_start_ms = millis();
+      
+      // Center the grid search on the current manually-selected values!
+      _autotune_base_kff = _p4_kff;
+      _autotune_base_kp = _p4_kp;
+      _autotune_base_ki = _p4_ki;
+      
       _p4_running = false;
       _p4_target_mm_s = 0;
       _autotune_running = false;
@@ -1042,13 +1125,30 @@ void loop() {
         _autotune_state = 1;
         _autotune_state_start_ms = millis();
 
-        // Calculate parameters for this iteration
-        _p4_kp = 4.0f + _autotune_kp_idx * 1.0f; // 4.0 to 13.0
-        _p4_ki = 0.6f + _autotune_ki_idx * 0.2f; // 0.6 to 2.4
+        // Calculate parameters for this iteration relative to the starting base values
+        // KFF: base ± 0.4  (5 steps of 0.2)
+        _p4_kff = _autotune_base_kff + (_autotune_kff_idx - 2) * 0.2f; 
+        if (_p4_kff < 0.0f) _p4_kff = 0.0f;
+        
+        // KP: base - 4.0 to +5.0 (10 steps of 1.0)
+        _p4_kp  = _autotune_base_kp + (_autotune_kp_idx - 4) * 1.0f;  
+        if (_p4_kp < 0.0f) _p4_kp = 0.0f;
+        
+        // KI: base - 0.8 to +1.0 (10 steps of 0.2)
+        _p4_ki  = _autotune_base_ki + (_autotune_ki_idx - 4) * 0.2f;  
+        if (_p4_ki < 0.0f) _p4_ki = 0.0f;
+
+        int current_idx = (_autotune_kff_idx * AUTOTUNE_KP_STEPS * AUTOTUNE_KI_STEPS) +
+                          (_autotune_kp_idx * AUTOTUNE_KI_STEPS) + 
+                          _autotune_ki_idx;
 
         Serial.print(F("Testing ["));
-        Serial.print(_autotune_kp_idx * 10 + _autotune_ki_idx + 1);
-        Serial.print(F("/100] KP: "));
+        Serial.print(current_idx + 1);
+        Serial.print(F("/"));
+        Serial.print(AUTOTUNE_TOTAL);
+        Serial.print(F("] KFF: "));
+        Serial.print(_p4_kff, 1);
+        Serial.print(F(" KP: "));
         Serial.print(_p4_kp, 1);
         Serial.print(F(" KI: "));
         Serial.println(_p4_ki, 2);
@@ -1081,7 +1181,11 @@ void loop() {
         if (overshoot > 45.0f)
           penalty = overshoot * 1000.0f;
 
-        int result_idx = _autotune_kp_idx * 10 + _autotune_ki_idx;
+        int result_idx = (_autotune_kff_idx * AUTOTUNE_KP_STEPS * AUTOTUNE_KI_STEPS) +
+                         (_autotune_kp_idx * AUTOTUNE_KI_STEPS) + 
+                         _autotune_ki_idx;
+                         
+        _autotune_results[result_idx].kff = _p4_kff;
         _autotune_results[result_idx].kp = _p4_kp;
         _autotune_results[result_idx].ki = _p4_ki;
         _autotune_results[result_idx].score = _autotune_score + penalty;
@@ -1094,19 +1198,23 @@ void loop() {
 
         // Advance indices
         _autotune_ki_idx++;
-        if (_autotune_ki_idx >= 10) {
+        if (_autotune_ki_idx >= AUTOTUNE_KI_STEPS) {
           _autotune_ki_idx = 0;
           _autotune_kp_idx++;
+          if (_autotune_kp_idx >= AUTOTUNE_KP_STEPS) {
+            _autotune_kp_idx = 0;
+            _autotune_kff_idx++;
+          }
         }
 
-        if (_autotune_kp_idx >= 10) {
+        if (_autotune_kff_idx >= AUTOTUNE_KFF_STEPS) {
           // ALL DONE
           _autotune_active = false;
           LOG_INFO("=== AUTOTUNE COMPLETE ===");
 
-          // Sort results (Bubble sort - simple and fine for 100 items)
-          for (int i = 0; i < 100 - 1; i++) {
-            for (int j = 0; j < 100 - i - 1; j++) {
+          // Sort results (Bubble sort - simple and fine for 400 items on a fast 84MHz chip)
+          for (int i = 0; i < AUTOTUNE_TOTAL - 1; i++) {
+            for (int j = 0; j < AUTOTUNE_TOTAL - i - 1; j++) {
               if (_autotune_results[j].score > _autotune_results[j + 1].score) {
                 AutoTuneResult temp = _autotune_results[j];
                 _autotune_results[j] = _autotune_results[j + 1];
@@ -1119,7 +1227,9 @@ void loop() {
           Serial.println(F("--- TOP 3 COMBINATIONS ---"));
           for (int i = 0; i < 3; i++) {
             Serial.print(i + 1);
-            Serial.print(F(". KP:"));
+            Serial.print(F(". KFF:"));
+            Serial.print(_autotune_results[i].kff, 1);
+            Serial.print(F(" KP:"));
             Serial.print(_autotune_results[i].kp, 1);
             Serial.print(F(" KI:"));
             Serial.print(_autotune_results[i].ki, 2);
@@ -1128,17 +1238,20 @@ void loop() {
           }
 
           // Apply the best values automatically
-          _p4_kp = _autotune_results[0].kp;
-          _p4_ki = _autotune_results[0].ki;
+          _p4_kff = _autotune_results[0].kff;
+          _p4_kp  = _autotune_results[0].kp;
+          _p4_ki  = _autotune_results[0].ki;
 
           oled_clear();
           oled_print(0, 0, "BEST TUNING:");
           char b[32];
-          sprintf(b, "KP: %d.%d", (int)_p4_kp, (int)(_p4_kp * 10) % 10);
+          sprintf(b, "KFF: %d.%d", (int)_p4_kff, (int)(_p4_kff * 10) % 10);
+          oled_print(0, 8, b);
+          sprintf(b, "KP: %d.%d KI: %d.%02d", 
+                  (int)_p4_kp, (int)(_p4_kp * 10) % 10,
+                  (int)_p4_ki, (int)(_p4_ki * 100) % 100);
           oled_print(0, 16, b);
-          sprintf(b, "KI: %d.%02d", (int)_p4_ki, (int)(_p4_ki * 100) % 100);
-          oled_print(0, 32, b);
-          oled_print(0, 48, "Values Applied!");
+          oled_print(0, 24, "Values Applied!");
           oled_update();
         } else {
           // Go back to resting for next test
@@ -1155,10 +1268,16 @@ void loop() {
       oled_clear();
       oled_print(0, 0, "AUTOTUNING...");
       char b[32];
-      sprintf(b, "KP %d/10 KI %d/10", _autotune_kp_idx + 1,
-              _autotune_ki_idx + 1);
+      int current_idx = (_autotune_kff_idx * AUTOTUNE_KP_STEPS * AUTOTUNE_KI_STEPS) +
+                        (_autotune_kp_idx * AUTOTUNE_KI_STEPS) + 
+                        _autotune_ki_idx;
+                        
+      sprintf(b, "%d/%d KFF %d", current_idx + 1, AUTOTUNE_TOTAL, _autotune_kff_idx + 1);
+      oled_print(0, 8, b);
+      
+      sprintf(b, "KP %d KI %d", _autotune_kp_idx + 1, _autotune_ki_idx + 1);
       oled_print(0, 16, b);
-      oled_print(0, 32, _autotune_state == 1 ? "TESTING..." : "RESTING");
+      oled_print(0, 24, _autotune_state == 1 ? "TESTING..." : "RESTING");
       oled_update();
     }
 
@@ -1175,7 +1294,7 @@ void loop() {
       // ODOMETRY PRINT MODE
       Pose p = odometry_get_pose();
       float fused_th = heading_estimator_get();
-      
+
       Serial.print(F("[ODOM] X:"));
       Serial.print(p.x_mm, 1);
       Serial.print(F(" Y:"));
@@ -1188,19 +1307,15 @@ void loop() {
       oled_clear();
       oled_print(0, 0, "--- ODOMETRY ---");
       char buf[32];
-      sprintf(buf, "X: %d mm", (int)p.x_mm);
+      sprintf(buf, "X:%d Y:%d", (int)p.x_mm, (int)p.y_mm);
+      oled_print(0, 8, buf);
+
+      int th_int = (int)(p.theta_rad * 57.3f);
+      int fused_int = (int)(fused_th * 57.3f);
+      sprintf(buf, "Th:%d F:%d deg", th_int, fused_int);
       oled_print(0, 16, buf);
-      sprintf(buf, "Y: %d mm", (int)p.y_mm);
-      oled_print(0, 28, buf);
 
-      int th_int = (int)p.theta_rad;
-      int th_dec = abs((int)(p.theta_rad * 100)) % 100;
-      int fused_int = (int)fused_th;
-      int fused_dec = abs((int)(fused_th * 100)) % 100;
-      sprintf(buf, "Th:%d.%02d F:%d.%02d", th_int, th_dec, fused_int, fused_dec);
-      oled_print(0, 40, buf);
-
-      oled_print(0, 52, "BTN_MODE: Reset");
+      oled_print(0, 24, "BTN_MODE: Reset");
       oled_update();
     } else {
       // PI TUNING PRINT MODE
@@ -1225,30 +1340,133 @@ void loop() {
       Serial.print(pnames[_p4_param]);
       Serial.println(F("]"));
 
-      // OLED — 6 rows
-      char buf[24];
+      // OLED — Packed into 4 lines (128x32 compatible)
+      char buf[32];
       oled_clear();
-      oled_print(0, 0, _p4_running ? "P4 RUNNING" : "P4 STOPPED");
-      sprintf(buf, "L:%d R:%d mm/s", (int)l_spd, (int)r_spd);
-      oled_print(0, 12, buf);
+      sprintf(buf, "%s | %d", _p4_running ? "RUNNING" : "STOPPED", (int)_p4_target_mm_s);
+      oled_print(0, 0, buf);
+
+      sprintf(buf, "L:%d R:%d", (int)l_spd, (int)r_spd);
+      oled_print(0, 8, buf);
 
       int kff_int = (int)_p4_kff;
       int kff_dec = (int)(_p4_kff * 10) % 10;
-      sprintf(buf, "KFF:%d.%d%s", kff_int, kff_dec, _p4_param == 0 ? "<" : " ");
-      oled_print(0, 24, buf);
-
       int kp_int = (int)_p4_kp;
       int kp_dec = (int)(_p4_kp * 10) % 10;
-      sprintf(buf, "KP :%d.%d%s", kp_int, kp_dec, _p4_param == 1 ? "<" : " ");
-      oled_print(0, 36, buf);
+      sprintf(buf, "KFF:%d.%d%c KP:%d.%d%c", 
+              kff_int, kff_dec, _p4_param == 0 ? '<' : ' ',
+              kp_int, kp_dec, _p4_param == 1 ? '<' : ' ');
+      oled_print(0, 16, buf);
 
       int ki_int = (int)_p4_ki;
       int ki_dec = (int)(_p4_ki * 100) % 100;
-      sprintf(buf, "KI :%d.%02d%s", ki_int, ki_dec, _p4_param == 2 ? "<" : " ");
-      oled_print(0, 48, buf);
+      sprintf(buf, "KI :%d.%02d%c", ki_int, ki_dec, _p4_param == 2 ? '<' : ' ');
+      oled_print(0, 24, buf);
 
       oled_update();
     }
+  }
+
+  delay(5);
+  return;
+#endif
+
+#if PHASE_5_TEST_MODE == 1
+  button_update();
+  led_update();
+
+  /* MPU6050 I2C filter update — must be in loop(), NOT in ISR */
+  mpu6050_update_filter(0.005f); /* ~200Hz update rate */
+
+  /* ── BTN_START: trigger one cell drive (180mm, 300mm/s) ─────────────── */
+  if (button_just_pressed(BUTTON_START)) {
+    if (motion_is_cell_moving()) {
+      /* Already moving — emergency stop */
+      motion_emergency_stop();
+      encoder_reset_all();
+      LOG_INFO("[P5.3] STOPPED (emergency).");
+    } else {
+      /* Start a fresh cell drive:
+       *   - Resets local odometry and heading to 0 internally
+       *   - Profile: 0 -> 300 mm/s -> 0 over 180mm
+       *   - ISR (motion_controller_update) drives it autonomously */
+      encoder_reset_all();
+      motion_drive_cell();
+      LOG_INFO("[P5.3] Cell drive STARTED: 180mm @ 300mm/s");
+      LOG_INFO("[P5.3] Profile: Accel 30mm | Cruise 120mm | Decel 30mm");
+    }
+  }
+
+  /* ── BTN_MODE: emergency stop + full reset ──────────────────────────── */
+  if (button_just_pressed(BUTTON_MODE)) {
+    motion_emergency_stop();
+    encoder_reset_all();
+    LOG_INFO("[P5.3] Reset!");
+
+    oled_clear();
+    oled_print(0, 0, "RESET");
+    oled_print(0, 16, "BTN_START = GO");
+    oled_update();
+  }
+
+  /* ── Serial + OLED update every 50ms (20Hz) ─────────────────────────── */
+  static uint32_t last_p5_print = 0;
+  static bool     _p5_done_printed = false;
+
+  if ((phase5_timer_ticks - last_p5_print) >= 50) {
+    last_p5_print = phase5_timer_ticks;
+
+    Pose    p        = odometry_get_pose();
+    float   fused_th = heading_estimator_get();
+    float   l_spd    = encoder_get_speed_mms(ENCODER_LEFT);
+    float   r_spd    = encoder_get_speed_mms(ENCODER_RIGHT);
+    bool    moving   = motion_is_cell_moving();
+
+    /* Detect completion edge for a one-shot log message */
+    if (!moving && !_p5_done_printed && p.x_mm > 10.0f) {
+      Serial.print(F("[P5.3] DONE! X:"));
+      Serial.print(p.x_mm, 1);
+      Serial.print(F(" mm  Head:"));
+      Serial.print(fused_th * 57.2958f, 2);
+      Serial.println(F(" deg  (target: X=180mm Head=0deg)"));
+      _p5_done_printed = true;
+    }
+    if (moving) _p5_done_printed = false; /* reset for next run */
+
+    /* Serial line — compatible with Serial Plotter */
+    Serial.print(F("[P5] X:"));
+    Serial.print(p.x_mm, 1);
+    Serial.print(F(" Y:"));
+    Serial.print(p.y_mm, 1);
+    Serial.print(F(" Th:"));
+    Serial.print(fused_th * 57.2958f, 2);
+    Serial.print(F("deg L:"));
+    Serial.print(l_spd, 0);
+    Serial.print(F(" R:"));
+    Serial.print(r_spd, 0);
+    Serial.print(F(" mm/s "));
+    Serial.println(moving ? F("MOVING") : F("IDLE"));
+
+    /* OLED — Packed into 4 lines (128x32 compatible) */
+    char buf[32];
+    oled_clear();
+
+    if (moving) {
+      oled_print(0, 0, "CELL DRIVE...");
+    } else if (p.x_mm > 10.0f) {
+      oled_print(0, 0, "DONE!");
+    } else {
+      oled_print(0, 0, "READY");
+    }
+
+    sprintf(buf, "X:%d mm H:%d deg", (int)p.x_mm, (int)(fused_th * 57.3f));
+    oled_print(0, 8, buf);
+
+    sprintf(buf, "L:%d R:%d", (int)l_spd, (int)r_spd);
+    oled_print(0, 16, buf);
+    
+    oled_print(0, 24, "BTN: GO | RST");
+    oled_update();
   }
 
   delay(5);

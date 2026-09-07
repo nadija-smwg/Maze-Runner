@@ -52,16 +52,29 @@
  */
 
 // ==========================================
-// TUNING CONSTANTS
+// TUNING CONSTANTS — UPDATE AFTER PHASE 4 TUNING SESSION
 // ==========================================
-// Baseline PWM to roughly hit target. Found via Phase 4 Auto-Tuner
-#define KFF 2.4f
+// Target: 150 mm/s | Tune using PHASE_4_TEST_MODE
+//
+// Step 1 — KFF only (KP=0, KI=0):
+//   Press BTN_START -> 150 mm/s step. Adjust KFF until wheels
+//   reach ~150 mm/s open-loop (no oscillation, may have offset).
+//   Good starting range: 2.0 – 4.0. Keep incrementing by 0.2.
+//
+// Step 2 — Add KP (KI=0):
+//   Increase KP until response is fast without oscillating.
+//   Good starting range: 5.0 – 20.0. Increment by 0.5.
+//
+// Step 3 — Add KI:
+//   Increase KI slowly until steady-state speed error disappears.
+//   Good starting range: 0.5 – 3.0. Increment by 0.1.
+//
+// When settled: copy found values below, set PHASE_5_TEST_MODE=1.
 
-// Proportional: Corrects immediate error quickly
-#define KP 13.0f
-
-// Integral: Corrects steady-state error over time
-#define KI 2.0f
+#define SPEED_KP 5.0f
+#define SPEED_KI 1.0f
+#define SPEED_KD 0.0f
+#define SPEED_KFF 2.6f // Integral — reset, tune after KP settled
 
 /** Anti-windup clamp on integral accumulator (PWM units). */
 #define INTEGRAL_LIMIT 1000.0f
@@ -102,29 +115,31 @@ void speed_controller_update(float target_left_mm_s, float target_right_mm_s,
                              float dt) {
   /* ── Left wheel ─────────────────────────────────────────────────────── */
   float out_L = 0.0f;
-  if (target_left_mm_s == 0.0f) {
-    _left_integral = 0.0f; // Clear windup
+  float err_L = target_left_mm_s - current_left_mm_s;
+
+  if (target_left_mm_s == 0.0f && fabsf(current_left_mm_s) < 10.0f) {
+    _left_integral = 0.0f; // Clear windup when completely stopped
+    out_L = 0.0f;          // Disable motor to prevent jitter
   } else {
-    float err_L = target_left_mm_s - current_left_mm_s;
     _left_integral =
         clampf(_left_integral + err_L * dt, -INTEGRAL_LIMIT, INTEGRAL_LIMIT);
-
-    out_L = KFF * target_left_mm_s + KP * err_L + KI * _left_integral;
-
+    out_L = SPEED_KFF * target_left_mm_s + SPEED_KP * err_L +
+            SPEED_KI * _left_integral;
     out_L = clampf(out_L, -(float)PWM_MAX, (float)PWM_MAX);
   }
 
   /* ── Right wheel ────────────────────────────────────────────────────── */
   float out_R = 0.0f;
-  if (target_right_mm_s == 0.0f) {
-    _right_integral = 0.0f; // Clear windup
+  float err_R = target_right_mm_s - current_right_mm_s;
+
+  if (target_right_mm_s == 0.0f && fabsf(current_right_mm_s) < 10.0f) {
+    _right_integral = 0.0f; // Clear windup when completely stopped
+    out_R = 0.0f;           // Disable motor to prevent jitter
   } else {
-    float err_R = target_right_mm_s - current_right_mm_s;
     _right_integral =
         clampf(_right_integral + err_R * dt, -INTEGRAL_LIMIT, INTEGRAL_LIMIT);
-
-    out_R = KFF * target_right_mm_s + KP * err_R + KI * _right_integral;
-
+    out_R = SPEED_KFF * target_right_mm_s + SPEED_KP * err_R +
+            SPEED_KI * _right_integral;
     out_R = clampf(out_R, -(float)PWM_MAX, (float)PWM_MAX);
   }
 

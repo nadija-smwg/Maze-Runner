@@ -17,20 +17,20 @@
  * ═══════════════════════════════════════════════════════════════════════════ */
 
 /** Previous count values for delta calculation. */
-static int32_t _last_left_count  = 0;
-static int32_t _last_right_count = 0;
+static volatile int32_t _last_left_count  = 0;
+static volatile int32_t _last_right_count = 0;
 
 /* ═══════════════════════════════════════════════════════════════════════════
  *  Private Velocity State
  * ═══════════════════════════════════════════════════════════════════════════ */
 
 /** LPF-smoothed counts per second for each wheel. */
-static float _left_filtered_cps  = 0.0f;
-static float _right_filtered_cps = 0.0f;
+static volatile float _left_filtered_cps  = 0.0f;
+static volatile float _right_filtered_cps = 0.0f;
 
 /** Total accumulated distance per wheel (mm, signed). */
-static float _left_distance_mm   = 0.0f;
-static float _right_distance_mm  = 0.0f;
+static volatile float _left_distance_mm   = 0.0f;
+static volatile float _right_distance_mm  = 0.0f;
 
 /* ═══════════════════════════════════════════════════════════════════════════
  *  Initialization

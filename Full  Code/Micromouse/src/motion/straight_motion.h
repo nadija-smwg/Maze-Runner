@@ -39,4 +39,14 @@ bool straight_motion_is_complete(void);
  */
 float straight_motion_get_target_speed(void);
 
+/**
+ * @brief Get the total profile distance (mm).
+ */
+float straight_motion_get_total_dist(void);
+
+/**
+ * @brief Immediately stop the profile (emergency or manual stop).
+ */
+void straight_motion_stop(void);
+
 #endif /* STRAIGHT_MOTION_H */
