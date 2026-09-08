@@ -74,7 +74,7 @@
 #define SPEED_KP 5.0f
 #define SPEED_KI 1.0f
 #define SPEED_KD 0.0f
-#define SPEED_KFF 2.6f // Integral — reset, tune after KP settled
+#define SPEED_KFF 2.6f
 
 /** Anti-windup clamp on integral accumulator (PWM units). */
 #define INTEGRAL_LIMIT 1000.0f

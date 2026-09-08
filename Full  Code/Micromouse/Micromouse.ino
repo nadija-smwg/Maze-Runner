@@ -39,6 +39,7 @@
 #include "src/control/motion_controller.h"
 #include "src/control/speed_controller.h"
 #include "src/control/velocity_controller.h"
+#include "src/control/wall_follower.h"
 
 // Robot
 #include "src/robot/mission_manager.h"
@@ -57,8 +58,8 @@
 #define PHASE_1_TEST_MODE 0
 #define PHASE_2_TEST_MODE 0
 #define PHASE_3_TEST_MODE 0
-#define PHASE_4_TEST_MODE 1 // ← Step 4.1-300: PI Velocity Tuning @ 300 mm/s
-#define PHASE_5_TEST_MODE 0 // ← Enable after speed_controller.cpp is updated
+#define PHASE_4_TEST_MODE 0 // ← Step 4.1-300: PI Velocity Tuning @ 300 mm/s
+#define PHASE_5_TEST_MODE 3 // ← 1=Cell drive (5.3)  2=Turn test (5.4)  3=Wall follow (5.5)
 
 #if PHASE_1_TEST_MODE == 1
 volatile uint32_t phase1_timer_ticks = 0;
@@ -85,9 +86,10 @@ void phase3_timer_callback(void) { phase3_timer_ticks++; }
  */
 volatile uint32_t phase4_timer_ticks = 0;
 volatile float _p4_target_mm_s = 0.0f;
-volatile float _p4_kff = 2.4f;  // KFF starting point (same ratio, still valid at 150)
-volatile float _p4_kp  = 0.0f;  // KP reset to 0 — tune from scratch at 300 mm/s
-volatile float _p4_ki  = 0.0f;  // KI reset to 0 — tune from scratch at 300 mm/s
+volatile float _p4_kff =
+    2.6f; // KFF starting point (same ratio, still valid at 150)
+volatile float _p4_kp = 5.0f; // KP reset to 0 — tune from scratch at 300 mm/s
+volatile float _p4_ki = 1.0f; // KI reset to 0 — tune from scratch at 300 mm/s
 
 /*
  * speed_controller_update_live — same math as speed_controller.cpp
@@ -185,7 +187,7 @@ void phase4_timer_callback(void) {
  *   - Heading correction (Kp=2.0, Step 5.1)
  *   - Auto-stop at cell completion
  *
- * Speed controller uses Phase 4 tuned gains: KFF=2.4, KP=13.0, KI=2.0
+ * Speed controller uses Phase 4 tuned gains: KFF=2.6, KP=5.0, KI=1.0
  */
 volatile uint32_t phase5_timer_ticks = 0;
 
@@ -193,6 +195,28 @@ void phase5_timer_callback(void) {
   phase5_timer_ticks++;
   /* All sensor reads, odometry, heading, profile, and motor control
    * are handled inside motion_controller_update(). */
+  motion_controller_update();
+}
+#endif
+
+#if PHASE_5_TEST_MODE == 2
+/*
+ * Phase 5 — Step 5.4: 90° Turn Primitive Test
+ *
+ * Tests the gyro-guided closed-loop turn controller:
+ *   BTN_START → Turn Right 90° (CW,  heading −π/2)
+ *   BTN_MODE  → Turn Left  90° (CCW, heading +π/2)
+ *   Hold either for 1s while idle → No-op (robot already stopped)
+ *
+ * OLED shows: heading (deg), turn state, target heading.
+ * Serial shows heading trace compatible with Serial Plotter.
+ *
+ * Tuning: KP_TURN, MAX_TURN_RAD_S, TURN_DONE_RAD in robot_config.h
+ */
+volatile uint32_t phase5_timer_ticks = 0;
+
+void phase5_timer_callback(void) {
+  phase5_timer_ticks++;
   motion_controller_update();
 }
 #endif
@@ -363,7 +387,8 @@ void setup() {
 #endif
 
 #if PHASE_5_TEST_MODE == 1
-  LOG_INFO("=== PHASE 5 TEST MODE: STEP 5.3 — CELL DRIVE (180mm @ 300mm/s) ===");
+  LOG_INFO(
+      "=== PHASE 5 TEST MODE: STEP 5.3 — CELL DRIVE (180mm @ 300mm/s) ===");
 
   gpio_init_motor_pins();
   pwm_init();
@@ -403,6 +428,87 @@ void setup() {
   LOG_INFO(" - BTN_START : Drive one cell 180mm (trapezoidal, 300mm/s)");
   LOG_INFO(" - BTN_MODE  : Emergency stop + reset");
   LOG_INFO(" - Profile: 0->300->0 mm/s | Accel/Decel=1500 mm/s^2");
+  return;
+#endif
+
+#if PHASE_5_TEST_MODE == 3
+  LOG_INFO("=== PHASE 5 TEST MODE: STEP 5.5 - WALL FOLLOWING ===");
+
+  gpio_init_motor_pins();
+  pwm_init();
+  encoder_init();
+  motor_init();
+  button_init();
+  led_init();
+  battery_init();
+
+  Wire.setSCL(PIN_I2C_SCL);
+  Wire.setSDA(PIN_I2C_SDA);
+  Wire.begin();
+  Wire.setClock(400000);
+
+  if (oled_init()) {
+    oled_clear();
+    oled_print(0, 0,  "Phase 5 - Step 5.5");
+    oled_print(0, 8,  "Wall Follow Test");
+    oled_print(0, 16, "S=Go  M=Stop");
+    oled_update();
+  } else {
+    LOG_ERROR("OLED Init Failed");
+  }
+
+  sensor_manager_init();
+  calibrate_all();
+
+  motion_controller_init();
+
+  /* 1kHz control loop ISR */
+  timer_init_1khz(phase5_timer_callback);
+
+  delay(1000); /* let sensors settle after calibration */
+  LOG_INFO("[P5.5] Ready. S=Drive with wall following. M=Stop.");
+  return;
+#endif
+
+#if PHASE_5_TEST_MODE == 2
+  LOG_INFO("=== PHASE 5 TEST MODE: STEP 5.4 - 90deg TURN PRIMITIVE ===");
+
+  gpio_init_motor_pins();
+  pwm_init();
+  encoder_init();
+  motor_init();
+  button_init();
+  led_init();
+  battery_init();
+
+  Wire.setSCL(PIN_I2C_SCL);
+  Wire.setSDA(PIN_I2C_SDA);
+  Wire.begin();
+  Wire.setClock(400000);
+  if (oled_init()) {
+    oled_clear();
+    oled_print(0, 0,  "Phase 5 - Step 5.4");
+    oled_print(0, 8,  "S=TurnR  M=TurnL");
+    oled_print(0, 16, "1s delay on start");
+    oled_update();
+  } else {
+    LOG_ERROR("OLED Init Failed");
+  }
+
+  sensor_manager_init();
+  calibrate_all(); /* zero gyro bias */
+
+  encoder_reset_all();
+  motion_controller_init();
+
+  timer_init(phase5_timer_callback);
+  timer_start();
+
+  LOG_INFO("Phase 5 Step 5.4 Ready!");
+  LOG_INFO(" - BTN_START : Turn RIGHT 90deg (closed-loop heading)");
+  LOG_INFO(" - BTN_MODE  : Turn LEFT  90deg (closed-loop heading)");
+  LOG_INFO(" - Press while turning: Emergency stop");
+  LOG_INFO(" - Tuning: KP_TURN, MAX_TURN_RAD_S, TURN_DONE_RAD in robot_config.h");
   return;
 #endif
 
@@ -1034,12 +1140,13 @@ void loop() {
     float score;
     float max_overshoot;
   };
-  
-  #define AUTOTUNE_KFF_STEPS 5
-  #define AUTOTUNE_KP_STEPS 10
-  #define AUTOTUNE_KI_STEPS 10
-  #define AUTOTUNE_TOTAL (AUTOTUNE_KFF_STEPS * AUTOTUNE_KP_STEPS * AUTOTUNE_KI_STEPS)
-  
+
+#define AUTOTUNE_KFF_STEPS 5
+#define AUTOTUNE_KP_STEPS 10
+#define AUTOTUNE_KI_STEPS 10
+#define AUTOTUNE_TOTAL                                                         \
+  (AUTOTUNE_KFF_STEPS * AUTOTUNE_KP_STEPS * AUTOTUNE_KI_STEPS)
+
   static bool _autotune_active = false;
   static int _autotune_kff_idx = 0;
   static int _autotune_kp_idx = 0;
@@ -1047,7 +1154,7 @@ void loop() {
   static int _autotune_state = 0; // 0=resting, 1=running
   static uint32_t _autotune_state_start_ms = 0;
   static AutoTuneResult _autotune_results[AUTOTUNE_TOTAL];
-  
+
   static float _autotune_base_kff = 0.0f;
   static float _autotune_base_kp = 0.0f;
   static float _autotune_base_ki = 0.0f;
@@ -1074,12 +1181,12 @@ void loop() {
       _autotune_ki_idx = 0;
       _autotune_state = 0; // begin with rest
       _autotune_state_start_ms = millis();
-      
+
       // Center the grid search on the current manually-selected values!
       _autotune_base_kff = _p4_kff;
       _autotune_base_kp = _p4_kp;
       _autotune_base_ki = _p4_ki;
-      
+
       _p4_running = false;
       _p4_target_mm_s = 0;
       _autotune_running = false;
@@ -1125,22 +1232,25 @@ void loop() {
         _autotune_state = 1;
         _autotune_state_start_ms = millis();
 
-        // Calculate parameters for this iteration relative to the starting base values
-        // KFF: base ± 0.4  (5 steps of 0.2)
-        _p4_kff = _autotune_base_kff + (_autotune_kff_idx - 2) * 0.2f; 
-        if (_p4_kff < 0.0f) _p4_kff = 0.0f;
-        
-        // KP: base - 4.0 to +5.0 (10 steps of 1.0)
-        _p4_kp  = _autotune_base_kp + (_autotune_kp_idx - 4) * 1.0f;  
-        if (_p4_kp < 0.0f) _p4_kp = 0.0f;
-        
-        // KI: base - 0.8 to +1.0 (10 steps of 0.2)
-        _p4_ki  = _autotune_base_ki + (_autotune_ki_idx - 4) * 0.2f;  
-        if (_p4_ki < 0.0f) _p4_ki = 0.0f;
+        // Calculate parameters for this iteration relative to the starting base
+        // values KFF: base ± 0.4  (5 steps of 0.2)
+        _p4_kff = _autotune_base_kff + (_autotune_kff_idx - 2) * 0.2f;
+        if (_p4_kff < 0.0f)
+          _p4_kff = 0.0f;
 
-        int current_idx = (_autotune_kff_idx * AUTOTUNE_KP_STEPS * AUTOTUNE_KI_STEPS) +
-                          (_autotune_kp_idx * AUTOTUNE_KI_STEPS) + 
-                          _autotune_ki_idx;
+        // KP: base - 4.0 to +5.0 (10 steps of 1.0)
+        _p4_kp = _autotune_base_kp + (_autotune_kp_idx - 4) * 1.0f;
+        if (_p4_kp < 0.0f)
+          _p4_kp = 0.0f;
+
+        // KI: base - 0.8 to +1.0 (10 steps of 0.2)
+        _p4_ki = _autotune_base_ki + (_autotune_ki_idx - 4) * 0.2f;
+        if (_p4_ki < 0.0f)
+          _p4_ki = 0.0f;
+
+        int current_idx =
+            (_autotune_kff_idx * AUTOTUNE_KP_STEPS * AUTOTUNE_KI_STEPS) +
+            (_autotune_kp_idx * AUTOTUNE_KI_STEPS) + _autotune_ki_idx;
 
         Serial.print(F("Testing ["));
         Serial.print(current_idx + 1);
@@ -1181,10 +1291,10 @@ void loop() {
         if (overshoot > 45.0f)
           penalty = overshoot * 1000.0f;
 
-        int result_idx = (_autotune_kff_idx * AUTOTUNE_KP_STEPS * AUTOTUNE_KI_STEPS) +
-                         (_autotune_kp_idx * AUTOTUNE_KI_STEPS) + 
-                         _autotune_ki_idx;
-                         
+        int result_idx =
+            (_autotune_kff_idx * AUTOTUNE_KP_STEPS * AUTOTUNE_KI_STEPS) +
+            (_autotune_kp_idx * AUTOTUNE_KI_STEPS) + _autotune_ki_idx;
+
         _autotune_results[result_idx].kff = _p4_kff;
         _autotune_results[result_idx].kp = _p4_kp;
         _autotune_results[result_idx].ki = _p4_ki;
@@ -1212,7 +1322,8 @@ void loop() {
           _autotune_active = false;
           LOG_INFO("=== AUTOTUNE COMPLETE ===");
 
-          // Sort results (Bubble sort - simple and fine for 400 items on a fast 84MHz chip)
+          // Sort results (Bubble sort - simple and fine for 400 items on a fast
+          // 84MHz chip)
           for (int i = 0; i < AUTOTUNE_TOTAL - 1; i++) {
             for (int j = 0; j < AUTOTUNE_TOTAL - i - 1; j++) {
               if (_autotune_results[j].score > _autotune_results[j + 1].score) {
@@ -1239,17 +1350,17 @@ void loop() {
 
           // Apply the best values automatically
           _p4_kff = _autotune_results[0].kff;
-          _p4_kp  = _autotune_results[0].kp;
-          _p4_ki  = _autotune_results[0].ki;
+          _p4_kp = _autotune_results[0].kp;
+          _p4_ki = _autotune_results[0].ki;
 
           oled_clear();
           oled_print(0, 0, "BEST TUNING:");
           char b[32];
           sprintf(b, "KFF: %d.%d", (int)_p4_kff, (int)(_p4_kff * 10) % 10);
           oled_print(0, 8, b);
-          sprintf(b, "KP: %d.%d KI: %d.%02d", 
-                  (int)_p4_kp, (int)(_p4_kp * 10) % 10,
-                  (int)_p4_ki, (int)(_p4_ki * 100) % 100);
+          sprintf(b, "KP: %d.%d KI: %d.%02d", (int)_p4_kp,
+                  (int)(_p4_kp * 10) % 10, (int)_p4_ki,
+                  (int)(_p4_ki * 100) % 100);
           oled_print(0, 16, b);
           oled_print(0, 24, "Values Applied!");
           oled_update();
@@ -1268,13 +1379,14 @@ void loop() {
       oled_clear();
       oled_print(0, 0, "AUTOTUNING...");
       char b[32];
-      int current_idx = (_autotune_kff_idx * AUTOTUNE_KP_STEPS * AUTOTUNE_KI_STEPS) +
-                        (_autotune_kp_idx * AUTOTUNE_KI_STEPS) + 
-                        _autotune_ki_idx;
-                        
-      sprintf(b, "%d/%d KFF %d", current_idx + 1, AUTOTUNE_TOTAL, _autotune_kff_idx + 1);
+      int current_idx =
+          (_autotune_kff_idx * AUTOTUNE_KP_STEPS * AUTOTUNE_KI_STEPS) +
+          (_autotune_kp_idx * AUTOTUNE_KI_STEPS) + _autotune_ki_idx;
+
+      sprintf(b, "%d/%d KFF %d", current_idx + 1, AUTOTUNE_TOTAL,
+              _autotune_kff_idx + 1);
       oled_print(0, 8, b);
-      
+
       sprintf(b, "KP %d KI %d", _autotune_kp_idx + 1, _autotune_ki_idx + 1);
       oled_print(0, 16, b);
       oled_print(0, 24, _autotune_state == 1 ? "TESTING..." : "RESTING");
@@ -1343,7 +1455,8 @@ void loop() {
       // OLED — Packed into 4 lines (128x32 compatible)
       char buf[32];
       oled_clear();
-      sprintf(buf, "%s | %d", _p4_running ? "RUNNING" : "STOPPED", (int)_p4_target_mm_s);
+      sprintf(buf, "%s | %d", _p4_running ? "RUNNING" : "STOPPED",
+              (int)_p4_target_mm_s);
       oled_print(0, 0, buf);
 
       sprintf(buf, "L:%d R:%d", (int)l_spd, (int)r_spd);
@@ -1353,9 +1466,9 @@ void loop() {
       int kff_dec = (int)(_p4_kff * 10) % 10;
       int kp_int = (int)_p4_kp;
       int kp_dec = (int)(_p4_kp * 10) % 10;
-      sprintf(buf, "KFF:%d.%d%c KP:%d.%d%c", 
-              kff_int, kff_dec, _p4_param == 0 ? '<' : ' ',
-              kp_int, kp_dec, _p4_param == 1 ? '<' : ' ');
+      sprintf(buf, "KFF:%d.%d%c KP:%d.%d%c", kff_int, kff_dec,
+              _p4_param == 0 ? '<' : ' ', kp_int, kp_dec,
+              _p4_param == 1 ? '<' : ' ');
       oled_print(0, 16, buf);
 
       int ki_int = (int)_p4_ki;
@@ -1386,6 +1499,13 @@ void loop() {
       encoder_reset_all();
       LOG_INFO("[P5.3] STOPPED (emergency).");
     } else {
+      /* Countdown: show message, wait 1s so user can remove hand */
+      oled_clear();
+      oled_print(0, 0,  "CELL DRIVE");
+      oled_print(0, 16, "Starting in 1s...");
+      oled_update();
+      delay(1000);
+
       /* Start a fresh cell drive:
        *   - Resets local odometry and heading to 0 internally
        *   - Profile: 0 -> 300 mm/s -> 0 over 180mm
@@ -1404,23 +1524,23 @@ void loop() {
     LOG_INFO("[P5.3] Reset!");
 
     oled_clear();
-    oled_print(0, 0, "RESET");
+    oled_print(0, 0,  "RESET");
     oled_print(0, 16, "BTN_START = GO");
     oled_update();
   }
 
   /* ── Serial + OLED update every 50ms (20Hz) ─────────────────────────── */
   static uint32_t last_p5_print = 0;
-  static bool     _p5_done_printed = false;
+  static bool _p5_done_printed = false;
 
   if ((phase5_timer_ticks - last_p5_print) >= 50) {
     last_p5_print = phase5_timer_ticks;
 
-    Pose    p        = odometry_get_pose();
-    float   fused_th = heading_estimator_get();
-    float   l_spd    = encoder_get_speed_mms(ENCODER_LEFT);
-    float   r_spd    = encoder_get_speed_mms(ENCODER_RIGHT);
-    bool    moving   = motion_is_cell_moving();
+    Pose p = odometry_get_pose();
+    float fused_th = heading_estimator_get();
+    float l_spd = encoder_get_speed_mms(ENCODER_LEFT);
+    float r_spd = encoder_get_speed_mms(ENCODER_RIGHT);
+    bool moving = motion_is_cell_moving();
 
     /* Detect completion edge for a one-shot log message */
     if (!moving && !_p5_done_printed && p.x_mm > 10.0f) {
@@ -1431,7 +1551,8 @@ void loop() {
       Serial.println(F(" deg  (target: X=180mm Head=0deg)"));
       _p5_done_printed = true;
     }
-    if (moving) _p5_done_printed = false; /* reset for next run */
+    if (moving)
+      _p5_done_printed = false; /* reset for next run */
 
     /* Serial line — compatible with Serial Plotter */
     Serial.print(F("[P5] X:"));
@@ -1464,11 +1585,340 @@ void loop() {
 
     sprintf(buf, "L:%d R:%d", (int)l_spd, (int)r_spd);
     oled_print(0, 16, buf);
-    
+
     oled_print(0, 24, "BTN: GO | RST");
     oled_update();
   }
 
+  delay(5);
+  return;
+#endif
+
+#if PHASE_5_TEST_MODE == 2
+  button_update();
+  led_update();
+
+  /* MPU6050 I2C filter update — must be in loop(), NOT in ISR */
+  mpu6050_update_filter(0.005f); /* ~200Hz update rate */
+
+  /* Tell drift-correction whether we are moving — only correct bias when idle */
+  mpu6050_set_stationary(motion_is_idle());
+
+  /* ── BTN_START: Turn Right 90° ──────────────────────────────────────── */
+  if (button_just_pressed(BUTTON_START)) {
+    if (motion_is_turning() || motion_is_cell_moving()) {
+      /* Already moving — emergency stop */
+      motion_emergency_stop();
+      LOG_INFO("[P5.4] STOPPED (emergency).");
+    } else {
+      oled_clear();
+      oled_print(0, 0,  "TURN RIGHT 90");
+      oled_print(0, 16, "Starting in 1s...");
+      oled_update();
+      delay(1000);
+
+      motion_turn_right_90();
+      LOG_INFO("[P5.4] Turn RIGHT 90deg started.");
+    }
+  }
+
+  /* ── BTN_MODE: Turn Left 90° ─────────────────────────────────────────── */
+  if (button_just_pressed(BUTTON_MODE)) {
+    if (motion_is_turning() || motion_is_cell_moving()) {
+      /* Already moving — emergency stop */
+      motion_emergency_stop();
+      LOG_INFO("[P5.4] STOPPED (emergency).");
+    } else {
+      oled_clear();
+      oled_print(0, 0,  "TURN LEFT 90");
+      oled_print(0, 16, "Starting in 1s...");
+      oled_update();
+      delay(1000);
+
+      motion_turn_left_90();
+      LOG_INFO("[P5.4] Turn LEFT 90deg started.");
+    }
+  }
+
+  /* ── Serial + OLED update every 50ms (20Hz) ─────────────────────────── */
+  static uint32_t last_p54_print = 0;
+  static bool _p54_done_printed = false;
+
+  if ((phase5_timer_ticks - last_p54_print) >= 50) {
+    last_p54_print = phase5_timer_ticks;
+
+    float fused_th    = heading_estimator_get();
+    float fused_deg   = fused_th * 57.2958f;
+    float l_spd       = encoder_get_speed_mms(ENCODER_LEFT);
+    float r_spd       = encoder_get_speed_mms(ENCODER_RIGHT);
+    bool  turning     = motion_is_turning();
+
+    /* One-shot completion message */
+    if (!turning && !_p54_done_printed) {
+      Serial.print(F("[P5.4] DONE! Heading:"));
+      Serial.print(fused_deg, 1);
+      Serial.println(F(" deg"));
+      _p54_done_printed = true;
+    }
+    if (turning) _p54_done_printed = false;
+
+    /* Serial Plotter compatible — Heading and wheel speeds */
+    Serial.print(F("Heading:"));
+    Serial.print(fused_deg, 1);
+    Serial.print(F(" L:"));
+    Serial.print(l_spd, 0);
+    Serial.print(F(" R:"));
+    Serial.print(r_spd, 0);
+    Serial.print(F(" State:"));
+    Serial.println(turning ? F("TURNING") : F("IDLE"));
+
+    /* OLED — 4 lines */
+    oled_clear();
+
+    oled_print(0, 0, turning ? "TURNING..." : "IDLE");
+
+    String h_str = "H:" + String(fused_deg, 1) + " deg";
+    oled_print(0, 8, h_str.c_str());
+
+    String lr_str = "L:" + String(l_spd, 0) + " R:" + String(r_spd, 0);
+    oled_print(0, 16, lr_str.c_str());
+
+    oled_print(0, 24, "S=R90 M=L90");
+    oled_update();
+  }
+
+  delay(5);
+  return;
+#endif
+
+#if PHASE_5_TEST_MODE == 3
+  {
+    button_update();
+    led_update();
+
+    /* MPU6050 must be updated in loop() (I2C cannot run inside ISR) */
+    mpu6050_update_filter(0.005f);
+    mpu6050_set_stationary(motion_is_idle());
+
+    /* ToF sensors update (I2C polling, ~100 Hz) */
+    static uint32_t _p55_last_tof_ms = 0;
+    if (millis() - _p55_last_tof_ms >= 10) {
+      _p55_last_tof_ms = millis();
+      distance_manager_update();
+    }
+
+    /* ── BTN_START: drive one cell with wall following ── */
+    if (button_just_pressed(BUTTON_START)) {
+      if (motion_is_cell_moving() || motion_is_turning()) {
+        motion_emergency_stop();
+        LOG_INFO("[P5.5] STOPPED (emergency).");
+      } else {
+        oled_clear();
+        oled_print(0, 0,  "WALL FOLLOW");
+        oled_print(0, 8,  "Starting in 1s...");
+        oled_update();
+        delay(1000);
+        motion_drive_cell();
+        LOG_INFO("[P5.5] Cell drive + wall follow started.");
+      }
+    }
+
+    /* ── Live Tuning State ── */
+    static float _p55_kp = KP_WALL;
+    static float _p55_kd = KD_WALL;
+    static uint8_t _p55_param = 0; // 0=KP, 1=KD
+
+    /* ── Long-press detection for BTN_MODE ──────────────── */
+    static bool _mode_was_pressed = false;
+    static uint32_t _mode_press_start_ms = 0;
+    static bool _mode_long_triggered = false;
+
+    bool mode_down = button_is_pressed(BUTTON_MODE);
+
+    if (mode_down && !_mode_was_pressed) {
+      _mode_was_pressed = true;
+      _mode_press_start_ms = millis();
+      _mode_long_triggered = false;
+    }
+
+    if (mode_down && _mode_was_pressed && !_mode_long_triggered) {
+      if (millis() - _mode_press_start_ms >= 600) {
+        /* LONG PRESS: cycle parameter */
+        _p55_param = (_p55_param + 1) % 2;
+        _mode_long_triggered = true;
+
+        oled_clear();
+        oled_print(0, 0, "Select param:");
+        oled_print(0, 16, _p55_param == 0 ? "KP_WALL" : "KD_WALL");
+        oled_update();
+        led_toggle(LED_STATUS);
+      }
+    }
+
+    if (!mode_down && _mode_was_pressed) {
+      /* Falling edge */
+      if (!_mode_long_triggered && (millis() - _mode_press_start_ms) < 600) {
+        /* SHORT PRESS: increase value or Emergency Stop if moving */
+        if (motion_is_cell_moving() || motion_is_turning()) {
+          motion_emergency_stop();
+          wall_follower_enable(false);
+          LOG_INFO("[P5.5] STOPPED (mode btn).");
+        } else {
+          if (_p55_param == 0) {
+            _p55_kp += 0.001f;
+            if (_p55_kp > 0.050f) _p55_kp = 0.0f; // Wrap around
+          } else {
+            _p55_kd += 0.001f;
+            if (_p55_kd > 0.030f) _p55_kd = 0.0f;
+          }
+          wall_follower_set_gains(_p55_kp, _p55_kd);
+        }
+      }
+      _mode_was_pressed = false;
+    }
+
+    /* ── Live telemetry ── */
+    static uint32_t _p55_last_print_ms = 0;
+    if (millis() - _p55_last_print_ms >= 50) {
+      _p55_last_print_ms = millis();
+
+      float l_dist   = (float)distance_get_mm(TOF_LEFT);
+      float r_dist   = (float)distance_get_mm(TOF_RIGHT);
+      float err      = distance_get_centering_error();
+      float fused_deg = heading_estimator_get() * 57.2958f;
+      bool  moving   = motion_is_cell_moving();
+
+      /* Serial Plotter output */
+      Serial.print(F("LDist:")); Serial.print(l_dist, 0);
+      Serial.print(F(" RDist:")); Serial.print(r_dist, 0);
+      Serial.print(F(" Err:"));   Serial.print(err, 1);
+      Serial.print(F(" H:"));     Serial.print(fused_deg, 1);
+      Serial.print(F(" KP:"));    Serial.print(_p55_kp, 3);
+      Serial.print(F(" KD:"));    Serial.print(_p55_kd, 3);
+      Serial.print(F(" State:")); Serial.println(moving ? F("MOVING") : F("IDLE"));
+
+      /* OLED */
+      if (!_mode_long_triggered || !mode_down) {
+          oled_clear();
+          oled_print(0, 0, moving ? "WALL FOLLOW" : "READY (START)");
+          String e_str = "Err:" + String(err, 1) + "mm";
+          oled_print(0, 8, e_str.c_str());
+
+          String p_str;
+          if (_p55_param == 0) p_str = ">KP:" + String(_p55_kp, 3) + " KD:" + String(_p55_kd, 3);
+          else p_str = " KP:" + String(_p55_kp, 3) + ">KD:" + String(_p55_kd, 3);
+          
+          oled_print(0, 16, p_str.c_str());
+          oled_print(0, 24, "Hold MODE->Switch");
+          oled_update();
+      }
+    }
+  }
+
+  delay(5);
+  return;
+#endif
+
+#if PHASE_5_TEST_MODE == 4
+  {
+    button_update();
+    led_update();
+    mpu6050_update_filter(0.005f);
+    mpu6050_set_stationary(motion_is_idle());
+
+    static uint32_t _p56_last_tof_ms = 0;
+    if (millis() - _p56_last_tof_ms >= 10) {
+      _p56_last_tof_ms = millis();
+      distance_manager_update();
+    }
+
+    if (button_just_pressed(BUTTON_START)) {
+      if (motion_is_cell_moving() || motion_is_turning()) {
+        motion_emergency_stop();
+        wall_follower_enable(false);
+      } else {
+        oled_clear();
+        oled_print(0, 0,  "5 CELLS");
+        oled_print(0, 8,  "Starting 1s...");
+        oled_update();
+        delay(1000);
+        motion_drive_cells(5);
+      }
+    }
+
+    if (button_just_pressed(BUTTON_MODE)) {
+      motion_emergency_stop();
+      wall_follower_enable(false);
+    }
+
+    static uint32_t _p56_last_print_ms = 0;
+    if (millis() - _p56_last_print_ms >= 50) {
+      _p56_last_print_ms = millis();
+      oled_clear();
+      oled_print(0, 0, motion_is_cell_moving() ? "DRIVING..." : "READY: 5 CELLS");
+      oled_print(0, 16, "Press START");
+      oled_update();
+    }
+  }
+  delay(5);
+  return;
+#endif
+
+#if PHASE_5_TEST_MODE == 5
+  {
+    button_update();
+    led_update();
+    mpu6050_update_filter(0.005f);
+    mpu6050_set_stationary(motion_is_idle());
+
+    static uint32_t _p57_last_tof_ms = 0;
+    if (millis() - _p57_last_tof_ms >= 10) {
+      _p57_last_tof_ms = millis();
+      distance_manager_update();
+    }
+
+    static int sequence_step = 0;
+
+    if (button_just_pressed(BUTTON_START) && sequence_step == 0) {
+      oled_clear();
+      oled_print(0, 0,  "L-SHAPE");
+      oled_print(0, 8,  "Starting 1s...");
+      oled_update();
+      delay(1000);
+      sequence_step = 1;
+      motion_drive_cells(1);
+    }
+
+    if (button_just_pressed(BUTTON_MODE)) {
+      motion_emergency_stop();
+      wall_follower_enable(false);
+      sequence_step = 0;
+    }
+
+    if (sequence_step == 1 && motion_is_idle()) {
+      delay(200); // Small pause for stability
+      sequence_step = 2;
+      motion_turn_right_90();
+    } else if (sequence_step == 2 && motion_is_idle()) {
+      delay(200);
+      sequence_step = 3;
+      motion_drive_cells(1);
+    } else if (sequence_step == 3 && motion_is_idle()) {
+      sequence_step = 0; // Done
+    }
+
+    static uint32_t _p57_last_print_ms = 0;
+    if (millis() - _p57_last_print_ms >= 50) {
+      _p57_last_print_ms = millis();
+      oled_clear();
+      if (sequence_step == 0) oled_print(0, 0, "READY: L-SHAPE");
+      else if (sequence_step == 1) oled_print(0, 0, "DRIVING CELL 1");
+      else if (sequence_step == 2) oled_print(0, 0, "TURNING RIGHT");
+      else if (sequence_step == 3) oled_print(0, 0, "DRIVING CELL 2");
+      oled_print(0, 16, "Press START");
+      oled_update();
+    }
+  }
   delay(5);
   return;
 #endif

@@ -132,7 +132,8 @@ static const uint8_t GOAL_CELLS[][2] = {
  *     └─╱────────────────╲── time
  */
 #define JERK_LIMIT_MM_S3       8000.0f   /* mm/s³ — higher = snappier, lower = smoother */
-#define ENABLE_S_CURVE         1         /* set to 0 for basic trapezoidal              */
+#define ENABLE_S_CURVE         0         /* set to 0 for basic trapezoidal              */
+#define MIN_SPEED_MM_S         20.0f     /* minimum speed to prevent starting deadlock  */
 
 /* ─── Turn Tolerance ───────────────────────────────────────────────── */
 #define TURN_TOLERANCE_DEG     2.0f      /* acceptable heading error after a turn (°) */

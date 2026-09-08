@@ -18,6 +18,7 @@
 #include "tof_filter.h"
 #include "vl53l0x.h"
 #include "../config/pin_config.h"
+#include "../config/robot_config.h"
 #include <Arduino.h>
 
 /* ═══════════════════════════════════════════════════════════════════════════
@@ -100,12 +101,15 @@ void distance_manager_init(void)
     _sensors[TOF_RIGHT].xshut_pin     = PIN_TOF_XSHUT_RIGHT;
     _sensors[TOF_RIGHT].i2c_address   = TOF_ADDR_RIGHT;
 
-    /* 2. Initialize filter states (offsets default to 0) */
+    /* 2. Initialize filter states and apply config offsets */
     for (int i = 0; i < TOF_COUNT; i++)
     {
         _filter[i].offset = 0;          /* set before init to preserve offset */
         tof_filter_init(&_filter[i]);
     }
+    distance_set_sensor_offset(TOF_FRONT, TOF_OFFSET_FRONT);
+    distance_set_sensor_offset(TOF_LEFT,  TOF_OFFSET_LEFT);
+    distance_set_sensor_offset(TOF_RIGHT, TOF_OFFSET_RIGHT);
 
     /* 3. Initialize VL53L0X hardware (XSHUT sequencing + I2C address assign) */
     uint8_t count = vl53l0x_init_all(_sensors, TOF_COUNT);

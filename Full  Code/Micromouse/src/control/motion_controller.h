@@ -39,6 +39,13 @@ void motion_controller_init(void);
 void motion_controller_update(void);
 
 /**
+ * @brief Drive a specified number of cells straight.
+ *
+ * @param count Number of cells to drive (e.g. 5 for test 5.6)
+ */
+void motion_drive_cells(int count);
+
+/**
  * @brief Execute a single motion command.
  *
  * @param cmd MotionCommand from the path smoother
@@ -80,5 +87,34 @@ void motion_drive_cell(void);
  * @return true = still driving, false = stopped / idle
  */
 bool motion_is_cell_moving(void);
+
+/* ── Phase 5.4 — 90° Turn Primitives ──────────────────────────────────────── */
+
+/**
+ * @brief Spin right (clockwise) exactly 90° using closed-loop heading control.
+ *
+ * Uses the fused gyro+encoder heading as feedback. Runs entirely in the
+ * 1kHz ISR — no blocking delay. Poll motion_is_turning() to detect completion.
+ *
+ * Tuning: KP_TURN, MAX_TURN_RAD_S, TURN_DONE_RAD in robot_config.h.
+ */
+void motion_turn_right_90(void);
+
+/**
+ * @brief Spin left (counter-clockwise) exactly 90° using closed-loop heading control.
+ *
+ * Mirror of motion_turn_right_90(). Same tuning constants apply.
+ */
+void motion_turn_left_90(void);
+
+/**
+ * @brief Returns true while an in-place turn is in progress.
+ *
+ * Poll this from loop() to detect when the robot has finished turning
+ * and is ready for the next command (e.g., motion_drive_cell).
+ *
+ * @return true = still turning, false = stopped / idle
+ */
+bool motion_is_turning(void);
 
 #endif /* MOTION_CONTROLLER_H */

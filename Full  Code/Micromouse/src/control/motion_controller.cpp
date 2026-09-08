@@ -17,6 +17,11 @@
  *          motion_drive_cell() — resets local pose, starts profile
  *          motion_controller_update() — 1kHz ISR, drives until done
  *
+ *   5.4 — 90° turn primitive (gyro-guided)
+ *          motion_turn_right_90() / motion_turn_left_90()
+ *          P-controller on fused heading: w = −KP_TURN × heading_error
+ *          Stops when |error| < TURN_DONE_RAD (≈2°)
+ *
  * 1kHz ISR pipeline (motion_controller_update):
  *   encoder_get_delta()         -> raw ticks this ms
  *   encoder_update_velocity()   -> EMA-smoothed mm/s
@@ -27,7 +32,7 @@
  *   velocity_controller_update(v, w) -> wheel speeds -> PWM
  *   completion check            -> auto-stop at end of cell
  *
- * KFF=2.4, KP=13.0, KI=2.0 are baked into speed_controller.cpp (Phase 4).
+ * KFF=2.6, KP=5.0, KI=1.0 are baked into speed_controller.cpp (Phase 4).
  */
 
 #include "motion_controller.h"
@@ -38,7 +43,10 @@
 #include "../localization/odometry.h"
 #include "../motion/straight_motion.h"
 #include "../sensors/mpu6050.h"
+#include "../sensors/distance_manager.h"
 #include "velocity_controller.h"
+#include "speed_controller.h"
+#include "wall_follower.h"
 
 /* ── Heading-correction gain (Step 5.1) ──────────────────────────────────
  * Kp = 2.0 rad/s per rad of heading error.
@@ -51,6 +59,8 @@
 
 /* ── Module-level state ───────────────────────────────────────────────── */
 static volatile bool _cell_moving = false;
+static volatile bool _turning = false;
+static volatile float _turn_target_rad = 0.0f;
 
 
 /* ════════════════════════════════════════════════════════════════════════
@@ -60,6 +70,7 @@ static volatile bool _cell_moving = false;
 void motion_controller_init(void) {
   velocity_controller_init();
   odometry_init();
+  wall_follower_init();
   heading_estimator_init();
   straight_motion_stop();
   _cell_moving = false;
@@ -73,17 +84,12 @@ void motion_controller_init(void) {
  * ════════════════════════════════════════════════════════════════════════ */
 
 void motion_controller_update(void) {
-  /* 1. Encoder deltas (raw ticks since last ms) */
-  int32_t l_ticks = encoder_get_delta(ENCODER_LEFT);
-  int32_t r_ticks = encoder_get_delta(ENCODER_RIGHT);
-
-  /* 2. Velocity LPF (EMA-smoothed mm/s for PI controller) */
+  /* 1 & 2 & 3. Velocity LPF & Odometry Update
+   * NOTE: encoder_update_velocity internally reads encoder_get_delta()
+   * and calls odometry_update(). Calling them separately clears the 
+   * deltas, resulting in 0 measured speed!
+   */
   encoder_update_velocity(CONTROL_LOOP_DT_S);
-
-  /* 3. Odometry — integrate X, Y, theta */
-  float l_mm = (float)l_ticks * LEFT_MM_PER_COUNT;
-  float r_mm = (float)r_ticks * RIGHT_MM_PER_COUNT;
-  odometry_update(l_mm, r_mm);
 
   /* 4. Heading fusion (gyro + encoder complementary filter)
    *    NOTE: mpu6050_update_filter() is called from loop() at ~200Hz.
@@ -93,7 +99,37 @@ void motion_controller_update(void) {
   heading_estimator_update(imu.gyro_z_dps, odometry_get_pose().theta_rad,
                            CONTROL_LOOP_DT_S);
 
-  /* 5. Motion control — only when a cell drive is active */
+  /* 5. Motion control state machine */
+
+  /* ── Step 5.4: Turn state (highest priority — overrides cell drive) ──── */
+  if (_turning) {
+    float heading_err = heading_estimator_get() - _turn_target_rad;
+
+    /* Normalize to [-π, π] to handle 0↔360 wrap-around */
+    while (heading_err >  3.14159f) heading_err -= 6.28318f;
+    while (heading_err < -3.14159f) heading_err += 6.28318f;
+
+    if (fabsf(heading_err) > TURN_DONE_RAD) {
+      /* P-controller: negative sign because +error needs -w (CW rotation) */
+      float w = -KP_TURN * heading_err;
+      if (w >  MAX_TURN_RAD_S) w =  MAX_TURN_RAD_S;
+      if (w < -MAX_TURN_RAD_S) w = -MAX_TURN_RAD_S;
+
+      /* Anti-stall: ensure it pushes through the last degree */
+      if (w > 0.0f && w < MIN_TURN_RAD_S) w = MIN_TURN_RAD_S;
+      if (w < 0.0f && w > -MIN_TURN_RAD_S) w = -MIN_TURN_RAD_S;
+
+      velocity_controller_update(0.0f, w);
+    } else {
+      /* Within deadband — declare turn complete */
+      velocity_controller_update(0.0f, 0.0f);
+      speed_controller_reset();
+      _turning = false;
+    }
+    return; /* skip cell drive block */
+  }
+
+  /* ── Step 5.3: Cell drive (only active when not turning) ─────────────── */
   if (!_cell_moving) {
     /* Idle — hold zero velocity (integrators stay cleared) */
     velocity_controller_update(0.0f, 0.0f);
@@ -114,10 +150,18 @@ void motion_controller_update(void) {
   float heading_err = 0.0f - heading_estimator_get();
   float w = KP_HEADING * heading_err;
 
+  /* 5c-ii. Wall following correction (Step 5.5)
+   *   Compute lateral error from side ToF sensors and add PD correction.
+   *   Only active when wall_follower is enabled (both walls or at least one). */
+  float lateral_err = distance_get_centering_error();
+  float wall_w = wall_follower_update(lateral_err, CONTROL_LOOP_DT_S);
+  w += wall_w;
+
   /* 5d. Completion check */
   if (straight_motion_is_complete()) {
     velocity_controller_update(0.0f, 0.0f);
     straight_motion_stop();
+    wall_follower_enable(false); /* disable correction when stopped */
     _cell_moving = false;
     return;
   }
@@ -131,6 +175,10 @@ void motion_controller_update(void) {
  * ════════════════════════════════════════════════════════════════════════ */
 
 void motion_drive_cell(void) {
+  motion_drive_cells(1);
+}
+
+void motion_drive_cells(int count) {
   /* Reset local pose to (0, 0, 0) so X-distance tracks from the current
    * position rather than the accumulated world position.                 */
   Pose zero = {0.0f, 0.0f, 0.0f};
@@ -141,17 +189,16 @@ void motion_drive_cell(void) {
   heading_estimator_init();
 
   /* Start trapezoidal profile:
-   *   distance   = CELL_SIZE_MM  = 180 mm
-   *   start_speed              = 0 mm/s   (from standstill)
+   *   distance   = count * CELL_SIZE_MM
+   *   start_speed              = MIN_SPEED_MM_S (overcome static friction deadlock)
    *   end_speed                = 0 mm/s   (stop cleanly)
    *   max/cruise speed         = SEARCH_MAX_SPEED_MM_S = 300 mm/s
-   *
-   * Profile phases (accel = decel = 1500 mm/s2):
-   *   Accel:  0 -> 300 mm/s over (300^2)/(2*1500) = 30 mm
-   *   Cruise: 300 mm/s for 180 - 30 - 30 = 120 mm
-   *   Decel:  300 -> 0 mm/s over 30 mm
    */
-  straight_motion_start(CELL_SIZE_MM, 0.0f, 0.0f, SEARCH_MAX_SPEED_MM_S);
+  straight_motion_start(count * CELL_SIZE_MM, MIN_SPEED_MM_S, 0.0f, SEARCH_MAX_SPEED_MM_S);
+
+  /* Enable wall following — let ToF sensors centre robot in the corridor */
+  wall_follower_reset();
+  wall_follower_enable(true);
 
   /* Arm the ISR — motion_controller_update() takes over from here */
   _cell_moving = true;
@@ -159,6 +206,31 @@ void motion_drive_cell(void) {
 
 bool motion_is_cell_moving(void) {
   return _cell_moving;
+}
+
+/* ════════════════════════════════════════════════════════════════════════
+ *  Phase 5.4 — 90° Turn Primitives
+ * ════════════════════════════════════════════════════════════════════════ */
+
+void motion_turn_right_90(void) {
+  /* Target = current heading − π/2 − 2° buffer (0.035r) to compensate
+   * for motor deceleration lag at end of turn */
+  mpu6050_set_stationary(false);   /* disable drift correction during turn */
+  _turn_target_rad = heading_estimator_get() - 1.5708f - 0.035f;
+  speed_controller_reset();
+  _turning = true;
+}
+
+void motion_turn_left_90(void) {
+  /* Target = current heading + π/2 + 2° buffer */
+  mpu6050_set_stationary(false);   /* disable drift correction during turn */
+  _turn_target_rad = heading_estimator_get() + 1.5708f + 0.035f;
+  speed_controller_reset();
+  _turning = true;
+}
+
+bool motion_is_turning(void) {
+  return _turning;
 }
 
 /* ════════════════════════════════════════════════════════════════════════
@@ -178,12 +250,13 @@ void motion_execute_command(const MotionCommand *cmd) {
  * ════════════════════════════════════════════════════════════════════════ */
 
 bool motion_is_idle(void) {
-  return !_cell_moving;
+  return !_cell_moving && !_turning;
 }
 
 void motion_emergency_stop(void) {
-  /* Immediately disarm profile and cut motor power */
+  /* Immediately disarm both the cell drive and the turn state */
   _cell_moving = false;
+  _turning     = false;
   straight_motion_stop();
   motor_stop();
 }

@@ -147,6 +147,17 @@
 #define LEFT_WHEEL_DIAMETER_MM 46.9f /* Calibrated via Test 4.3 push test */
 
 /**
+ * [CALIBRATED] Gyro Z-Axis Multiplier (Asymmetric).
+ * The MPU6050 datasheet scaling (65.5 LSB/dps) is sometimes off by 5-10% on
+ * clones. Additionally, cheap clones or weight imbalances can cause asymmetry
+ * between left/right rotations.
+ * - LEFT turn (CCW, positive Z): tuned to 0.60f
+ * - RIGHT turn (CW, negative Z): tuned to 0.60f
+ */
+#define GYRO_MULTIPLIER_LEFT 0.60f
+#define GYRO_MULTIPLIER_RIGHT 0.60f
+
+/**
  * [CALIBRATED] Right wheel effective outer diameter (mm).
  * Same correction as left: 46.9 mm.
  */
@@ -246,8 +257,9 @@
  *   If robot turns 4x90° and ends up short of 360°, actual base is SMALLER.
  *   If it turns too far, actual base is LARGER.
  */
-#define WHEEL_BASE_MM 95.3f /* Tuned via Test 4.4 after fixing wheel diameter  \
-                             */
+#define WHEEL_BASE_MM                                                          \
+  95.3f /* Tuned via Test 4.4 after fixing wheel diameter                      \
+         */
 
 /**
  * Distance from wheel axle to front sensor mounting point (mm).
@@ -363,5 +375,122 @@
 #define SEARCH_DECEL_MM_S2 1500.0f
 
 /** @} */ // end MotionProfile
+
+/* ═══════════════════════════════════════════════════════════════════════════
+ *  Turn Controller Constants (Phase 5.4)
+ * ═══════════════════════════════════════════════════════════════════════════
+ */
+
+/** @defgroup TurnController Gyro-Guided 90° Turn Parameters
+ *  @{
+ */
+
+/**
+ * Maximum angular speed (rad/s) commanded during an in-place turn.
+ * At WHEEL_BASE=95.3mm: each wheel travels at 6.0 × 95.3/2 ≈ 286 mm/s.
+ * This is safely below SEARCH_MAX_SPEED_MM_S so no wheel saturates.
+ * Reduce if turns are too violent or wheels slip.
+ */
+#define MAX_TURN_RAD_S 6.0f
+
+/**
+ * Minimum angular speed (rad/s) commanded during an in-place turn.
+ * Ensures the robot pushes through stiction at the very end of the turn
+ * when the P-controller output gets very small.
+ */
+#define MIN_TURN_RAD_S 1.5f
+
+/**
+ * Proportional gain for the in-place turn heading P-controller.
+ * w = -KP_TURN × heading_error
+ * At 1 rad error: w = 6.0 rad/s → full speed.
+ * At 0.1 rad (~6°): w = 0.6 rad/s → slow crawl to target.
+ * Increase if turns undershoot; decrease if they overshoot.
+ */
+#define KP_TURN 5.0f
+
+/**
+ * Heading deadband to declare a turn complete (radians).
+ * 0.035 rad ≈ 2°. Once |error| < this threshold the turn stops.
+ * Decrease to 0.017 (~1°) for higher precision; risk of oscillation.
+ * Increase to 0.052 (~3°) if robot chatters at end of turn.
+ */
+#define TURN_DONE_RAD 0.035f
+
+/** @} */ // end TurnController
+
+/* ═══════════════════════════════════════════════════════════════════════════
+ *  Wall Follower Constants (Phase 5.5)
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ *  The wall follower uses a PD controller on the lateral centering error
+ *  (mm) from the side ToF sensors, and outputs an angular velocity
+ *  correction (rad/s) added to the heading correction.
+ *
+ *  ── Tuning Guide ──────────────────────────────────────────────────────
+ *
+ *  [CALIBRATE] KP_WALL (Proportional gain)
+ *    Determines how aggressively the robot corrects sideways drift.
+ *    Too low  → slow to centre, robot wanders in wide S-curves.
+ *    Too high → robot oscillates left-right rapidly (steering wobble).
+ *    Start: 0.010.  Typical range: 0.005 – 0.030.
+ *
+ *  [CALIBRATE] KD_WALL (Derivative gain)
+ *    Damps the rate of change of lateral error. Prevents overshoot.
+ *    Too low  → robot overshoots and oscillates.
+ *    Too high → robot feels "sticky" and slow to respond.
+ *    Start: 0.005.  Typical range: 0.002 – 0.015.
+ *
+ *  [CALIBRATE] MAX_WALL_CORRECTION_RAD_S
+ *    Hard clamp on the correction output.  Prevents sharp steer inputs.
+ *    At WHEEL_BASE=95.3mm: 0.5 rad/s → each wheel ±24 mm/s differential.
+ *    Too high → wall correction fights the speed controller.
+ *    Keep below 1.0 rad/s for smooth maze navigation.
+ * ═══════════════════════════════════════════════════════════════════════════
+ */
+
+/** @defgroup WallFollower Wall-Following PD Controller Parameters
+ *  @{
+ */
+
+/**
+ * [CALIBRATE] Proportional gain (rad/s per mm of lateral error).
+ * wall_correction = KP_WALL * centering_error_mm
+ */
+#define KP_WALL 0.010f
+
+/**
+ * [CALIBRATE] Derivative gain (rad/s per mm/s rate of error change).
+ * Damps oscillation caused by Kp.
+ */
+#define KD_WALL 0.005f
+
+/**
+ * [CALIBRATE] Maximum angular velocity correction from wall follower (rad/s).
+ * Keeps the wall correction from overpowering the speed controller.
+ */
+#define MAX_WALL_CORRECTION_RAD_S 0.5f
+
+/** @} */ // end WallFollower
+
+/* ═══════════════════════════════════════════════════════════════════════════
+ *  ToF Sensor Calibration Offsets
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ *  [CALIBRATE] These offsets are added to the raw distance readings in mm.
+ *  If a sensor reads 50mm but the actual distance is 55mm, set offset to +5.
+ *  If a sensor reads 60mm but the actual distance is 55mm, set offset to -5.
+ * ═══════════════════════════════════════════════════════════════════════════
+ */
+
+/** @defgroup ToFOffsets ToF Calibration Offsets
+ *  @{
+ */
+
+#define TOF_OFFSET_FRONT -28
+#define TOF_OFFSET_LEFT -14
+#define TOF_OFFSET_RIGHT -9
+
+/** @} */ // end ToFOffsets
 
 #endif /* ROBOT_CONFIG_H */
