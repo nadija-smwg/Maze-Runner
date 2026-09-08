@@ -38,8 +38,12 @@
  *  @{
  */
 
-/** Minimum plausible distance reading (mm). Below this = sensor error. */
-#define TOF_MIN_DIST_MM         20u
+/** Minimum plausible distance reading (mm). Below this = sensor error.
+ *  Set to 15 (not 20) to give headroom when negative calibration offsets
+ *  are applied before the range check. Prevents valid close-range readings
+ *  from being rejected after offset correction.
+ */
+#define TOF_MIN_DIST_MM         15u
 
 /** Maximum plausible distance reading (mm). Above this = out of range. */
 #define TOF_MAX_DIST_MM         500u
@@ -54,11 +58,11 @@
 
 /**
  * EMA smoothing coefficient.
- * α = 0.30 → 30% new sample, 70% previous filtered value.
- * Increase toward 1.0 for faster response, decrease for more smoothing.
+ * α = 0.20 → 20% new sample, 80% previous filtered value.
+ * Lowered to 0.20 to heavily smooth out noise from the sensors.
  * Recommended range for micromouse: 0.20 – 0.40
  */
-#define TOF_EMA_ALPHA           0.30f
+#define TOF_EMA_ALPHA           0.20f
 
 /** Number of samples in the median ring buffer. Must be 3 (fixed). */
 #define TOF_MEDIAN_SIZE         3u

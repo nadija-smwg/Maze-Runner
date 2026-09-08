@@ -107,9 +107,14 @@ void distance_manager_init(void)
         _filter[i].offset = 0;          /* set before init to preserve offset */
         tof_filter_init(&_filter[i]);
     }
-    distance_set_sensor_offset(TOF_FRONT, TOF_OFFSET_FRONT);
-    distance_set_sensor_offset(TOF_LEFT,  TOF_OFFSET_LEFT);
-    distance_set_sensor_offset(TOF_RIGHT, TOF_OFFSET_RIGHT);
+    /* Apply calibration offsets for all 5 sensors.
+     * Offsets corrected so: filtered = raw + offset ≈ actual distance.
+     * FL/FR offsets start at 0 — calibrate using ruler at 100mm (see robot_config.h). */
+    distance_set_sensor_offset(TOF_FRONT,       TOF_OFFSET_FRONT);
+    distance_set_sensor_offset(TOF_LEFT,        TOF_OFFSET_LEFT);
+    distance_set_sensor_offset(TOF_RIGHT,       TOF_OFFSET_RIGHT);
+    distance_set_sensor_offset(TOF_FRONT_LEFT,  TOF_OFFSET_FRONT_LEFT);   /* Bug B1 fix */
+    distance_set_sensor_offset(TOF_FRONT_RIGHT, TOF_OFFSET_FRONT_RIGHT);  /* Bug B1 fix */
 
     /* 3. Initialize VL53L0X hardware (XSHUT sequencing + I2C address assign) */
     uint8_t count = vl53l0x_init_all(_sensors, TOF_COUNT);
@@ -195,12 +200,11 @@ float distance_get_centering_error(void)
     bool wall_r = distance_has_wall_right();
 
     /*
-     * Target distance from robot center to each side wall.
-     * Standard maze cell = 180 mm. Robot width ≈ 80 mm.
-     * Target clearance ≈ 50 mm on each side.
-     * TODO: Tune TARGET_WALL_DIST_MM based on actual robot width.
+     * Target distance from robot center to each side wall (mm).
+     * Defined in robot_config.h as TARGET_WALL_DIST_MM (default 50mm).
+     * Update if robot width changes or sensor is off-center.
      */
-    const float TARGET_WALL_DIST_MM = 50.0f;
+    const float TARGET = TARGET_WALL_DIST_MM;
 
     if (wall_l && wall_r)
     {
@@ -218,7 +222,7 @@ float distance_get_centering_error(void)
          * Only left wall: error = target - left_dist
          * Positive error → too close to left wall → correct rightward
          */
-        return TARGET_WALL_DIST_MM - (float)_distances_mm[TOF_LEFT];
+        return TARGET - (float)_distances_mm[TOF_LEFT];
     }
     else if (wall_r)
     {
@@ -226,7 +230,7 @@ float distance_get_centering_error(void)
          * Only right wall: error = right_dist - target
          * Negative error → too close to right wall → correct leftward
          */
-        return (float)_distances_mm[TOF_RIGHT] - TARGET_WALL_DIST_MM;
+        return (float)_distances_mm[TOF_RIGHT] - TARGET;
     }
 
     return 0.0f;

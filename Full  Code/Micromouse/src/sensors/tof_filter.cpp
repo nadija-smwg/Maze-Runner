@@ -115,8 +115,27 @@ uint16_t tof_filter_process(ToF_FilterState *s, uint16_t raw)
 {
     if (!s) return 0u;
 
-    /* ── Stage 1: Range validity ──────────────────────────────────────────── */
-    if (raw < TOF_MIN_DIST_MM || raw > TOF_MAX_DIST_MM)
+    /* ── Stage 0: Hardware physical limit ─────────────────────────────────── */
+    /* A VL53L0X physically cannot measure raw photon times < 15mm. 
+     * If the raw value is this small, it is hardware blindness wrap-around.
+     * We MUST reject it before adding positive offsets (like the Right sensor's +12). */
+    if (raw < TOF_MIN_DIST_MM)
+    {
+        s->valid = false;
+        return s->filtered;
+    }
+
+    /* ── Stage 1: Calibration offset ─────────────────────────────────────── */
+    int32_t corrected = (int32_t)raw + (int32_t)s->offset;
+
+    /* Clamp negative or zero values to 1 before range check */
+    if (corrected <= 0)
+        corrected = 1;
+
+    uint16_t cal = (uint16_t)corrected;
+
+    /* ── Stage 2: Range validity ──────────────────────────────────────────── */
+    if (cal < TOF_MIN_DIST_MM || cal > TOF_MAX_DIST_MM)
     {
         s->valid = false;
         /* Hold previous filtered output unchanged */
@@ -125,34 +144,8 @@ uint16_t tof_filter_process(ToF_FilterState *s, uint16_t raw)
 
     s->valid = true;
 
-    /* ── Stage 2: Calibration offset ─────────────────────────────────────── */
-    int32_t corrected = (int32_t)raw + (int32_t)s->offset;
-
-    /* Clamp to valid range after offset */
-    if (corrected < (int32_t)TOF_MIN_DIST_MM)
-        corrected = (int32_t)TOF_MIN_DIST_MM;
-
-    if (corrected > (int32_t)TOF_MAX_DIST_MM)
-        corrected = (int32_t)TOF_MAX_DIST_MM;
-
-    uint16_t cal = (uint16_t)corrected;
-
     /* ── Stage 3: Median-3 filter ─────────────────────────────────────────── */
     uint16_t med = median_update(s, cal);
-
-    /* ── Stage 4: Outlier jump rejection ─────────────────────────────────── */
-    if (s->initialized)
-    {
-        uint16_t jump = (med > s->previous) ?
-                        (med - s->previous) :
-                        (s->previous - med);
-
-        if (jump > TOF_MAX_JUMP_MM)
-        {
-            /* Reject — hold last filtered output */
-            return s->filtered;
-        }
-    }
 
     s->previous = med;
 

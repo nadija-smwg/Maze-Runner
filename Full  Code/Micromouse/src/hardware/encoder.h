@@ -5,17 +5,19 @@
  * Reads N20 motor encoders via STM32 timer encoder mode (no interrupts
  * needed — the timer hardware counts automatically).
  *
- * Hardware configuration:
- *   - Left encoder:  TIM2 (32-bit), PA0 (CH1), PA1 (CH2)
- *   - Right encoder: TIM3 (16-bit), PA6 (CH1), PA7 (CH2)
+ * Hardware configuration (NOTE: L/R timers were physically SWAPPED during wiring):
+ *   - Left encoder:  TIM3 (16-bit), PA6 (CH1), PA7 (CH2), AF2  ← SWAPPED from original
+ *   - Right encoder: TIM2 (32-bit), PA0 (CH1), PA1 (CH2), AF1  ← SWAPPED from original
+ *   - Negation applied in software to correct forward-direction sign.
  *
  * Encoder Mode 3: counts on both rising and falling edges of both
  * channels → 4× resolution (quadrature decoding).
  *
- * Motor specs:
- *   - 7 PPR × 65:1 gear ratio × 4 (quadrature) = 1820 counts/revolution
- *   - Wheel circumference ≈ 106.81 mm
- *   - Resolution ≈ 0.0587 mm/count
+ * Motor specs (MEASURED — not datasheet):
+ *   - 7 PPR × 21:1 gear ratio × 4 (quadrature) ≈ 588 counts/revolution
+ *   - Wheel diameter: 46.9 mm (calibrated push test)
+ *   - Wheel circumference: π × 46.9 ≈ 147.34 mm
+ *   - Resolution: 147.34 / 588 ≈ 0.2534 mm/count
  *
  * Dependencies: pin_config, robot_config
  */

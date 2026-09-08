@@ -357,20 +357,26 @@
 
 /**
  * Search run cruise speed (mm/s).
- * Start at 150, increase in Phase 7 once maze solve is reliable.
+ * Start at 300, increase to 400+ once wall following is reliable.
+ *
+ * NOTE: Also defined in config.h (for maze C files). Keep in sync!
  */
 #define SEARCH_MAX_SPEED_MM_S 300.0f
 
 /**
  * Acceleration rate (mm/s²) — how fast speed ramps UP.
- * At 1500 mm/s²: 0→150 mm/s takes 0.1s over ~7.5mm.
+ * At 1500 mm/s²: 0→300 mm/s takes 0.2s over ~30mm.
  * Reduce if wheels slip on acceleration.
+ *
+ * NOTE: Also defined in config.h. Keep in sync!
  */
 #define SEARCH_ACCEL_MM_S2 1500.0f
 
 /**
  * Deceleration rate (mm/s²) — how fast speed ramps DOWN to stop.
  * Keep equal to or higher than accel for reliable stopping.
+ *
+ * NOTE: Also defined in config.h. Keep in sync!
  */
 #define SEARCH_DECEL_MM_S2 1500.0f
 
@@ -487,9 +493,46 @@
  *  @{
  */
 
-#define TOF_OFFSET_FRONT -28
-#define TOF_OFFSET_LEFT -14
-#define TOF_OFFSET_RIGHT -9
+/**
+ * Front sensor offset (mm). Negative = sensor reads HIGH → subtract.
+ * Calibrated: ruler at 100mm → reading was 128mm → offset = -28. Now adjusted
+ * by +25.
+ */
+#define TOF_OFFSET_FRONT -4
+
+/**
+ * Left side sensor offset (mm).
+ * Calibrated: reads 44 when actual is 50. Offset adjusted by +6.
+ */
+#define TOF_OFFSET_LEFT -12
+
+/**
+ * Right side sensor offset (mm).
+ * Calibrated: reads 29 when actual is 50. Offset adjusted by +21.
+ */
+#define TOF_OFFSET_RIGHT -14
+
+/**
+ * [CALIBRATE] Front-Left diagonal sensor offset (mm).
+ * To calibrate: place ruler exactly 100mm from sensor face.
+ * Read FL value from Serial (Phase 3 mode).
+ * offset = 100 - reading_mm
+ */
+#define TOF_OFFSET_FRONT_LEFT -5
+
+/**
+ * [CALIBRATE] Front-Right diagonal sensor offset (mm).
+ * Same procedure as TOF_OFFSET_FRONT_LEFT.
+ */
+#define TOF_OFFSET_FRONT_RIGHT -6
+
+/**
+ * Target distance from robot center to each side wall (mm).
+ * Standard 180mm cell, ~120mm robot width → clearance ≈ 30mm each side.
+ * Update if your robot width changes or sensor is not at robot center.
+ * Used by distance_get_centering_error() in distance_manager.cpp.
+ */
+#define TARGET_WALL_DIST_MM 30.0f
 
 /** @} */ // end ToFOffsets
 

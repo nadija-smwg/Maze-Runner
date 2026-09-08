@@ -36,11 +36,9 @@
  *   33 000 µs (33 ms) → balanced, moderate noise (~±3 mm typical)
  *   50 000 µs (50 ms) → slowest,  quietest  (~±2 mm typical)
  *
- * For a micromouse running at 100 Hz sensor update rate with 5 sensors
- * all sharing one I2C bus, 33 ms is a reasonable starting point.
- * TODO: Lower to 20 ms if sensor update rate needs to be higher.
+ * Increased to 50ms to help stabilize noisy sensors (like the Left sensor).
  */
-#define TOF_TIMING_BUDGET_US    33000UL
+#define TOF_TIMING_BUDGET_US    50000UL
 
 /** Maximum number of sensors this driver manages. */
 #define MAX_TOF_SENSORS         5
@@ -166,16 +164,25 @@ uint16_t vl53l0x_read_distance_mm(const VL53L0X_Sensor *sensor)
 
     /*
      * RangeStatus meaning (ST API):
-     *   0 = Range valid
-     *   2 = Signal failure (weak return)
-     *   3 = Min range fail
-     *   4 = Phase failure / out of range → library returns 8190
+     *   0 = Range valid                         → always accept
+     *   2 = Signal failure (weak return)        → accept if distance is plausible
+     *   3 = Min range fail (too close)          → accept if distance is plausible
+     *   4 = Phase failure / out of range        → reject (library returns 8190)
      *
-     * We treat status 0 as valid. Any other status → return 8190 so the
-     * tof_filter_process() validity stage rejects the reading and holds
-     * the last good filtered value.
+     * Previously ONLY status 0 was accepted. This caused the Left sensor to
+     * get permanently stuck because at close range (≤ 50mm) it frequently
+     * returns status 2 or 3 — both of which still carry a valid distance.
+     *
+     * Fix: Accept status 0, 2, and 3 when RangeMilliMeter ≤ 300mm.
+     * Reject status 4 and any large distance with a bad status (crosstalk).
      */
     if (measure.RangeStatus == 0)
+        return measure.RangeMilliMeter;
+
+    /* Status 2 or 3: weak signal or min-range — use value if it looks real */
+    if ((measure.RangeStatus == 2 || measure.RangeStatus == 3) &&
+         measure.RangeMilliMeter > 0 &&
+         measure.RangeMilliMeter <= 300u)
         return measure.RangeMilliMeter;
 
     return 8190u;

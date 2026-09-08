@@ -213,18 +213,26 @@ bool motion_is_cell_moving(void) {
  * ════════════════════════════════════════════════════════════════════════ */
 
 void motion_turn_right_90(void) {
-  /* Target = current heading − π/2 − 2° buffer (0.035r) to compensate
-   * for motor deceleration lag at end of turn */
+  /* Target = current heading − π/2.
+   * A small buffer of 0.010 rad (≈0.6°) accounts for control overshoot
+   * and motor deceleration lag. TURN_DONE_RAD deadband = 0.035 rad.
+   * Combined effective accuracy = ⊱2°.
+   * If turns consistently undershoot: tune GYRO_MULTIPLIER_RIGHT in robot_config.h
+   * (formula: new = old × actual_degrees / 90.0).
+   */
   mpu6050_set_stationary(false);   /* disable drift correction during turn */
-  _turn_target_rad = heading_estimator_get() - 1.5708f - 0.035f;
+  _turn_target_rad = heading_estimator_get() - 1.5708f - 0.010f;
   speed_controller_reset();
   _turning = true;
 }
 
 void motion_turn_left_90(void) {
-  /* Target = current heading + π/2 + 2° buffer */
+  /* Target = current heading + π/2.
+   * Same 0.010 rad buffer as right turn.
+   * If turns consistently undershoot: tune GYRO_MULTIPLIER_LEFT in robot_config.h.
+   */
   mpu6050_set_stationary(false);   /* disable drift correction during turn */
-  _turn_target_rad = heading_estimator_get() + 1.5708f + 0.035f;
+  _turn_target_rad = heading_estimator_get() + 1.5708f + 0.010f;
   speed_controller_reset();
   _turning = true;
 }

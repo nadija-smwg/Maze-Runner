@@ -144,4 +144,25 @@ static const uint8_t GOAL_CELLS[][2] = {
  * deceleration and smooth turn entry. More = smoother but more compute. */
 #define LOOK_AHEAD_COMMANDS    3
 
+/* ─── Wall Detection Threshold (Phase 6 Search Run) ───────────────── */
+/*
+ * WALL_THRESHOLD_MM: distance (mm) below which a wall is declared present.
+ *
+ * How to set this value (use Phase 3 sensor test mode):
+ *   Open cell ahead:   front sensor reads ~150-180 mm
+ *   Wall present:      front sensor reads ~20-60  mm
+ *   Side open:         left/right sensor reads ~80-130 mm
+ *   Side wall present: left/right sensor reads ~20-50  mm
+ *
+ * Set to a value between "wall present max" and "open min".
+ * Recommended starting value: 100 mm.
+ * Hysteresis thresholds in distance_manager.h (WALL_ENTER/EXIT_*_MM)
+ * handle the precise on/off logic — this value is for the FSM check
+ * in the flood-fill solver only.
+ *
+ * NOTE: distance_has_wall_front/left/right() already apply hysteresis.
+ * This constant is a backup threshold for direct distance comparisons.
+ */
+#define WALL_THRESHOLD_MM      100       /* mm — tune with Phase 3 readings  */
+
 #endif /* CONFIG_H */

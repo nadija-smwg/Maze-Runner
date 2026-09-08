@@ -58,8 +58,11 @@
 #define PHASE_1_TEST_MODE 0
 #define PHASE_2_TEST_MODE 0
 #define PHASE_3_TEST_MODE 0
-#define PHASE_4_TEST_MODE 0 // ← Step 4.1-300: PI Velocity Tuning @ 300 mm/s
-#define PHASE_5_TEST_MODE 3 // ← 1=Cell drive (5.3)  2=Turn test (5.4)  3=Wall follow (5.5)
+#define PHASE_4_TEST_MODE 0
+// Phase 5 test modes (set >0 to re-activate individual tests):
+// 1=Cell drive (5.3)  2=Turn test (5.4)  3=Wall follow (5.5)
+// 4=Multi-cell (5.6)  5=L-shape sequence (5.7)
+#define PHASE_5_TEST_MODE 0 // ← 0 = Phase 6 LIVE MAZE EXPLORATION
 
 #if PHASE_1_TEST_MODE == 1
 volatile uint32_t phase1_timer_ticks = 0;
@@ -212,6 +215,21 @@ void phase5_timer_callback(void) {
  * Serial shows heading trace compatible with Serial Plotter.
  *
  * Tuning: KP_TURN, MAX_TURN_RAD_S, TURN_DONE_RAD in robot_config.h
+ */
+volatile uint32_t phase5_timer_ticks = 0;
+
+void phase5_timer_callback(void) {
+  phase5_timer_ticks++;
+  motion_controller_update();
+}
+#endif
+
+#if PHASE_5_TEST_MODE == 3 || PHASE_5_TEST_MODE == 4 || PHASE_5_TEST_MODE == 5
+/*
+ * Phase 5 — Step 5.5 / 5.6 / 5.7: Wall following / multi-cell / sequence tests
+ *
+ * Same 1kHz ISR as Mode 1/2 — delegates to motion_controller_update().
+ * ToF sensors and IMU are updated in loop() (I2C cannot run in ISR).
  */
 volatile uint32_t phase5_timer_ticks = 0;
 
@@ -431,8 +449,8 @@ void setup() {
   return;
 #endif
 
-#if PHASE_5_TEST_MODE == 3
-  LOG_INFO("=== PHASE 5 TEST MODE: STEP 5.5 - WALL FOLLOWING ===");
+#if PHASE_5_TEST_MODE == 3 || PHASE_5_TEST_MODE == 4 || PHASE_5_TEST_MODE == 5
+  LOG_INFO("=== PHASE 5 TEST MODE: STEP 5.5 / 5.6 / 5.7 ===");
 
   gpio_init_motor_pins();
   pwm_init();
@@ -462,8 +480,9 @@ void setup() {
 
   motion_controller_init();
 
-  /* 1kHz control loop ISR */
-  timer_init_1khz(phase5_timer_callback);
+  /* 1kHz control loop ISR — same API as all other phases */
+  timer_init(phase5_timer_callback);
+  timer_start();
 
   delay(1000); /* let sensors settle after calibration */
   LOG_INFO("[P5.5] Ready. S=Drive with wall following. M=Stop.");
@@ -1718,8 +1737,8 @@ void loop() {
         oled_print(0, 8,  "Starting in 1s...");
         oled_update();
         delay(1000);
-        motion_drive_cell();
-        LOG_INFO("[P5.5] Cell drive + wall follow started.");
+        motion_drive_cells(5);
+        LOG_INFO("[P5.5] 5-Cell drive + wall follow started.");
       }
     }
 
@@ -1801,7 +1820,7 @@ void loop() {
       if (!_mode_long_triggered || !mode_down) {
           oled_clear();
           oled_print(0, 0, moving ? "WALL FOLLOW" : "READY (START)");
-          String e_str = "Err:" + String(err, 1) + "mm";
+          String e_str = "L:" + String(l_dist, 0) + " R:" + String(r_dist, 0) + " E:" + String(err, 1);
           oled_print(0, 8, e_str.c_str());
 
           String p_str;
@@ -1923,30 +1942,47 @@ void loop() {
   return;
 #endif
 
-  // Watchdog feed (from plan)
-  // feedWatchdog();
+  /* ── Phase 6 / Live Run main loop ──────────────────────────────────
+   *
+   * Execution order (every iteration, ~1ms period):
+   *
+   *  1. button_update()           — capture button edges (FIFO debounce)
+   *  2. mpu6050_update_filter()   — gyro EMA filter (I2C, NOT in ISR)
+   *  3. distance_manager_update() — read all 5 ToF sensors + wall flags
+   *     Rate: ~100 Hz (10ms gate ensures we don't I2C-saturate the bus)
+   *  4. fsm_update()              — state machine:
+   *       IDLE        → wait BTN_START
+   *       SEARCH_RUN  → mission_manager_update() (SENSE→FLOOD→TURN→DRIVE)
+   *       RETURN_START→ mission_manager_update() (return via flood fill)
+   *       FAST_RUN    → mission_manager_update() (Dijkstra command replay)
+   *       ERROR       → motor stop + LED blink
+   *  5. OLED update (inside mission_manager, 10 Hz)
+   * ─────────────────────────────────────────────────────────────────── */
 
-  // Read user inputs
+  /* 1. Button edges */
   button_update();
-  serial_debug_update();
 
-  // Update slow sensors (I2C ToF)
-  sensor_manager_update();
+  /* 2. Gyro filter — must run in loop(), NOT in ISR (I2C not ISR-safe) */
+  mpu6050_update_filter(0.001f);  /* dt = 1ms (loop runs ~1kHz) */
+  mpu6050_set_stationary(motion_is_idle());
 
-  // Run high-level state machine (Exploring, Returning, Speed Run)
-  fsm_update();
-
-  // Update Display based on state
-  if (fsm_get_state() == STATE_IDLE) {
-    if (!menu_update()) {
-      status_screen_draw_main();
-    }
+  /* 3. ToF sensors — all 5 sensors at ~100 Hz
+   *    Uses left/right for wall-follow centering error.
+   *    Uses front for wall detection + flood fill decisions.
+   *    Uses FL/FR diagonals for heading squaring before turns.
+   */
+  static uint32_t _last_tof_ms = 0;
+  if (millis() - _last_tof_ms >= 10) {  /* 10ms = 100 Hz */
+    _last_tof_ms = millis();
+    distance_manager_update();
   }
 
-  // Stall and Battery Checks (from plan)
-  // checkMotorStall();
-  // checkBattery();
+  /* 4. High-level state machine */
+  fsm_update();
 
-  // Small delay to prevent tight loop lockup if needed
+  /* 5. Serial debug (non-blocking) */
+  serial_debug_update();
+
+  /* Small yield — keeps the loop from running faster than sensors update */
   delay(1);
 }
