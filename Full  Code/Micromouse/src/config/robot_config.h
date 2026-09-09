@@ -14,6 +14,8 @@
 #ifndef ROBOT_CONFIG_H
 #define ROBOT_CONFIG_H
 
+#include "config.h"
+
 /* ═══════════════════════════════════════════════════════════════════════════
  *  Motor Specifications — N20 Metal Gear Motor
  * ═══════════════════════════════════════════════════════════════════════════
@@ -355,30 +357,7 @@
  *  @{
  */
 
-/**
- * Search run cruise speed (mm/s).
- * Start at 300, increase to 400+ once wall following is reliable.
- *
- * NOTE: Also defined in config.h (for maze C files). Keep in sync!
- */
-#define SEARCH_MAX_SPEED_MM_S 300.0f
-
-/**
- * Acceleration rate (mm/s²) — how fast speed ramps UP.
- * At 1500 mm/s²: 0→300 mm/s takes 0.2s over ~30mm.
- * Reduce if wheels slip on acceleration.
- *
- * NOTE: Also defined in config.h. Keep in sync!
- */
-#define SEARCH_ACCEL_MM_S2 1500.0f
-
-/**
- * Deceleration rate (mm/s²) — how fast speed ramps DOWN to stop.
- * Keep equal to or higher than accel for reliable stopping.
- *
- * NOTE: Also defined in config.h. Keep in sync!
- */
-#define SEARCH_DECEL_MM_S2 1500.0f
+/* (Motion speed/accel constants are defined in config.h) */
 
 /** @} */ // end MotionProfile
 

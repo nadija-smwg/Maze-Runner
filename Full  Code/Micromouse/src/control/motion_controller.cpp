@@ -246,11 +246,22 @@ bool motion_is_turning(void) {
  * ════════════════════════════════════════════════════════════════════════ */
 
 void motion_execute_command(const MotionCommand *cmd) {
-  /**
-   * TODO (Phase 6):
-   * Switch on cmd->type and delegate to cell_controller or turn_controller.
-   */
-  (void)cmd; /* suppress unused-parameter warning */
+  if (!cmd) return;
+  switch (cmd->type) {
+    case CMD_FORWARD:
+      /* Drive multiple cells in one shot (path smoother groups straights) */
+      motion_drive_cells((cmd->count > 0) ? cmd->count : 1);
+      break;
+    case CMD_TURN_RIGHT:
+      motion_turn_right_90();
+      break;
+    case CMD_TURN_LEFT:
+      motion_turn_left_90();
+      break;
+    default:
+      /* Unknown command — safe no-op */
+      break;
+  }
 }
 
 /* ════════════════════════════════════════════════════════════════════════
